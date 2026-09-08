@@ -11,6 +11,8 @@ permissions:
 jobs:
   cpu:
     runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: ${{ matrix.python }}
     strategy:
       matrix:
         python: ['3.11', '3.12']
@@ -22,7 +24,7 @@ jobs:
         with:
           version: '0.9.30'
           python-version: ${{ matrix.python }}
-      - run: uv sync --locked --extra plot
+      - run: uv sync --locked --extra plot --python '${{ matrix.python }}'
       - run: uv run --locked --extra plot pytest -m 'not gpu'
       - run: uv run --locked ruff check . && uv run --locked ruff format --check .
       - run: uv build

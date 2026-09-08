@@ -181,3 +181,10 @@ def test_cuda_core_parity():
     assert result.status == "converged" and result.residual <= 1e-10
     result, _ = gpu_deflated_cg(sparse.eye(3), np.ones(3), maxiter=0)
     assert result.status == "maxiter"
+    result, _ = gpu_deflated_cg(-sparse.eye(3), np.ones(3), np.eye(3))
+    assert result.status == "breakdown"
+    result, _ = gpu_deflated_cg(
+        sparse.diags([1.0, 100.0]), np.ones(2), np.eye(2), condition_limit=10
+    )
+    assert result.status == "converged"
+    assert result.fallback_reason == "coarse_condition_limit" and result.rank == 0
