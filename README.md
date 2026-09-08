@@ -5,9 +5,10 @@ Control Problems**, by Kadeethum et al. Solve a constrained temperature-tracking
 problem, reuse a full-domain reference space, and inspect the resulting states,
 optimality checks and linear iterations.
 
-The [manuscript](https://github.com/teeratornk/opt_control) contains the analysis
-and broader experiments. This package demonstrates the method on three small
-quadratic problems; it does not reproduce every table in the paper.
+The manuscript contains the analysis and broader experiments. Its
+[sources](https://github.com/teeratornk/opt_control) are maintained separately
+and may require repository access. This package demonstrates the method on
+three small quadratic problems; it does not reproduce every table in the paper.
 
 ## Quickstart
 
