@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "deflation-example"
+version = "0.1.0"
+description = "A small, verified example of reference-space deflation for state-constrained control"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Teeratorn Kadeethum"}]
+dependencies = ["numpy>=1.26,<3", "scipy>=1.13,<2", "threadpoolctl>=3.5,<4", "hydra-core==1.3.2"]
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.8,<4"]
+gpu = ["torch==2.10.0"]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "build>=1.2,<2", "ruff>=0.11,<1"]
+
+[project.scripts]
+deflation-example = "deflation_example.cli:main"
+
+[project.urls]
+Repository = "https://github.com/teeratornk/deflation-example"
+Manuscript = "https://github.com/teeratornk/opt_control"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/deflation_example"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "tools", "examples", "docs", "README.md", "LICENSE", "PROVENANCE.md", "CITATION.cff", "CHANGELOG.md", "pyproject.toml", "uv.lock", ".python-version"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["gpu: requires a CUDA device and the optional PyTorch dependency"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+ignore = ["E741"] # I denotes inactive indices, consistently with the paper.
