@@ -60,18 +60,21 @@ hosted CI has no GPU. Passing CPU CI does not imply that CUDA was exercised.
 The expanded suite passes 93 CPU tests on Python 3.11.14 and 3.12.3 using the
 lockfile. Tests cover integer bounds, extreme load magnitudes, failed-inner-solve
 diagnostics, invalid inputs, kernel substitution, atomic report replacement and
-historical credentials removed from the current tree and sweep-mode rejection
-without metadata files. The historical test uses a synthetic
+credentials removed from the current tree but retained in Git history, and
+sweep-mode rejection without metadata files. The historical test uses a synthetic
 credential in a temporary test repository; no live credential is included.
 
 All nine default CPU queries and all 18 corresponding CUDA kernels passed their
 accuracy checks. CUDA validation used PyTorch 2.10.0 / CUDA 12.8 on an H200, and
 the CUDA regression test includes the extreme-scale and coarse-failure cases.
-The executed numerical source is commit `c92e9d8`. Version 0.1.2 changes release
-packaging only; its numerical implementations are unchanged.
+The executed numerical source is commit `c92e9d8`. Version 0.1.2 changes the
+release workflow and rejects Hydra sweep mode; its numerical implementations
+are unchanged.
 
 A wheel installed outside the checkout ran the thermal CLI and generated plots.
 The unpacked source archive passed all CPU tests in a fresh locked environment.
+These checks were repeated on the downloaded 0.1.2 release assets: all 93 CPU
+tests passed, and both asset hashes matched the locally built distributions.
 Source, reachable Git history, distributions and generated numerical reports were
 checked for credentials and machine-specific information, with no findings.
 This evidence supports the tested contracts and cases; it is not a guarantee of
