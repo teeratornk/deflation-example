@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.1
+
+- Fix state truncation when PDAS receives integer bounds.
+- Prevent false convergence caused by norm underflow or overflow.
+- Recompute failed-solve multipliers and inner residual diagnostics.
+- Reject malformed, complex and nonfinite numerical inputs explicitly.
+- Separate reporting and interchangeable kernel adapters from orchestration.
+- Write reports atomically and independently verify injected kernels.
+- Expand publication checks to Git history, credential formats and unsafe archives.
+
 ## 0.1.0
 
 - Three self-contained quadratic control presets with a reusable reference space.

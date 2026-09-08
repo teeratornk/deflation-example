@@ -6,7 +6,7 @@ Review the file inventory as well. Uses only the Python standard library.
 
 import argparse
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import stat
 import subprocess
@@ -18,48 +18,86 @@ PATTERNS = {
     "private key": r"-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----",
     "GitHub credential": r"(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,})",
     "cloud credential": r"(?:AKIA|ASIA)[A-Z0-9]{16}",
+    "service credential": r"(?:\bsk-(?:proj-|ant-)?[A-Za-z0-9_-]{24,}|\bhf_[A-Za-z0-9]{24,}|\bglpat-[A-Za-z0-9_-]{20,}|\bxox[baprs]-[A-Za-z0-9-]{20,})",
     "credential URL": r"https?://[^\s/@:]+:[^\s/@]+@",
     "user directory": r"/(?:home|Users)/[A-Za-z0-9_.-]+/",
     "cluster directory": r"/(?:scratch|lustre|gpfs)/[A-Za-z0-9_.-]+/",
-    "assigned credential": r"(?i)(?:api[_-]?key|password|secret[_-]?key)\s*[=:]\s*[\"'][A-Za-z0-9/+_=.-]{16,}[\"']",
+    "Windows user directory": r"[A-Za-z]:[/\\]+Users[/\\]+[^/\\\s]+",
+    "private network address": r"(?i)(?:(?:https?|ssh)://|(?:host(?:name)?|server|address)\s*[\"']?\s*[:=]\s*[\"']?)(?:10\.\d{1,3}|192\.168|172\.(?:1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}\b",
+    "assigned credential": r"(?i)(?:api[_-]?key|password|(?:access|auth)[_-]?token|secret(?:[_-]?access)?[_-]?key)[\"']?\s*[=:]\s*[\"'][A-Za-z0-9/+_=.-]{16,}[\"']",
 }
-FORBIDDEN = {".git", ".env", ".venv", "__pycache__", "runs", ".pytest_cache", ".ruff_cache"}
+FORBIDDEN = {
+    ".git",
+    ".env",
+    ".venv",
+    "__pycache__",
+    "runs",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".netrc",
+    ".pypirc",
+    ".npmrc",
+    "id_rsa",
+    "id_ed25519",
+}
 GENERATED_SOURCE = {"build", "dist", "runs", "__pycache__", ".pytest_cache", ".ruff_cache"}
+MAX_FILE_BYTES = 5 * 1024 * 1024
+MAX_ARCHIVE_BYTES = 20 * 1024 * 1024
+MAX_MEMBERS = 2000
 
 
 def inspect_content(name, content):
     """Return rule names only; never return matched text."""
     path = PurePosixPath(name)
     findings = []
-    if path.is_absolute() or ".." in path.parts or "\\" in name:
+    if path.is_absolute() or PureWindowsPath(name).drive or ".." in path.parts or "\\" in name:
         findings.append("unsafe path")
-    if any(p in FORBIDDEN or p.startswith((".venv-", ".env.")) for p in path.parts):
+    if any(p in FORBIDDEN or p.startswith((".venv", ".env.")) for p in path.parts):
         findings.append("private or generated file")
-    if path.suffix.lower() in {".pem", ".key", ".p12", ".pyc", ".out", ".log"}:
+    if path.suffix.lower() in {".pem", ".key", ".p12", ".pyc", ".out", ".log", ".sbatch", ".slurm"}:
         findings.append("unexpected file type")
-    text = content.decode("utf-8", errors="replace")
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return findings + ["unexpected binary content"]
+    if "\0" in text:
+        findings.append("unexpected binary content")
     findings.extend(label for label, pattern in PATTERNS.items() if re.search(pattern, text))
     return findings
 
 
 def members(path):
-    def safe_name(name):
+    seen, total = set(), 0
+
+    def safe_entry(name, size):
+        nonlocal total
         entry = PurePosixPath(name)
-        if entry.is_absolute() or ".." in entry.parts or "\\" in name:
+        if (
+            entry.is_absolute()
+            or PureWindowsPath(name).drive
+            or ".." in entry.parts
+            or "\\" in name
+        ):
             raise ValueError("Archive contains an unsafe path")
+        if entry in seen:
+            raise ValueError("Archive contains duplicate paths")
+        seen.add(entry)
+        total += size
+        if size > MAX_FILE_BYTES or total > MAX_ARCHIVE_BYTES or len(seen) > MAX_MEMBERS:
+            raise ValueError("Archive exceeds this package's review size limits")
 
     if path.suffix == ".whl":
         with zipfile.ZipFile(path) as archive:
             for item in archive.infolist():
-                safe_name(item.filename)
-                if stat.S_ISLNK(item.external_attr >> 16):
-                    raise ValueError("Archive contains a symlink")
+                safe_entry(item.filename, item.file_size)
+                if stat.S_IFMT(item.external_attr >> 16) not in {0, stat.S_IFREG, stat.S_IFDIR}:
+                    raise ValueError("Archive contains a link or special file")
                 if not item.is_dir():
                     yield item.filename, archive.read(item)
     elif path.name.endswith(".tar.gz"):
         with tarfile.open(path) as archive:
             for item in archive.getmembers():
-                safe_name(item.name)
+                safe_entry(item.name, item.size)
                 if item.isdir():
                     continue
                 if not item.isfile():
@@ -70,13 +108,47 @@ def members(path):
         raise ValueError("Expected a wheel or source distribution")
 
 
+def history_records(root):
+    """Inspect unique blobs reachable from all local refs; never execute old code."""
+    if (
+        subprocess.check_output(
+            ["git", "rev-parse", "--is-shallow-repository"], cwd=root, text=True
+        ).strip()
+        != "false"
+    ):
+        raise ValueError("History audit requires a full clone, not a shallow checkout")
+    objects = subprocess.check_output(
+        ["git", "rev-list", "--objects", "--all"], cwd=root, text=True
+    ).splitlines()
+    for record in objects:
+        oid, _, name = record.partition(" ")
+        if not name:
+            continue
+        info = subprocess.check_output(
+            ["git", "cat-file", "--batch-check"], input=oid + "\n", cwd=root, text=True
+        ).split()
+        if info[1] != "blob":
+            continue
+        if int(info[2]) > MAX_FILE_BYTES:
+            raise ValueError("Historical blob exceeds the review size limit")
+        data = subprocess.check_output(["git", "cat-file", "blob", oid], cwd=root)
+        yield f"history/{oid[:12]}/{name}", data
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, help="Git checkout or unpacked source distribution")
+    parser.add_argument(
+        "--history",
+        action="store_true",
+        help="Also scan reachable Git history (full clone required)",
+    )
     parser.add_argument("archives", nargs="*", type=Path)
     args = parser.parse_args()
     if args.source is None and not args.archives:
         parser.error("Specify --source and/or distribution archives")
+    if args.history and (args.source is None or not (args.source / ".git").exists()):
+        parser.error("History audit requires --source pointing to a Git checkout")
     records = []
     if args.source:
         root = args.source.resolve()
@@ -108,7 +180,11 @@ def main():
         for path in paths:
             if path.is_symlink():
                 raise ValueError("Source contains a symlink")
+            if path.stat().st_size > MAX_FILE_BYTES:
+                raise ValueError("Source file exceeds the review size limit")
             records.append((path.relative_to(root).as_posix(), path.read_bytes()))
+        if args.history:
+            records.extend(history_records(root))
     for archive in args.archives:
         records.extend((f"{archive.name}/{name}", data) for name, data in members(archive))
     failed = False

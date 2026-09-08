@@ -9,11 +9,13 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import eigsh
+from .validation import integer, positive_real
 
 
 def laplacian(n, dim=2):
     """Positive Dirichlet Laplacian on the unit square/cube."""
-    if not isinstance(n, (int, np.integer)) or n < 2 or dim not in (2, 3):
+    n = integer(n, "Grid size", 2)
+    if dim not in (2, 3):
         raise ValueError("Use at least two interior nodes per axis and dimension 2 or 3")
     T = sparse.diags([-np.ones(n - 1), 2 * np.ones(n), -np.ones(n - 1)], [-1, 0, 1])
     T *= (n + 1) ** 2
@@ -108,10 +110,9 @@ class Problem:
 
 def build_problem(name="diffusion", n=None, alpha=1e-3):
     """Create a quadratic problem; 'thermal' fixes Ra=100 and gamma=0."""
-    if name not in {"diffusion", "thermal", "cht"}:
+    if not isinstance(name, str) or name not in {"diffusion", "thermal", "cht"}:
         raise ValueError("Problem must be diffusion, thermal or cht")
-    if not np.isfinite(alpha) or alpha <= 0:
-        raise ValueError("Regularization alpha must be positive and finite")
+    alpha = positive_real(alpha, "Regularization")
     dim = 3 if name == "cht" else 2
     n = (12 if dim == 3 else 32) if n is None else n
     L = laplacian(n, dim)
@@ -133,7 +134,11 @@ def build_problem(name="diffusion", n=None, alpha=1e-3):
 
 def sine_modes(n, dim, rank):
     """Low tensor sine modes; stable sorting fixes a choice inside repeated clusters."""
-    if not isinstance(rank, (int, np.integer)) or not 0 <= rank <= n**dim:
+    n = integer(n, "Grid size", 2)
+    if dim not in (2, 3):
+        raise ValueError("Dimension must be 2 or 3")
+    rank = integer(rank, "Reference rank")
+    if rank > n**dim:
         raise ValueError("Reference rank must be an integer between zero and the full dimension")
     mu = 4 * (n + 1) ** 2 * np.sin(np.pi * np.arange(1, n + 1) / (2 * (n + 1))) ** 2
     ordered = np.argsort(sum(np.meshgrid(*([mu] * dim), indexing="ij")).ravel(), kind="stable")[
@@ -154,7 +159,8 @@ def sine_modes(n, dim, rank):
 def reference_modes(problem, rank=20):
     """Build once per sequence: sine modes for diffusion/CHT, eigsh for thermal."""
     N = problem.H.shape[0]
-    if not isinstance(rank, (int, np.integer)) or not 1 <= rank < N:
+    rank = integer(rank, "Reference rank", 1)
+    if rank >= N:
         raise ValueError("Reference rank must be an integer between 1 and N-1")
     if problem.name != "thermal":
         return sine_modes(problem.n, problem.dim, rank)

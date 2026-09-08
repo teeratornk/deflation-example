@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import linalg, sparse
 from scipy.sparse.linalg import LinearOperator, spsolve
+from .validation import integer, matrix, positive_real, real_array
 
 
 @dataclass
@@ -22,20 +23,38 @@ class LinearResult:
     fallback_reason: str | None = None
 
 
+def relative_norm(residual, rhs):
+    """Scale before taking norms; zero loads use an absolute norm.
+
+    Nonfinite arithmetic is a failed check, never a zero residual. Scaling
+    avoids squaring tiny/large loads in the convergence test.
+    """
+    if not np.all(np.isfinite(residual)) or not np.all(np.isfinite(rhs)):
+        return float("inf")
+    scale = float(np.max(np.abs(rhs), initial=0))
+    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+        value = (
+            linalg.norm(residual / scale, check_finite=False)
+            / linalg.norm(rhs / scale, check_finite=False)
+            if scale
+            else linalg.norm(residual, check_finite=False)
+        )
+    return float(value) if np.isfinite(value) else float("inf")
+
+
 def independent_residual(A, x, b):
-    r = np.linalg.norm(b - A @ x)
-    return float(r / np.linalg.norm(b)) if np.linalg.norm(b) else float(r)
+    with np.errstate(over="ignore", invalid="ignore"):
+        return relative_norm(np.asarray(b) - A @ x, np.asarray(b))
 
 
 def orthonormalize(Z, tolerance=1e-12):
     """Rank revealing SVD, including empty and dependent input spaces."""
-    Z = np.asarray(Z, dtype=float)
+    Z = real_array(Z, "Basis")
     if Z.ndim != 2 or not np.all(np.isfinite(Z)):
         raise ValueError("Basis must be a finite two-dimensional array")
-    if not np.isfinite(tolerance) or tolerance <= 0:
-        raise ValueError("Rank tolerance must be positive and finite")
-    if Z.shape[1] == 0:
-        return Z.copy()
+    positive_real(tolerance, "Rank tolerance")
+    if 0 in Z.shape:
+        return Z[:, :0].copy()
     U, s, _ = linalg.svd(Z, full_matrices=False, check_finite=True)
     return U[:, s > tolerance * s[0]] if s[0] else U[:, :0]
 
@@ -58,6 +77,7 @@ def deflated_cg(
     Rank loss and an ill-conditioned coarse matrix lead to explicit truncation or
     ordinary Jacobi-CG, not a pseudoinverse of a singular coarse matrix.
     """
+    A = matrix(A)
     b, x, d = validate_linear_inputs(
         A, b, basis, diagonal, x0, rtol, maxiter, refresh, condition_limit
     )
@@ -70,7 +90,7 @@ def deflated_cg(
         AZ = A @ Z
         E = Z.T @ AZ
         E = (E + E.T) / 2
-        condition = float(np.linalg.cond(E))
+        condition = float(np.linalg.cond(E)) if np.all(np.isfinite(E)) else float("inf")
         if np.isfinite(condition) and condition <= condition_limit:
             try:
                 factor = linalg.cho_factor(E, lower=True)
@@ -92,8 +112,7 @@ def deflated_cg(
 
     x += Q(b - A @ x)
     r = b - A @ x
-    target = rtol * (np.linalg.norm(b) if np.linalg.norm(b) else 1.0)
-    if np.linalg.norm(r) <= target:
+    if relative_norm(r, b) <= rtol:
         return LinearResult(
             x, 0, independent_residual(A, x, b), "converged", rank, condition, fallback
         )
@@ -110,15 +129,15 @@ def deflated_cg(
         x += step * p
         r -= step * Ap
         iterations = k + 1
-        restart = iterations % refresh == 0 or np.linalg.norm(r) <= target
+        restart = iterations % refresh == 0 or relative_norm(r, b) <= rtol
         if restart:
             r = b - A @ x
-            if np.linalg.norm(r) <= target:
+            if relative_norm(r, b) <= rtol:
                 status = "converged"
                 break
             x += Q(r)
             r = b - A @ x
-            if np.linalg.norm(r) <= target:
+            if relative_norm(r, b) <= rtol:
                 status = "converged"
                 break
         z = precondition(r)
@@ -128,29 +147,25 @@ def deflated_cg(
     residual = independent_residual(A, x, b)
     if residual <= rtol:
         status = "converged"
+    elif status == "converged":
+        status = "residual_failed"
     return LinearResult(x, iterations, residual, status, rank, condition, fallback)
 
 
 def validate_linear_inputs(A, b, basis, diagonal, x0, rtol, maxiter, refresh, condition_limit):
     """Shared CPU/GPU input contract; SPD remains a caller requirement."""
-    b = np.asarray(b, dtype=float)
-    if b.ndim != 1 or not np.all(np.isfinite(b)) or A.shape != (b.size, b.size):
+    b = real_array(b, "Right-hand side")
+    if b.ndim != 1 or b.size == 0 or not np.all(np.isfinite(b)) or A.shape != (b.size, b.size):
         raise ValueError(
             "Matrix and finite one-dimensional right-hand side must have compatible shapes"
         )
-    if (
-        not np.isfinite(rtol)
-        or rtol <= 0
-        or not isinstance(maxiter, (int, np.integer))
-        or maxiter < 0
-        or not isinstance(refresh, (int, np.integer))
-        or refresh < 1
-        or not np.isfinite(condition_limit)
-        or condition_limit < 1
-    ):
-        raise ValueError("Invalid convergence controls")
-    x = np.zeros(b.size) if x0 is None else np.asarray(x0, dtype=float).copy()
-    d = np.ones(b.size) if diagonal is None else np.asarray(diagonal, dtype=float)
+    positive_real(rtol, "Relative tolerance")
+    integer(maxiter, "Iteration cap")
+    integer(refresh, "Residual refresh interval", 1)
+    if positive_real(condition_limit, "Coarse condition limit") < 1:
+        raise ValueError("Coarse condition limit must be at least one")
+    x = np.zeros(b.size) if x0 is None else real_array(x0, "Initial state").copy()
+    d = np.ones(b.size) if diagonal is None else real_array(diagonal, "Jacobi diagonal")
     if x.shape != b.shape or not np.all(np.isfinite(x)):
         raise ValueError(
             "Initial state must be finite and have the same shape as the right-hand side"
@@ -158,7 +173,7 @@ def validate_linear_inputs(A, b, basis, diagonal, x0, rtol, maxiter, refresh, co
     if d.shape != b.shape or np.any(d <= 0) or not np.all(np.isfinite(d)):
         raise ValueError("Jacobi diagonal must be positive, finite and have the correct shape")
     if basis is not None:
-        Z = np.asarray(basis)
+        Z = real_array(basis, "Basis")
         if Z.ndim != 2 or Z.shape[0] != b.size or not np.all(np.isfinite(Z)):
             raise ValueError("Basis must be finite with one row per unknown")
     return b, x, d
@@ -184,25 +199,25 @@ def pdas(H, f, bound, initial_active=None, tolerance=1e-9, maxiter=100, linear_s
     The positive scaling c_i=H_ii is fixed during the solve. Cycles and
     unsuccessful inner solves are reported rather than silently accepted.
     """
-    H = sparse.csr_matrix(H)
-    f = np.asarray(f, dtype=float)
+    H = sparse.csr_matrix(matrix(H), dtype=float)
+    f = real_array(f, "PDAS load")
     if f.ndim != 1 or f.size == 0 or not np.all(np.isfinite(f)) or H.shape != (f.size, f.size):
         raise ValueError("PDAS needs a nonempty finite load and a compatible matrix")
     if not np.all(np.isfinite(H.data)) or np.any(H.diagonal() <= 0):
         raise ValueError("PDAS requires a finite SPD matrix")
-    if (
-        not np.isfinite(tolerance)
-        or tolerance <= 0
-        or not isinstance(maxiter, (int, np.integer))
-        or maxiter < 1
-    ):
-        raise ValueError("Invalid PDAS convergence controls")
-    bound = np.broadcast_to(bound, f.shape).copy()
+    positive_real(tolerance, "PDAS tolerance")
+    integer(maxiter, "PDAS iteration cap", 1)
+    bound = np.broadcast_to(real_array(bound, "Bounds"), f.shape).copy()
     if not np.all(np.isfinite(bound)):
         raise ValueError("Bounds must be finite")
-    active = (
-        np.zeros(len(f), dtype=bool) if initial_active is None else np.array(initial_active, bool)
+    raw_mask = (
+        np.zeros(len(f), dtype=bool)
+        if initial_active is None
+        else real_array(initial_active, "Initial mask")
     )
+    if not np.all(np.isin(raw_mask, [0, 1])):
+        raise ValueError("Initial mask must contain only Boolean or zero/one values")
+    active = np.array(raw_mask, dtype=bool)
     if active.shape != f.shape:
         raise ValueError("Initial mask must have one entry per unknown")
     solved_active = active.copy()
@@ -218,7 +233,7 @@ def pdas(H, f, bound, initial_active=None, tolerance=1e-9, maxiter=100, linear_s
         solved_active = active.copy()
         I, J = np.flatnonzero(~active), np.flatnonzero(active)
         y[J] = bound[J]
-        inner_residual, inner_iterations = 0.0, 0
+        inner_residual, inner_iterations, inner_status = 0.0, 0, "converged"
         if len(I):
             HII = H[I][:, I].tocsr()
             rhs = f[I] - H[I][:, J] @ bound[J]
@@ -227,11 +242,15 @@ def pdas(H, f, bound, initial_active=None, tolerance=1e-9, maxiter=100, linear_s
                 inner_residual = independent_residual(HII, y[I], rhs)
             else:
                 result = linear_solver(HII, rhs, I)
-                y[I] = result.x
-                inner_residual, inner_iterations = result.residual, result.iterations
-                if result.status != "converged":
-                    status = "inner_" + result.status
-                    break
+                values = real_array(result.x, "Inner solution")
+                if values.shape != rhs.shape:
+                    raise ValueError("Inner solution must have one entry per inactive unknown")
+                y[I] = values
+                inner_iterations = integer(result.iterations, "Inner iteration count")
+                inner_residual = independent_residual(HII, y[I], rhs)
+                inner_status = result.status
+            if not np.all(np.isfinite(y[I])) or not np.isfinite(inner_residual):
+                inner_status = "nonfinite"
         # Inactive multipliers are imposed as zero, so stationarity is not a
         # tautology that could conceal a failed inactive linear solve.
         multiplier[:] = 0
@@ -245,10 +264,14 @@ def pdas(H, f, bound, initial_active=None, tolerance=1e-9, maxiter=100, linear_s
                 "left": int((active & ~new_active).sum()),
                 "linear_residual": inner_residual,
                 "linear_iterations": inner_iterations,
+                "linear_status": inner_status,
                 **metrics,
             }
         )
-        if max(metrics.values()) <= tolerance:
+        if inner_status != "converged":
+            status = "inner_" + inner_status
+            break
+        if all(np.isfinite(v) and v <= tolerance for v in metrics.values()):
             status = "converged"
             break
         active = new_active
@@ -266,8 +289,18 @@ def pdas(H, f, bound, initial_active=None, tolerance=1e-9, maxiter=100, linear_s
 
 def restricted_normal_operator(A, alpha, inactive):
     """R_I (I + alpha A.T A) R_I.T; never substitute A_II.T A_II."""
-    A = sparse.csr_matrix(A)
-    indices = np.asarray(inactive, dtype=int)
+    A = sparse.csr_matrix(matrix(A), dtype=float)
+    positive_real(alpha, "Regularization")
+    indices = np.asarray(inactive)
+    if indices.ndim != 1 or (indices.size and indices.dtype.kind not in "iu"):
+        raise ValueError("Inactive indices must be a one-dimensional integer array")
+    indices = indices.astype(int)
+    if (
+        np.any(indices < 0)
+        or np.any(indices >= A.shape[1])
+        or len(np.unique(indices)) != len(indices)
+    ):
+        raise ValueError("Inactive indices must be distinct and within the column range")
     AI = A[:, indices]
 
     def apply(v):
@@ -283,10 +316,11 @@ def calibrate_bound(H, target, fraction, steps=12):
     unconstrained maximum has zero activity. Return the best attained fraction;
     discrete/symmetric masks need not realize an arbitrary exact percentage.
     """
-    if not np.isfinite(fraction) or not 0 < fraction < 1 or not isinstance(steps, int) or steps < 1:
+    if positive_real(fraction, "Activity target") >= 1:
         raise ValueError(
             "Activity target must lie in (0,1), with a positive number of calibration steps"
         )
+    integer(steps, "Calibration steps", 1)
     hi = max(float(np.max(spsolve(H, target))), np.finfo(float).eps)
     lo = 0.0
     best = None

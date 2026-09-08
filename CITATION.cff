@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "Please cite the accompanying manuscript and identify the example version when reporting results."
 title: "Deflation example: reference-space reuse for state-constrained control"
 type: software
-version: 0.1.0
+version: 0.1.1
 license: MIT
 authors:
   - family-names: Kadeethum

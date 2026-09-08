@@ -89,7 +89,8 @@ a wall-time speedup, and these examples make no general GPU performance claim.
 ## Python use and verification
 
 See [the short Python example](examples/basic.py) and
-[the review checklist](docs/review.md). To run the CPU tests and style checks:
+[the review checklist](docs/review.md). The [design notes](docs/design.md) explain
+module responsibilities and the tested kernel extension point. To run the CPU tests and style checks:
 
 ```bash
 uv sync --locked --extra plot

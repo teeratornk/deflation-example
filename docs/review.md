@@ -31,6 +31,18 @@ outputs, environment files, unsafe paths and archive links. It prints rule names
 not suspected credential values. Pattern checks cannot prove the absence of every
 possible secret; the release file inventory also needs human review.
 
+In a full Git clone, also scan all reachable historical blobs:
+
+```bash
+uv run --locked python tools/check_release.py --source . --history
+```
+
+The check intentionally accepts text-only release contents and limits individual
+files to 5 MiB and archives to 20 MiB / 2,000 entries. It rejects duplicate paths,
+Windows drive paths, links, special files and oversized members without extracting
+them. History checking refuses shallow clones. Source-archive users can run the
+ordinary source/archive checks without Git.
+
 To exercise the optional implementation on a CUDA device:
 
 ```bash
@@ -62,8 +74,8 @@ The CUDA regression test and all nine default queries also passed with PyTorch
 2.10.0, CUDA 12.8 and an NVIDIA H200. All 18 CUDA kernels (Jacobi and deflated
 for each query) passed fresh CPU residual checks below `1e-10`. The largest
 reported Torch allocation was about 33 MiB; this excludes non-Torch allocations.
-The executed package source was commit `50588d5`. The released solvers and
-benchmark definitions are unchanged from that commit.
+The executed package source was commit `50588d5`. Version 0.1.0's solvers and
+benchmark definitions were unchanged from that commit.
 
 ## Scope
 

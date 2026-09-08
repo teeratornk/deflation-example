@@ -1,77 +1,17 @@
 """A complete small CPU optimization sequence, with optional matched GPU kernels."""
 
 from dataclasses import asdict
-import hashlib
-import importlib.metadata
-import json
+from collections.abc import Mapping
 from pathlib import Path
-import platform
-import subprocess
+import re
 import time
 import numpy as np
-import scipy
-from threadpoolctl import threadpool_info, threadpool_limits
+from threadpoolctl import threadpool_limits
 from .problems import build_problem, reference_modes
-from .solvers import calibrate_bound, deflated_cg, pdas
-
-
-def environment():
-    """Record the installed source, even outside Git or after wheel installation."""
-    source = Path(__file__).resolve().parent
-    head = None
-    candidate = source.parent.parent
-    if (candidate / ".git").exists():
-        try:
-            head = subprocess.check_output(
-                ["git", "rev-parse", "HEAD"], cwd=candidate, text=True, stderr=subprocess.DEVNULL
-            ).strip()
-        except (OSError, subprocess.CalledProcessError):
-            pass
-    blas = [{k: v for k, v in item.items() if k != "filepath"} for item in threadpool_info()]
-    return {
-        "python": platform.python_version(),
-        "system": platform.system(),
-        "machine": platform.machine(),
-        "numpy": np.__version__,
-        "scipy": scipy.__version__,
-        "package": importlib.metadata.version("deflation-example"),
-        "git_head": head,
-        "source_sha256": {
-            p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(source.glob("*.py"))
-        },
-        "blas": blas,
-    }
-
-
-def json_safe(value):
-    """Keep failure records valid JSON without disguising nonfinite quantities."""
-    if isinstance(value, dict):
-        return {k: json_safe(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [json_safe(v) for v in value]
-    if isinstance(value, np.ndarray):
-        return json_safe(value.tolist())
-    if isinstance(value, (float, np.floating)):
-        return float(value) if np.isfinite(value) else None
-    if isinstance(value, (np.integer, np.bool_)):
-        return value.item()
-    return value
-
-
-def write_report(path, report):
-    path.write_text(json.dumps(json_safe(report), indent=2, allow_nan=False) + "\n")
-
-
-def summarize_pdas(result, seconds):
-    return {
-        "status": result["status"],
-        "kkt": result["kkt"],
-        "objective_reduced": result["objective"],
-        "outer_iterations": result["iterations"],
-        "inner_iterations": sum(row["linear_iterations"] for row in result["history"]),
-        "seconds": seconds,
-        "history": result["history"],
-    }
+from .solvers import calibrate_bound, deflated_cg, independent_residual, pdas
+from .reporting import environment, summarize_pdas, write_csv, write_fields, write_report
+from .backends import LinearKernel, default_kernels
+from .validation import integer, real_array
 
 
 def accepted_pdas(result):
@@ -90,14 +30,22 @@ def run_demo(
     plot=False,
     threads=1,
     maxiter=20000,
+    kernels: Mapping[str, LinearKernel] | None = None,
 ):
     """Run in a new directory; numerical failures are saved and return success=False."""
-    if device not in {"cpu", "cuda"} or not isinstance(threads, int) or threads < 1:
+    if not isinstance(device, str) or device not in {"cpu", "cuda"}:
         raise ValueError("Use device cpu/cuda and a positive integer thread count")
-    if not isinstance(maxiter, int) or maxiter < 0:
-        raise ValueError("Iteration cap must be a nonnegative integer")
-    if not isinstance(rank, int) or rank < 1:
-        raise ValueError("Rank must be a positive integer")
+    threads = integer(threads, "Thread count", 1)
+    maxiter = integer(maxiter, "Iteration cap")
+    rank = integer(rank, "Reference rank", 1)
+    if not isinstance(plot, bool):
+        raise ValueError("Plot must be Boolean")
+    kernels = dict(default_kernels(device) if kernels is None else kernels)
+    if not kernels or any(
+        not isinstance(k, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", k) or not callable(v)
+        for k, v in kernels.items()
+    ):
+        raise ValueError("Kernels need nonempty lowercase names and callable implementations")
     if plot:
         try:
             import matplotlib  # noqa: F401
@@ -107,7 +55,6 @@ def run_demo(
         from .gpu import require_cuda
 
         torch = require_cuda()
-        torch.set_num_threads(threads)
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     report = {
@@ -122,6 +69,8 @@ def run_demo(
             "device": device,
             "threads": threads,
             "maxiter": maxiter,
+            "plot": plot,
+            "kernel_backends": list(kernels),
             "angles": [0.0, float(np.pi / 4), float(np.pi / 2)],
             "kkt_tolerance": 1e-9,
             "kernel_rtol": 1e-10,
@@ -209,21 +158,32 @@ def run_demo(
                     b = f[I] - model.H[I][:, J] @ np.full(len(J), bound)
                     if len(I):
                         for label, basis in [("jacobi", None), ("deflated", reference[I])]:
-                            t = time.perf_counter()
-                            result = deflated_cg(B, b, basis, B.diagonal(), maxiter=maxiter)
-                            timing = {"total_seconds": time.perf_counter() - t}
-                            values = asdict(result)
-                            values.pop("x")
-                            row["kernels"][label + "_cpu"] = {**values, **timing}
-                            if device == "cuda":
-                                from .gpu import gpu_deflated_cg
-
-                                result, timing = gpu_deflated_cg(
-                                    B, b, basis, B.diagonal(), maxiter=maxiter
+                            for backend, solve in kernels.items():
+                                result, timing = solve(
+                                    B, b, basis, B.diagonal(), rtol=1e-10, maxiter=maxiter
                                 )
+                                solution = real_array(result.x, "Kernel solution")
+                                if solution.shape != b.shape:
+                                    raise ValueError("Kernel returned an incompatible solution")
                                 values = asdict(result)
                                 values.pop("x")
-                                row["kernels"][label + "_cuda"] = {**values, **timing}
+                                integer(values["iterations"], "Kernel iteration count")
+                                integer(values["rank"], "Kernel rank")
+                                values["residual"] = independent_residual(B, solution, b)
+                                if values["status"] == "converged" and values["residual"] > 1e-10:
+                                    values["status"] = "residual_failed"
+                                if "total_seconds" not in timing or any(
+                                    not isinstance(v, (int, float)) or not np.isfinite(v) or v < 0
+                                    for v in timing.values()
+                                ):
+                                    raise ValueError(
+                                        "Kernel timings must be finite and nonnegative"
+                                    )
+                                if values.keys() & timing.keys():
+                                    raise ValueError(
+                                        "Kernel timing fields must not override solver results"
+                                    )
+                                row["kernels"][label + "_" + backend] = {**values, **timing}
                     else:
                         row["kernel_note"] = "All nodes active: no inactive system to solve"
                 row["kernels_passed"] = all(
@@ -233,7 +193,7 @@ def run_demo(
                     for v in row["kernels"].values()
                 )
                 row["success"] = row["optimization_passed"] and row["kernels_passed"]
-                np.savez_compressed(
+                write_fields(
                     output / f"fields-{index}.npz",
                     desired=f,
                     state=direct["y"],
@@ -274,34 +234,8 @@ def run_demo(
             "type": type(error).__name__,
             "message": "Execution failed; see the command output for details",
         }
-        write_report(output / "results.json", report)
+        try:
+            write_report(output / "results.json", report)
+        except OSError:
+            pass  # Preserve the original failure if the output device also failed.
         raise
-
-
-def write_csv(output, report):
-    import csv
-
-    with (output / "kernels.csv").open("w", newline="") as stream:
-        writer = csv.DictWriter(
-            stream,
-            fieldnames=[
-                "theta",
-                "method",
-                "status",
-                "iterations",
-                "residual",
-                "rank",
-                "total_seconds",
-                "fallback_reason",
-            ],
-        )
-        writer.writeheader()
-        for row in report["cases"]:
-            for method, values in row["kernels"].items():
-                writer.writerow(
-                    {
-                        "theta": row["theta"],
-                        "method": method,
-                        **{k: values[k] for k in writer.fieldnames if k not in {"theta", "method"}},
-                    }
-                )

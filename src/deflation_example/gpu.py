@@ -3,7 +3,9 @@
 import time
 import numpy as np
 from scipy import sparse
+from scipy.linalg import norm
 from .solvers import LinearResult, independent_residual, orthonormalize, validate_linear_inputs
+from .validation import matrix
 
 
 def require_cuda():
@@ -38,7 +40,7 @@ def gpu_deflated_cg(
     CPU residual. It excludes problem assembly, reference construction and PDAS.
     """
     torch = require_cuda()
-    A = sparse.csr_matrix(A)
+    A = sparse.csr_matrix(matrix(A), dtype=float)
     b, initial, d = validate_linear_inputs(
         A, b, basis, diagonal, x0, rtol, maxiter, refresh, condition_limit
     )
@@ -67,7 +69,7 @@ def gpu_deflated_cg(
     if rank:
         E = V.T @ torch.mm(H, V)
         E = (E + E.T) / 2
-        condition = float(torch.linalg.cond(E))
+        condition = float(torch.linalg.cond(E)) if bool(torch.isfinite(E).all()) else float("inf")
         if not np.isfinite(condition) or condition > condition_limit:
             rank, V, fallback = 0, None, "coarse_condition_limit"
         else:
@@ -85,7 +87,13 @@ def gpu_deflated_cg(
         z = r / diag
         return z - Q(apply(z)) if rank else z
 
-    target = rtol * (float(np.linalg.norm(b)) if np.linalg.norm(b) else 1.0)
+    rhs_scale = float(np.max(np.abs(b))) or 1.0
+    rhs_norm = float(norm(b / rhs_scale)) or 1.0
+
+    def small_residual(residual):
+        value = float(torch.linalg.vector_norm(residual / rhs_scale)) / rhs_norm
+        return np.isfinite(value) and value <= rtol
+
     status, iterations = "breakdown" if coarse_failed else "maxiter", 0
     if not coarse_failed:
         x += Q(rhs - apply(x))
@@ -94,7 +102,7 @@ def gpu_deflated_cg(
     setup = time.perf_counter() - start
     solve_start = time.perf_counter()
     if not coarse_failed:
-        if float(torch.linalg.norm(r)) <= target:
+        if small_residual(r):
             status = "converged"
         else:
             z = precondition(r)
@@ -113,15 +121,15 @@ def gpu_deflated_cg(
                 x += step * p
                 r -= step * Ap
                 iterations = k + 1
-                restart = iterations % refresh == 0 or float(torch.linalg.norm(r)) <= target
+                restart = iterations % refresh == 0 or small_residual(r)
                 if restart:
                     r = rhs - apply(x)
-                    if float(torch.linalg.norm(r)) <= target:
+                    if small_residual(r):
                         status = "converged"
                         break
                     x += Q(r)
                     r = rhs - apply(x)
-                    if float(torch.linalg.norm(r)) <= target:
+                    if small_residual(r):
                         status = "converged"
                         break
                 z = precondition(r)
