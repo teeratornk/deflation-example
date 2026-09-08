@@ -103,6 +103,8 @@ CPU execution does not import Torch. After dependencies are installed, neither
 the CLI nor the Python API needs network or Git access. Hydra leaves the working
 directory unchanged and does not save a separate machine-specific configuration
 dump. Output provenance excludes hostnames, user paths and scheduler identifiers.
+Hydra's multirun mode is intentionally disabled because its sweeper writes
+machine-specific metadata. Run additional configurations as separate invocations.
 
 This repository is MIT-licensed. The manuscript has separate rights; see
 [provenance and attribution](PROVENANCE.md). Cite the accompanying paper when

@@ -22,7 +22,7 @@ class DemoConfig:
 
 
 @hydra.main(version_base="1.3", config_path="conf", config_name="config")
-def main(config: DictConfig):
+def run_config(config: DictConfig):
     try:
         checked = OmegaConf.merge(OmegaConf.structured(DemoConfig), config)
         args = OmegaConf.to_container(checked, resolve=True, throw_on_missing=True)
@@ -33,3 +33,18 @@ def main(config: DictConfig):
     print(f"Results: {args['output']}; all checks passed: {report['success']}")
     if not report["success"]:
         raise SystemExit(1)
+
+
+def main():
+    # Hydra's BasicSweeper always writes multirun.yaml, even with output_subdir
+    # disabled. Reject sweep mode before Hydra can persist machine-specific data.
+    if any(
+        arg == "-m" or (arg.startswith("--") and len(arg) > 2 and "--multirun".startswith(arg))
+        for arg in sys.argv[1:]
+    ):
+        print(
+            "Configuration sweeps are not enabled. Run each configuration separately; each run contains three queries.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    return run_config()

@@ -160,6 +160,14 @@ def test_reference_validation():
         reference_modes(build_problem(n=4), 16)
 
 
+@pytest.mark.parametrize("flag", ["-m", "--multirun", "--multi"])
+def test_sweep_mode_cannot_write_machine_metadata(tmp_path, flag):
+    result = cli(tmp_path, flag, "grid=4,5", "rank=2")
+    assert result.returncode == 2
+    assert "not enabled" in result.stderr
+    assert list(tmp_path.iterdir()) == []
+
+
 @pytest.mark.gpu
 def test_cuda_core_parity():
     torch = pytest.importorskip("torch")

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2
+
+- Publish tested distributions as release assets without a duplicate CI artifact upload.
+- Retain all CPU, installation, style and publication checks as release gates.
+- Disable Hydra sweep mode before it can write machine-specific configuration data.
+- Numerical implementations are unchanged from 0.1.1.
+
 ## 0.1.1
 
 - Fix state truncation when PDAS receives integer bounds.

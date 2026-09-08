@@ -55,21 +55,23 @@ CPU CI runs on Python 3.11 and 3.12, builds the distributions, and executes a wh
 from outside the source tree. CUDA tests are marked separately because ordinary
 hosted CI has no GPU. Passing CPU CI does not imply that CUDA was exercised.
 
-## Version 0.1.1 verification
+## Versions 0.1.1–0.1.2 verification
 
-The expanded suite passes 90 CPU tests on Python 3.11.14 and 3.12.3 using the
+The expanded suite passes 93 CPU tests on Python 3.11.14 and 3.12.3 using the
 lockfile. Tests cover integer bounds, extreme load magnitudes, failed-inner-solve
 diagnostics, invalid inputs, kernel substitution, atomic report replacement and
-historical credentials removed from the current tree. The latter uses a synthetic
+historical credentials removed from the current tree and sweep-mode rejection
+without metadata files. The historical test uses a synthetic
 credential in a temporary test repository; no live credential is included.
 
 All nine default CPU queries and all 18 corresponding CUDA kernels passed their
 accuracy checks. CUDA validation used PyTorch 2.10.0 / CUDA 12.8 on an H200, and
 the CUDA regression test includes the extreme-scale and coarse-failure cases.
-The executed numerical source is commit `c92e9d8`.
+The executed numerical source is commit `c92e9d8`. Version 0.1.2 changes release
+packaging only; its numerical implementations are unchanged.
 
 A wheel installed outside the checkout ran the thermal CLI and generated plots.
-The unpacked source archive passed all 90 CPU tests in a fresh locked environment.
+The unpacked source archive passed all CPU tests in a fresh locked environment.
 Source, reachable Git history, distributions and generated numerical reports were
 checked for credentials and machine-specific information, with no findings.
 This evidence supports the tested contracts and cases; it is not a guarantee of

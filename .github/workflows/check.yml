@@ -38,11 +38,6 @@ jobs:
           uv pip install --python "$example_env/venv/bin/python" dist/*.whl
           cd "$example_env"
           "$example_env/venv/bin/deflation-example" grid=8 rank=5 output=run
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: distributions-python-${{ matrix.python }}
-          path: dist/*
-          if-no-files-found: error
   release:
     if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
     needs: cpu
