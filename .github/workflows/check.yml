@@ -55,6 +55,8 @@ jobs:
       - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
         with:
           version: '0.9.30'
+      - name: Check tag against package version
+        run: python3 -c 'import os, tomllib; v = tomllib.load(open("pyproject.toml", "rb"))["project"]["version"]; assert os.environ["GITHUB_REF_NAME"] == "v" + v'
       - run: uv build
       - name: Publish tagged distributions
         env:

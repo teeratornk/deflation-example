@@ -5,6 +5,7 @@ Review the file inventory as well. Uses only the Python standard library.
 """
 
 import argparse
+import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
@@ -23,6 +24,7 @@ PATTERNS = {
     "assigned credential": r"(?i)(?:api[_-]?key|password|secret[_-]?key)\s*[=:]\s*[\"'][A-Za-z0-9/+_=.-]{16,}[\"']",
 }
 FORBIDDEN = {".git", ".env", ".venv", "__pycache__", "runs", ".pytest_cache", ".ruff_cache"}
+GENERATED_SOURCE = {"build", "dist", "runs", "__pycache__", ".pytest_cache", ".ruff_cache"}
 
 
 def inspect_content(name, content):
@@ -41,9 +43,15 @@ def inspect_content(name, content):
 
 
 def members(path):
+    def safe_name(name):
+        entry = PurePosixPath(name)
+        if entry.is_absolute() or ".." in entry.parts or "\\" in name:
+            raise ValueError("Archive contains an unsafe path")
+
     if path.suffix == ".whl":
         with zipfile.ZipFile(path) as archive:
             for item in archive.infolist():
+                safe_name(item.filename)
                 if stat.S_ISLNK(item.external_attr >> 16):
                     raise ValueError("Archive contains a symlink")
                 if not item.is_dir():
@@ -51,6 +59,7 @@ def members(path):
     elif path.name.endswith(".tar.gz"):
         with tarfile.open(path) as archive:
             for item in archive.getmembers():
+                safe_name(item.name)
                 if item.isdir():
                     continue
                 if not item.isfile():
@@ -71,6 +80,8 @@ def main():
     records = []
     if args.source:
         root = args.source.resolve()
+        if not root.is_dir():
+            parser.error("Source must be an existing directory")
         if (root / ".git").exists():
             names = (
                 subprocess.check_output(
@@ -82,7 +93,18 @@ def main():
             )
             paths = [root / p for p in sorted(set(names)) if p]
         else:
-            paths = sorted(p for p in root.rglob("*") if p.is_file() or p.is_symlink())
+            # An unpacked sdist has no Git ignore rules. Match the checkout's
+            # generated-directory exclusions without hiding credential files.
+            paths = []
+            for directory, subdirs, files in os.walk(root):
+                subdirs[:] = [
+                    d for d in subdirs if d not in GENERATED_SOURCE and not d.startswith(".venv")
+                ]
+                paths.extend(Path(directory) / name for name in files)
+                paths.extend(
+                    Path(directory) / d for d in subdirs if (Path(directory) / d).is_symlink()
+                )
+            paths.sort()
         for path in paths:
             if path.is_symlink():
                 raise ValueError("Source contains a symlink")

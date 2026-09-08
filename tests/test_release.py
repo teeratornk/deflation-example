@@ -2,6 +2,7 @@
 
 import importlib.util
 from pathlib import Path
+import zipfile
 import pytest
 
 spec = importlib.util.spec_from_file_location(
@@ -27,8 +28,13 @@ def test_rejects_sensitive_or_unsafe_content(name, content, rule):
     assert rule in guard.inspect_content(name, content)
 
 
-def test_allows_public_links_and_hashes():
+def test_public_content_and_archive_paths(tmp_path):
     assert not guard.inspect_content(
         "README.md", b"https://github.com/teeratornk/deflation-example"
     )
     assert not guard.inspect_content("provenance.json", b"a1b2c3d4" * 8)
+    archive = tmp_path / "unsafe.whl"
+    with zipfile.ZipFile(archive, "w") as stream:
+        stream.writestr("/absolute.txt", "example")
+    with pytest.raises(ValueError, match="unsafe path"):
+        list(guard.members(archive))

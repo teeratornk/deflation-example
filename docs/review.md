@@ -43,6 +43,28 @@ CPU CI runs on Python 3.11 and 3.12, builds the distributions, and executes a wh
 from outside the source tree. CUDA tests are marked separately because ordinary
 hosted CI has no GPU. Passing CPU CI does not imply that CUDA was exercised.
 
+## Version 0.1.0 verification
+
+Linux x86-64 checks on 8 September 2026 passed all 44 CPU tests with Python 3.12.3
+(NumPy 2.5.3, SciPy 1.18.1) and Python 3.11.14 (NumPy 2.4.6, SciPy 1.17.1).
+The unpacked source archive passed the same tests in a fresh uv environment.
+A separately installed wheel ran the Hydra command and generated plots from
+outside the checkout, with no Torch installed and no Git source available.
+
+All nine default CPU queries passed: diffusion and thermal at 32 × 32, and
+CHT at 12 × 12 × 12, each at three angles. The largest deflated-PDAS KKT
+component was below `1.2e-11`, state error against direct PDAS below `1.6e-13`,
+and every independently checked kernel residual below `1e-10`. The documented
+40 × 40 diffusion override with rank 40 and alpha `0.0001` also passed.
+These accuracy results are not performance guarantees for other settings.
+
+The CUDA regression test and all nine default queries also passed with PyTorch
+2.10.0, CUDA 12.8 and an NVIDIA H200. All 18 CUDA kernels (Jacobi and deflated
+for each query) passed fresh CPU residual checks below `1e-10`. The largest
+reported Torch allocation was about 33 MiB; this excludes non-Torch allocations.
+The executed package source was commit `50588d5`. The released solvers and
+benchmark definitions are unchanged from that commit.
+
 ## Scope
 
 The examples are small Cartesian, linear-quadratic control problems. They do not
