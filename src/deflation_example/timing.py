@@ -29,10 +29,12 @@ class PhaseTimer:
     intervals, not isolated device execution times.
     """
 
-    def __init__(self, clock=time.perf_counter):
+    def __init__(self, clock=time.perf_counter, phases=PHASES):
         self.clock = clock
         self.start = self.last = clock()
-        self.components = dict.fromkeys(PHASES, 0.0)
+        self.components = dict.fromkeys(phases, 0.0)
+        if "host_bookkeeping" not in self.components:
+            raise ValueError("Timer phases must include host_bookkeeping")
         self.closed = False
 
     def mark(self, phase):

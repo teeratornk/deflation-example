@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Extend complete CHT sequences to sixteen distinct targets on two grids.
+- Match outer active-set and inner-solution warm starts across GPU solvers.
+- Record complete-sequence cost components, failures and per-target KKT checks.
+- Support right-hand-side-relative AmgX stopping with nonzero initial guesses.
+
 ## 0.2.0
 
 - Add a self-contained GPU-QR/AmgX benchmark with nonoverlapping wall-time components and all repetitions.

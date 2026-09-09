@@ -70,3 +70,58 @@ The CPU-only second command checks a nontrivial restriction bound and compares J
 The ordinary 2D demo intentionally retains its original angles for comparison
 with the manuscript fixtures: 0 and pi/2 repeat one symmetric problem. The
 moving-Gaussian GPU benchmark and all three CHT targets are distinct problems.
+
+## Extended complete CHT protocol
+
+The predeclared configuration is `conf/benchmark_extended.yaml`. It selects
+sixteen targets on each of the `24^3` and `32^3` grids, rank 100, five
+independent repetitions and three matched initialization policies. Run:
+
+```bash
+uv run --no-sync python -m deflation_example.benchmark_extended --cfg job
+uv run --no-sync python -m deflation_example.benchmark_extended output=runs/extended-cht
+```
+
+Each target is a weighted sum of four Gaussians with width 0.12. For
+`t = m/15`, the horizontal rotation is `1.2*t`, the vertical translation is
+`0.035*(2*t-1)`, and the weights are `[1, 0.8+0.15*t, 0.65, 0.45]`.
+Every target has a different unordered set of Gaussian weights. A spatial
+symmetry cannot map one target into another. Exact centers and amplitudes
+are written to `protocol.json` before calibration or timing starts.
+
+The physical bound is calibrated once on grid 24 at `t=0.5`, using eight
+PDAS bisections toward 20% activity. The resulting scalar is fixed on both
+grids and all targets. Each full repetition starts with empty history.
+`cold` uses an empty active set for every target and zero inner guesses.
+`outer` passes the previous accepted active set and keeps zero inner guesses.
+`outer_inner` also passes the previous full state, restricts it to each
+new inactive system, and updates it after every inner solve. Both competitors
+have identical access to their own previously accepted solutions.
+
+The native AmgX convergence rule is `ABSOLUTE` for this experiment.
+The right-hand side and initial solution are divided by the right-hand-side
+norm, and the returned solution is rescaled. This gives RHS-relative
+stopping for every initial guess. The matrix and hierarchy construction
+are unchanged. This uses the documented
+[AmgX absolute residual rule](https://github.com/NVIDIA/AMGX/blob/v2.5.0/src/convergence/absolute.cu)
+and [PyAMGX supplied-initial-guess interface](https://github.com/shwina/pyamgx/blob/master/pyamgx/Solver.pyx).
+Both solvers require an original CPU residual of `1e-10` and every PDAS
+KKT component below `1e-8`. The limits are 10,000 inner and 100 outer steps.
+GPU QR, the `1e-12` numerical-rank threshold, the `1e10` coarse-condition
+limit and the 1,000-iteration residual refresh follow the current method.
+
+Each sequence includes assembly, reference or persistent-resource creation,
+every target, inactive-set update, inner solve, transfer, verification and
+final cleanup. Components partition this whole interval; `remaining_host_work`
+contains callback, loop and report-assembly overhead. Kernel components are
+expanded once in this partition. Calibration, process initialization and
+finalization are separate records. Add these three common costs to a
+sequence total to obtain a single-deployment total. JSON disk writes occur
+between measured sequences. No warmup solve is omitted from these totals.
+
+The benchmark retains every target, including failures. A failed target
+clears warm-start history for the next target. Every sequence has its own
+raw file, hash, target cumulative costs, outer history, inner diagnostics
+and all five final KKT components. Summary medians use independently timed
+complete sequences. The original three-target benchmark remains available
+through `benchmark_sequence` and the version 0.2.0 source.

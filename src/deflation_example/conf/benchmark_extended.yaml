@@ -1,0 +1,26 @@
+defaults:
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+  - _self_
+
+grids: [24, 32]
+targets: 16
+rank: 100
+repeats: 5
+warm_starts: [cold, outer, outer_inner]
+rtol: 1.0e-10
+outer_tolerance: 1.0e-8
+inner_cap: 10000
+outer_cap: 100
+threads: 4
+calibration_grid: 24
+calibration_steps: 8
+calibration_activity: 0.2
+output: runs/extended-cht-${now:%Y%m%d-%H%M%S-%f}
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job:
+    chdir: false

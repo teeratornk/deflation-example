@@ -10,6 +10,7 @@ import numpy as np
 from scipy import linalg, sparse
 from scipy.sparse.linalg import LinearOperator, spsolve
 from .validation import integer, matrix, positive_real, real_array
+from .timing import PhaseTimer
 
 
 @dataclass
@@ -199,6 +200,16 @@ def pdas(H, f, bound, initial_active=None, tolerance=1e-9, maxiter=100, linear_s
     The positive scaling c_i=H_ii is fixed during the solve. Cycles and
     unsuccessful inner solves are reported rather than silently accepted.
     """
+    timer = PhaseTimer(
+        phases=(
+            "preparation",
+            "restriction",
+            "inner_solve",
+            "inner_verification",
+            "kkt_and_update",
+            "host_bookkeeping",
+        )
+    )
     H = sparse.csr_matrix(matrix(H), dtype=float)
     f = real_array(f, "PDAS load")
     if f.ndim != 1 or f.size == 0 or not np.all(np.isfinite(f)) or H.shape != (f.size, f.size):
@@ -224,7 +235,9 @@ def pdas(H, f, bound, initial_active=None, tolerance=1e-9, maxiter=100, linear_s
     seen, history = set(), []
     y, multiplier = bound.copy(), np.zeros(len(f))
     status = "maxiter"
+    timer.mark("preparation")
     for iteration in range(maxiter):
+        timer.mark("host_bookkeeping")
         key = active.tobytes()
         if key in seen:
             status = "cycle"
@@ -237,11 +250,14 @@ def pdas(H, f, bound, initial_active=None, tolerance=1e-9, maxiter=100, linear_s
         if len(I):
             HII = H[I][:, I].tocsr()
             rhs = f[I] - H[I][:, J] @ bound[J]
+            timer.mark("restriction")
             if linear_solver is None:
                 y[I] = spsolve(HII, rhs)
+                timer.mark("inner_solve")
                 inner_residual = independent_residual(HII, y[I], rhs)
             else:
                 result = linear_solver(HII, rhs, I)
+                timer.mark("inner_solve")
                 values = real_array(result.x, "Inner solution")
                 if values.shape != rhs.shape:
                     raise ValueError("Inner solution must have one entry per inactive unknown")
@@ -251,6 +267,9 @@ def pdas(H, f, bound, initial_active=None, tolerance=1e-9, maxiter=100, linear_s
                 inner_status = result.status
             if not np.all(np.isfinite(y[I])) or not np.isfinite(inner_residual):
                 inner_status = "nonfinite"
+            timer.mark("inner_verification")
+        else:
+            timer.mark("restriction")
         # Inactive multipliers are imposed as zero, so stationarity is not a
         # tautology that could conceal a failed inactive linear solve.
         multiplier[:] = 0
@@ -268,6 +287,7 @@ def pdas(H, f, bound, initial_active=None, tolerance=1e-9, maxiter=100, linear_s
                 **metrics,
             }
         )
+        timer.mark("kkt_and_update")
         if inner_status != "converged":
             status = "inner_" + inner_status
             break
@@ -275,7 +295,7 @@ def pdas(H, f, bound, initial_active=None, tolerance=1e-9, maxiter=100, linear_s
             status = "converged"
             break
         active = new_active
-    return {
+    output = {
         "y": y,
         "multiplier": multiplier,
         "active": solved_active,
@@ -285,6 +305,8 @@ def pdas(H, f, bound, initial_active=None, tolerance=1e-9, maxiter=100, linear_s
         "kkt": kkt_metrics(H, f, bound, y, multiplier),
         "objective": float(0.5 * y @ (H @ y) - f @ y),
     }
+    output["timing"] = timer.finish()
+    return output
 
 
 def restricted_normal_operator(A, alpha, inactive):
