@@ -46,7 +46,9 @@ class Records:
 def write_tables(kind, result, output):
     def table(filename, rows, columns):
         with atomic_output(output / filename) as stream:
-            writer = csv.DictWriter(stream, fieldnames=columns, extrasaction="ignore")
+            writer = csv.DictWriter(
+                stream, fieldnames=columns, extrasaction="ignore", lineterminator="\n"
+            )
             writer.writeheader()
             writer.writerows(rows)
 

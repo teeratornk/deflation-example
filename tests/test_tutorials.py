@@ -164,6 +164,7 @@ def test_tutorial_writes_protocol_results_and_csv_and_preserves_existing_output(
     assert report["protocol"]["diffusion"]["grids"] == [4, 6, 12]
     assert len(report["input_sha256"]) == 2
     assert len((folder / "spectral.csv").read_text().splitlines()) == 22
+    assert b"\r" not in (folder / "spectral.csv").read_bytes()
     assert json.loads((folder / "results.json").read_text())["tutorial_version"] == 1
     with pytest.raises(FileExistsError):
         run("spectral", DATA, folder)
