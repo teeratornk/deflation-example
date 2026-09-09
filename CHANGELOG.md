@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+- Add a self-contained GPU-QR/AmgX benchmark with nonoverlapping wall-time components and all repetitions.
+- Compare recreated and persistent AmgX configuration/resources while rebuilding every hierarchy.
+- Include per-call cleanup and independent original residuals in both timing boundaries.
+- Add complete CHT PDAS sequence, restriction-bound and scaled/unscaled Ritz controls.
+- Export checked cumulative instance medians, raw repetition CSV and the timing figure.
+- Clarify quarter-turn repetitions in the default 2D examples.
+
 ## 0.1.2
 
 - Publish tested distributions as release assets without a duplicate CI artifact upload.

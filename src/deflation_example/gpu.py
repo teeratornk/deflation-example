@@ -6,6 +6,7 @@ from scipy import sparse
 from scipy.linalg import norm
 from .solvers import LinearResult, independent_residual, orthonormalize, validate_linear_inputs
 from .validation import matrix
+from .timing import PhaseTimer
 
 
 def require_cuda():
@@ -22,7 +23,19 @@ def require_cuda():
     return torch
 
 
-def gpu_deflated_cg(
+def orthonormalize_gpu(basis, torch, tolerance=1e-12):
+    """Thin QR and SVD of its small factor, with the CPU singular-value cutoff."""
+    if 0 in basis.shape:
+        return basis[:, :0].clone()
+    Q, R = torch.linalg.qr(basis, mode="reduced")
+    U, values, _ = torch.linalg.svd(
+        R, full_matrices=False, driver="gesvd" if R.is_cuda else None
+    )
+    keep = values > tolerance * values[0]
+    return Q if bool(keep.all()) else Q @ U[:, keep]
+
+
+def _gpu_deflated_cg(
     A,
     b,
     basis=None,
@@ -32,22 +45,24 @@ def gpu_deflated_cg(
     maxiter=20000,
     refresh=1000,
     condition_limit=1e10,
+    *, basis_backend, timer, torch,
 ):
     """Return (LinearResult, timing/memory metrics), verified with the CPU matrix.
 
-    The GPU context should be warmed by the caller. Setup includes CPU SVD,
-    transfer and coarse construction. Total includes transfer back and the fresh
-    CPU residual. It excludes problem assembly, reference construction and PDAS.
+    The caller initializes the GPU context. Setup includes the selected CPU-SVD
+    or GPU-QR basis processing, transfer and coarse construction. The public
+    wrapper additionally times return transfer, fresh CPU residual and cleanup.
+    Problem assembly, reference construction and PDAS are outside this kernel.
     """
-    torch = require_cuda()
+    timer.synchronize(torch.cuda.synchronize)
     A = sparse.csr_matrix(matrix(A), dtype=float)
     b, initial, d = validate_linear_inputs(
         A, b, basis, diagonal, x0, rtol, maxiter, refresh, condition_limit
     )
-    torch.cuda.synchronize()
     torch.cuda.reset_peak_memory_stats()
-    start = time.perf_counter()
+    start = timer.start
     baseline = torch.cuda.memory_allocated()
+    timer.mark("conversion")
     H = torch.sparse_csr_tensor(
         torch.tensor(A.indptr, device="cuda"),
         torch.tensor(A.indices, device="cuda"),
@@ -58,9 +73,26 @@ def gpu_deflated_cg(
     rhs = torch.tensor(b, device="cuda", dtype=torch.float64)
     diag = torch.tensor(d, device="cuda", dtype=torch.float64)
     x = torch.tensor(initial, device="cuda", dtype=torch.float64)
-    Z = np.empty((b.size, 0)) if basis is None else orthonormalize(basis)
-    rank = Z.shape[1]
-    V = torch.tensor(Z, device="cuda", dtype=torch.float64) if rank else None
+    timer.mark("upload")
+    timer.synchronize(torch.cuda.synchronize)
+    if basis is None:
+        V = None
+    elif basis_backend == "cpu_svd":
+        Z = orthonormalize(basis)
+        timer.mark("basis_processing")
+        V = torch.tensor(Z, device="cuda", dtype=torch.float64)
+        timer.mark("upload")
+        timer.synchronize(torch.cuda.synchronize)
+    else:
+        V = torch.tensor(basis, device="cuda", dtype=torch.float64)
+        timer.mark("upload")
+        timer.synchronize(torch.cuda.synchronize)
+        V = orthonormalize_gpu(V, torch)
+        timer.mark("basis_processing")
+        timer.synchronize(torch.cuda.synchronize)
+    rank = 0 if V is None else V.shape[1]
+    requested_rank = 0 if basis is None else basis.shape[1]
+    orthogonalized_rank = rank
     condition, fallback, coarse_failed = 1.0, None, False
 
     def apply(v):
@@ -69,12 +101,17 @@ def gpu_deflated_cg(
     if rank:
         E = V.T @ torch.mm(H, V)
         E = (E + E.T) / 2
-        condition = float(torch.linalg.cond(E)) if bool(torch.isfinite(E).all()) else float("inf")
+        eigenvalues = torch.linalg.eigvalsh(E)
+        condition = (float(eigenvalues[-1] / eigenvalues[0])
+                     if bool(torch.isfinite(eigenvalues).all()) and float(eigenvalues[0]) > 0
+                     else float("inf"))
         if not np.isfinite(condition) or condition > condition_limit:
             rank, V, fallback = 0, None, "coarse_condition_limit"
         else:
             chol, info = torch.linalg.cholesky_ex(E)
             coarse_failed = bool(info)
+    timer.mark("coarse_or_hierarchy_setup")
+    timer.synchronize(torch.cuda.synchronize)
 
     def Q(v):
         return (
@@ -98,7 +135,8 @@ def gpu_deflated_cg(
     if not coarse_failed:
         x += Q(rhs - apply(x))
     r = rhs - apply(x)
-    torch.cuda.synchronize()
+    timer.mark("initialization")
+    timer.synchronize(torch.cuda.synchronize)
     setup = time.perf_counter() - start
     solve_start = time.perf_counter()
     if not coarse_failed:
@@ -136,14 +174,18 @@ def gpu_deflated_cg(
                 new_rz = torch.dot(r, z)
                 p = z.clone() if restart else z + (new_rz / rz) * p
                 rz = new_rz
-    torch.cuda.synchronize()
+    timer.mark("iteration")
+    timer.synchronize(torch.cuda.synchronize)
     solve = time.perf_counter() - solve_start
     x_cpu = x.cpu().numpy()
+    timer.mark("download")
+    timer.synchronize(torch.cuda.synchronize)
     residual = independent_residual(A, x_cpu, b)
     if residual <= rtol and not coarse_failed:
         status = "converged"
     elif status == "converged":
         status = "residual_failed"
+    timer.mark("verification")
     total = time.perf_counter() - start
     return LinearResult(x_cpu, iterations, residual, status, rank, condition, fallback), {
         "setup_seconds": setup,
@@ -152,4 +194,37 @@ def gpu_deflated_cg(
         "total_seconds": total,
         "peak_torch_bytes": torch.cuda.max_memory_allocated(),
         "baseline_torch_bytes": baseline,
+        "requested_rank": requested_rank,
+        "orthogonalized_rank": orthogonalized_rank,
+        "basis_backend": basis_backend,
     }
+
+
+def gpu_deflated_cg(
+    A, b, basis=None, diagonal=None, x0=None, rtol=1e-10, maxiter=20000,
+    refresh=1000, condition_limit=1e10, *, basis_backend="cpu_svd",
+):
+    """Verified CUDA solve, including conversion, transfers and temporary cleanup.
+
+    Runtime initialization is the caller's responsibility. Components partition
+    the complete call after runtime availability is checked. Explicit barriers
+    are separate from asynchronous stage times. PyTorch's allocator remains
+    cached; cleanup releases this solve's tensors, not the shared runtime.
+    """
+    if basis_backend not in {"cpu_svd", "gpu_qr"}:
+        raise ValueError("Basis backend must be cpu_svd or gpu_qr")
+    torch = require_cuda()
+    timer = PhaseTimer()
+    result, metrics = _gpu_deflated_cg(
+        A, b, basis, diagonal, x0, rtol, maxiter, refresh, condition_limit,
+        basis_backend=basis_backend, timer=timer, torch=torch,
+    )
+    # Returning from the helper releases its temporary GPU tensors. The
+    # returned solution owns CPU storage only. No empty_cache() is charged.
+    timer.mark("cleanup")
+    timer.synchronize(torch.cuda.synchronize)
+    metrics.update(timer.finish())
+    metrics["return_and_verify_seconds"] = (
+        metrics["total_seconds"] - metrics["setup_seconds"] - metrics["solve_seconds"]
+    )
+    return result, metrics

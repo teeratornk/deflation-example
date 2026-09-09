@@ -17,7 +17,7 @@ from threadpoolctl import threadpool_info
 def environment():
     """Record the installed source, even outside Git or after wheel installation."""
     source = Path(__file__).resolve().parent
-    head = None
+    head, source_tree_clean = None, None
     candidate = source.parent.parent
     if (candidate / ".git").exists():
         try:
@@ -28,6 +28,10 @@ def environment():
                 stderr=subprocess.DEVNULL,
                 timeout=2,
             ).strip()
+            source_tree_clean = not bool(subprocess.check_output(
+                ["git", "status", "--porcelain", "--", "src"], cwd=candidate,
+                text=True, stderr=subprocess.DEVNULL, timeout=2,
+            ).strip())
         except (OSError, subprocess.SubprocessError):
             pass
     fields = {
@@ -40,14 +44,20 @@ def environment():
         "architecture",
     }
     blas = [{k: v for k, v in item.items() if k in fields} for item in threadpool_info()]
+    try:
+        package_version = importlib.metadata.version("deflation-example")
+    except importlib.metadata.PackageNotFoundError:
+        from . import __version__
+        package_version = __version__
     return {
         "python": platform.python_version(),
         "system": platform.system(),
         "machine": platform.machine(),
         "numpy": np.__version__,
         "scipy": scipy.__version__,
-        "package": importlib.metadata.version("deflation-example"),
+        "package": package_version,
         "git_head": head,
+        "source_tree_clean": source_tree_clean,
         "source_sha256": {
             p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(source.glob("*.py"))
         },

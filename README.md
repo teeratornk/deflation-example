@@ -26,6 +26,10 @@ subsequent runs reuse the environment. Python 3.11 is also supported. Omit
 `--extra plot` and `plot=true` for a smaller, numerical-only installation.
 
 The three queries rotate a four-source desired state through 0, pi/4 and pi/2.
+For diffusion and frozen thermal, the equal-weight target is quarter-turn
+symmetric: the first and last queries repeat the same optimization problem.
+There are two distinct 2D problems and three solves per preset; the CHT
+targets have different source heights and give three distinct problems.
 The program solves each optimization problem twice: with direct linear solves
 and with deflated CG. It then compares linear kernels on the same verified mask.
 Outputs in the new directory are:
@@ -86,6 +90,11 @@ CPU matrix. Missing CUDA is an error, not a silent fallback to CPU execution.
 Timings include GPU setup and transfers; reference construction is reported
 separately. Small problems can be faster on the CPU. Iteration reduction is not
 a wall-time speedup, and these examples make no general GPU performance claim.
+
+For the manuscript timing comparison, use the separate
+[GPU benchmark](docs/gpu-benchmark.md). It includes GPU QR, AmgX with fresh
+and persistent resources, all repetitions, itemized timing and plot generation.
+It also supplies complete CHT PDAS sequence and scaled-Ritz controls.
 
 ## Python use and verification
 

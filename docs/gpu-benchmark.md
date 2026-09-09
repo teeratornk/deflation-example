@@ -1,0 +1,72 @@
+# Matched GPU benchmark
+
+This self-contained benchmark generates the six Laplacian inactive systems used in the manuscript GPU comparison. It needs no manuscript checkout, stored matrix or private dataset. It includes the GPU-QR variant, CPU-SVD/GPU control, exact AmgX configuration, resource-lifetime controls and every timed repetition.
+
+## Installation
+
+Use Linux, an NVIDIA GPU, a compatible driver and the locked Python environment:
+
+```bash
+uv sync --locked --extra gpu --extra plot
+```
+
+AmgX and its Python binding are optional native dependencies, not Python packages supplied by this repository. The measurements use AmgX **2.5.0**, PyAMGX reporting **0.1**, PyTorch 2.10.0, CUDA 12.8 and an H200. Build [NVIDIA AmgX](https://github.com/NVIDIA/AMGX/tree/v2.5.0) using the upstream CMake instructions; a single-GPU build can use `CMAKE_NO_MPI=ON`. The public v2.5.0 tag resolves to `cc1cebdbb32b14d33762d4ddabcb2e23c1669f47`. Set `AMGX_DIR` and, if needed, `AMGX_BUILD_DIR`, then build [PyAMGX](https://pyamgx.readthedocs.io/en/latest/install.html) against that library in this environment. Its build requires Cython and SciPy. Record the binding checkout commit when rebuilding: the measured installation reports a version and binary hash, but does not retain its original checkout commit.
+
+After manually installing the binding, use `uv run --no-sync` so uv does not remove the additional native package. Check availability and execute the CUDA tests before measuring:
+
+```bash
+uv run --no-sync python -c 'import torch, pyamgx; assert torch.cuda.is_available()'
+uv run --no-sync pytest -m gpu
+uv run --no-sync python -m deflation_example.benchmark_gpu 'grids=[8]' rank=3 repeats=1 include_cpu=false output=runs/gpu-smoke
+uv run --no-sync python -m deflation_example.benchmark_gpu output=runs/gpu-benchmark
+uv run --no-sync python -m deflation_example.benchmark_report runs/gpu-benchmark/results.json --output runs/gpu-figures --plot
+```
+
+Hydra overrides include `grids`, `rank`, odd `repeats`, `threads` and `include_cpu`. `--cfg job` prints the configuration without CUDA. Output directories must be new. The report command validates every accepted repetition, exports `repetitions.csv` and `cumulative.json`, and optionally plots `cumulative.pdf`. Timings will vary across hardware, builds and runs.
+
+## Problem and acceptance
+
+Each grid has three moving-Gaussian targets at angles 0, 0.35 and 0.7 radians. The normal matrix is `I + 0.001 L.T L`. The bound is calibrated once with eight PDAS bisections, then held fixed. CPU PDAS must meet a normalized KKT tolerance of `1e-8`. Each method receives the same CPU CSR inactive matrix, right-hand side and zero initial guess. Every timed result must meet a newly computed original CPU residual of `1e-10`; AmgX must also report native success. Five repetitions use rotating method order, following one recorded warmup per method and grid. The deflated and AmgX iteration limits are 10,000; the single-run Jacobi control allows 20,000.
+
+The 100 reference columns are analytical tensor sine modes sorted by discrete Laplacian eigenvalue. GPU basis processing uses thin QR followed by an SVD of the small triangular factor. Singular values below `1e-12` times the largest are discarded. A coarse condition above `1e10` causes rank-zero fallback. The record separates requested, orthogonalized and deployed ranks. Cholesky is used only for an accepted SPD coarse matrix. Residual refresh and restart occur every 1,000 iterations or when the recurrence first meets the target.
+
+## Ownership and timing
+
+`amgx.py` contains the complete configuration. Both AmgX controls create a new matrix, two vectors, solver and hierarchy for every inactive system. The persistent control retains **only Config and Resources** across a grid. It does not reuse a hierarchy, matrix sparsity pattern or solver handle. All owned handles are destroyed, including on failure. Resource startup and final cleanup are timed separately for the persistent session. AmgX library initialization/finalization occur once per process.
+
+The measured kernel starts with CPU inputs and ends after the solution is returned, independently verified and temporary objects released. Its nonoverlapping components are:
+
+| Component | Work included |
+|---|---|
+| Conversion | Validation, CSR/index conversion, RHS and diagonal preparation |
+| Resource creation | AmgX Config/Resources when not persistent |
+| Handle creation | AmgX matrix, vectors and solver |
+| Upload | Matrix, vectors and basis host-to-device copies |
+| Basis processing | CPU SVD or GPU thin QR plus small-factor SVD |
+| Coarse/hierarchy setup | Deflation coarse assembly/condition/factor or AmgX hierarchy |
+| Initialization | Initial deflation correction and search-direction preparation |
+| Iteration | Krylov loop, including its recurrence checks and internal residual refresh |
+| Download | Return of the solution to CPU |
+| Verification | Independent original CPU residual and native-status query |
+| Cleanup | Per-call tensor or handle destruction |
+| Synchronization | Time spent in explicit CUDA barriers |
+| Host bookkeeping | Remaining measured host intervals |
+
+The components sum to `total_seconds`. They partition wall time, not device-kernel duration: implicit synchronization inside a library call belongs to that call, and explicit barrier waiting is listed separately. Do not add the legacy `setup_seconds`/`solve_seconds` aggregations to these components. PyTorch keeps its allocator cache and AmgX keeps process-level library state; neither method is charged a full runtime reset after each matrix.
+
+Matrix extraction, basis restriction, reference construction, warmups, persistent-session startup/cleanup and process initialization are explicit separate records. Cumulative curves add matrix extraction to all methods, basis restriction and reference construction to deflation, and one warmup per method. Persistent resource creation/destruction are charged once to each plotted prefix. Shared runtime initialization and the CPU optimization that determines the masks are outside these kernel-sequence curves. The curves are **sums of instance medians**, not independently repeated complete-sequence measurements.
+
+## Complete optimization and mathematical controls
+
+```bash
+uv run --no-sync python -m deflation_example.benchmark_sequence --output runs/cht-sequences
+uv run --locked --no-dev python -m deflation_example.benchmark_structure --output runs/structure
+```
+
+The first command compares rank-100 deflated PDAS with persistent-resource AmgX PDAS on a `24^3` heterogeneous CHT grid. Five complete three-target sequences are independently repeated per method. Each measured sequence includes assembly, reference/resource creation, every inactive-set update and inner solve, transfers, verification and cleanup. Both methods use the same outer criterion. Common bound calibration and process initialization are reported separately. All outer histories and inner failures are retained. These totals are not reconstructed from per-instance medians.
+
+The CPU-only second command checks a nontrivial restriction bound and compares Jacobi-scaled with unscaled Ritz selection on the same rank-300 CHT candidate space, retaining rank 100. It records every selection-inclusive repetition, effective rank and original residual. The controlled bound example uses unscaled coordinates throughout; it is an algebraic SPD example, not an additional PDE validation case.
+
+The ordinary 2D demo intentionally retains its original angles for comparison
+with the manuscript fixtures: 0 and pi/2 repeat one symmetric problem. The
+moving-Gaussian GPU benchmark and all three CHT targets are distinct problems.
