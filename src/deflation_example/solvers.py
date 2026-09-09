@@ -70,6 +70,7 @@ def deflated_cg(
     maxiter=20000,
     refresh=1000,
     condition_limit=1e10,
+    direction_callback=None,
 ):
     """Coarse-corrected, projected-direction CG (exact-coarse A-DEF2).
 
@@ -79,6 +80,8 @@ def deflated_cg(
     ordinary Jacobi-CG, not a pseudoinverse of a singular coarse matrix.
     """
     A = matrix(A)
+    if direction_callback is not None and not callable(direction_callback):
+        raise ValueError("Direction callback must be callable")
     b, x, d = validate_linear_inputs(
         A, b, basis, diagonal, x0, rtol, maxiter, refresh, condition_limit
     )
@@ -121,6 +124,8 @@ def deflated_cg(
     p, rz = z.copy(), float(r @ z)
     status, iterations = "maxiter", 0
     for k in range(maxiter):
+        if direction_callback is not None:
+            direction_callback(p.copy())
         Ap = A @ p
         curvature = float(p @ Ap)
         if curvature <= 0 or rz <= 0 or not np.isfinite(curvature + rz):

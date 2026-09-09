@@ -125,3 +125,56 @@ raw file, hash, target cumulative costs, outer history, inner diagnostics
 and all five final KKT components. Summary medians use independently timed
 complete sequences. The original three-target benchmark remains available
 through `benchmark_sequence` and the version 0.2.0 source.
+
+## Matrix-free rank controls
+
+```bash
+uv run --no-sync python -m deflation_example.benchmark_matrix_free --output runs/matrix-free
+```
+
+The fixed protocol uses grids 32, 64, 102 and 128 with ranks 0, 20 and 200,
+one run per pair, a 10,000-iteration cap and residual tolerance `1e-10`.
+Every rank receives the same supplied inactive slab, random manufactured
+solution, right-hand side and zero initial guess. Hashes verify these matches.
+The normal operator uses full-domain stencil applications and zero extension.
+An independently assembled CPU Laplacian and its transpose verify the final
+original residual at every size. The GPU residual is also recomputed.
+Rank zero uses Jacobi-CG. All ranks use the current projected-direction
+recurrence, residual refresh and rank/conditioning safeguards. Failed and
+capped runs remain in `results.json`.
+
+The total includes operator/basis construction, QR, coarse setup, iteration,
+return transfer, independent CPU verification and cleanup. Initialization is
+separate. GPU memory is the per-run PyTorch allocator peak. Host RSS is the
+process high-water mark and can include an earlier run's allocation. These
+are manufactured kernel tests with prescribed masks.
+
+## PDE separation and previous-system recycling
+
+```bash
+uv run --locked python -m deflation_example.benchmark_controls --output runs/controls
+```
+
+This command writes its protocol before calculations. The PDE example uses
+`I + 0.001 L.T L`, one reference mode, grids 4, 6 and 12, and corner squares
+of widths 1, 2 and 3. It reports the sufficient bound and actual angle in
+unscaled coordinates, including inconclusive cases. These masks are prescribed.
+
+The recycling control uses seven distinct targets in each of diffusion at
+`16^2`, frozen thermal at `16^2`, and CHT at `8^3`. CPU PDAS supplies each
+fixed inactive system. Both methods use the same projected-direction CG,
+zero initial guesses and residual acceptance. Three independently repeated
+kernel sequences include all solver calls. The first target uses rank zero
+for both methods. The history control retains up to 100 latest CG search
+directions, orthonormalizes them, and retains their 20 lowest previous-system
+Ritz directions. It embeds them by zero extension and restricts them to the
+next inactive set. Each pair uses the smaller of 20 and the transferred
+numerical rank. Any additional coarse-condition fallback is explicitly
+recorded and marks the pair's deployed ranks as unmatched.
+
+Timing includes transfer, every CG call and construction of the next history
+space. Reference construction is charged once to fixed-reference reuse.
+Calibration and common PDAS mask construction are separate. These costs are
+sums of measured kernels within each repeated control sequence; they exclude
+complete optimization. A failed kernel clears the retained history. All
+attempts remain visible. The comparison tests this bounded-history policy.
