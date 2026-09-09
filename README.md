@@ -102,6 +102,23 @@ starts, scaled-Ritz and history controls, and ranks 0, 20 and 200 through
 The CPU quickstart and installed wheel remain small; full evidence records
 are included in the repository and source distribution.
 
+## Diagnostic tutorials
+
+Three CPU-only tutorials reproduce the mathematical and verification examples
+and summarize the stored performance comparisons:
+
+- [Spectral diagnostics](docs/tutorials/spectral.md): rank loss, cluster cutoffs,
+  eigenvalue crossing, controlled SPD restrictions and diffusion angle bounds.
+- [Accuracy and stopping](docs/tutorials/verification.md): active-set release,
+  original residuals, objective versus stationarity and all CHT stopping protocols.
+- [Reuse costs](docs/tutorials/costs.md): resource persistence, preparation costs,
+  rank/memory and the specified last-window recycling policy.
+
+Each tutorial writes a fixed protocol, source/environment identifiers,
+input hashes, complete numerical results and compact CSV summaries. These
+version-1 tutorials are provided in the source revision linked by the manuscript;
+the published v0.3.0 distributions retain their original contents.
+
 ## Python use and verification
 
 See [the short Python example](examples/basic.py) and

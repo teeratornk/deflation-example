@@ -1,5 +1,12 @@
 # Changelog
 
+## Diagnostic tutorials, version 1
+
+- Add runnable spectral, accuracy/stopping and cost tutorials with fixed protocols.
+- Reconstruct controlled diffusion bounds and retain every secondary method and status.
+- Export source/environment identifiers, raw-input hashes and compact CSV summaries.
+- Preserve the benchmark solver implementations and all original measurement records.
+
 ## 0.3.0
 
 - Extend complete CHT sequences to sixteen distinct targets on two grids.
