@@ -1,0 +1,37 @@
+n,target,method,attempts,statuses,accepted_median_seconds
+64,1,deflated_gpu_qr,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.051490435376763344
+64,1,deflated_cpu_svd_gpu,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.1061844676733017
+64,1,amgx_fresh_resources,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.10909661184996367
+64,1,amgx_persistent_resources,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.04835939034819603
+64,1,jacobi_gpu,1,['converged'],0.3862650394439697
+64,1,deflated_cpu,1,['converged'],1.1913884244859219
+64,2,deflated_gpu_qr,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.05318882595747709
+64,2,deflated_cpu_svd_gpu,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.10975602269172668
+64,2,amgx_fresh_resources,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.10646809544414282
+64,2,amgx_persistent_resources,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.046948522329330444
+64,2,jacobi_gpu,1,['converged'],0.561472593806684
+64,2,deflated_cpu,1,['converged'],0.12122891005128622
+64,3,deflated_gpu_qr,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.052822697907686234
+64,3,deflated_cpu_svd_gpu,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.10771616268903017
+64,3,amgx_fresh_resources,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.10386167000979185
+64,3,amgx_persistent_resources,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.04415482189506292
+64,3,jacobi_gpu,1,['converged'],0.5298803430050611
+64,3,deflated_cpu,1,['converged'],0.1529738800600171
+128,1,deflated_gpu_qr,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.1574268788099289
+128,1,deflated_cpu_svd_gpu,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.2489697579294443
+128,1,amgx_fresh_resources,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.17725425213575363
+128,1,amgx_persistent_resources,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.1353852078318596
+128,1,jacobi_gpu,1,['converged'],2.728683790192008
+128,1,deflated_cpu,1,['converged'],0.7674921555444598
+128,2,deflated_gpu_qr,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.15903913788497448
+128,2,deflated_cpu_svd_gpu,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.25033660512417555
+128,2,amgx_fresh_resources,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.1785116633400321
+128,2,amgx_persistent_resources,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.13476554863154888
+128,2,jacobi_gpu,1,['converged'],3.1687438348308206
+128,2,deflated_cpu,1,['converged'],0.7609310280531645
+128,3,deflated_gpu_qr,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.1612841859459877
+128,3,deflated_cpu_svd_gpu,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.2529824012890458
+128,3,amgx_fresh_resources,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.17559174448251724
+128,3,amgx_persistent_resources,5,"['converged', 'converged', 'converged', 'converged', 'converged']",0.13306530471891165
+128,3,jacobi_gpu,1,['converged'],3.1728875497356057
+128,3,deflated_cpu,1,['converged'],0.7925740908831358

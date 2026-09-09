@@ -1,0 +1,652 @@
+{
+  "tutorial_version": 1,
+  "protocol": {
+    "tutorial": "spectral",
+    "version": 1,
+    "threads": 1,
+    "coordinates": "unscaled Euclidean",
+    "examples": [
+      "restriction rank loss",
+      "repeated-eigenvalue cutoff",
+      "complete cluster",
+      "two-dimensional eigenvalue crossing",
+      "controlled eight-dimensional SPD restriction",
+      "diffusion corner restrictions"
+    ],
+    "diffusion": {
+      "grids": [
+        4,
+        6,
+        12
+      ],
+      "corner_widths": [
+        1,
+        2,
+        3
+      ],
+      "rank": 1,
+      "alpha": 0.001
+    },
+    "numerical_rank_threshold": 1e-12,
+    "scope": "small spectral computations; no timing or optimization claim"
+  },
+  "environment": {
+    "python": "3.12.3",
+    "system": "Linux",
+    "machine": "x86_64",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "package": "0.3.0",
+    "git_head": "341067f8e3db595def7717ae5801793a0e3ae4dd",
+    "source_tree_clean": true,
+    "source_sha256": {
+      "__init__.py": "376656ea3f917f1c943f52862508fb479269ce04cdf67cf39a5b028244329065",
+      "__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+      "amgx.py": "cb31696bad8e1791ef398a058fbf55c48df1410a100223cd80b7771a3b0d0fd3",
+      "backends.py": "69c6c2ad0c6c5ca577339ae32ec8a2939efd1938e66f39555324127421951af6",
+      "benchmark_controls.py": "855d58ec5716a5effe3c868115b4269d79f7013d7fd96361262db4e9b07e0257",
+      "benchmark_extended.py": "0d647fd11829d7c957715703061e70ffd088d8fceef616e50b66601519c138d8",
+      "benchmark_extended_report.py": "0f40e802de367ede11764a1081865514f15d4884fcde44c5cad718dbad9deb34",
+      "benchmark_gpu.py": "b77fc512598a32b5bc85fc1dc397b95b108aea182c36186b3e2dbd71c3e09556",
+      "benchmark_matrix_free.py": "c24b43ee4be409434e6a52a4e8bd852af4e2aeeeef6e4abc434bed030c8dfa27",
+      "benchmark_report.py": "c01ef955d7d2e537ae48a65b34bc3f044609ba5e552ad79cae3371b94c822f3b",
+      "benchmark_sequence.py": "e9382352ad01acd0adbb21d3d19703a26a885ea82dbc25fc30730e7f2decfa97",
+      "benchmark_startup.py": "4cf4957ef78436af4a17495f67cca452f14c42738b03a8a90167398f8eed2280",
+      "benchmark_structure.py": "2ae29002797eb35241cdc4a10bd13cef752d0417db877b8d27e886ae7b535eb5",
+      "cli.py": "e15017ca7d3dff0be2d900bfb6cb7f5df5d3ec690b3c0539c522b6862b9ff302",
+      "gpu.py": "ecb87b21d7e5af48a8b8f39e8154568c5a0dc65447f90b076adea16d1a7e6200",
+      "plotting.py": "cf82f9b04ce9184b7595e01648d1f1ada7f3a2068360c1aeb7c1d5c9f75e1873",
+      "problems.py": "000dab0a63b47d346bee3ccc339e2965422f6981fd6e988296b85354ec3dac60",
+      "reporting.py": "02b9e3cbdfeb105306febe624e7188a29632817cbec775bb287c54fb37a63c79",
+      "runner.py": "8d86f85578020a040b9397cba3fca45a0421edcc7a65896140cb807a1a7fb7b9",
+      "solvers.py": "4c9160abf71a170497c6af1a6011f78d122b5f03d02ab8254c338e46a255be8a",
+      "spectral.py": "2f60157678ba907197d3a29d5a82c51744ca64e8d2c0ffc71307a8778a1ca8f4",
+      "timing.py": "d9713051c2e5728906a4396acbcfa7222111a3a9a31db6d56c7795a1a560f103",
+      "tutorial_costs.py": "efb7ad3c07074259a6a31f0b4a052e3b10cad841b1371dfefea2e76476596fc3",
+      "tutorial_spectral.py": "9c6d40374f1dd7bb60af0c143e78c6ac2f5e18c014d6e27f79e15e128b5512e3",
+      "tutorial_verification.py": "a7d2e0f11afb8c6a59130ddef50f9faa0e3df955208b4d0a50511e769b36fd0f",
+      "tutorials.py": "c0b153eb59a6d716272e0a87d3cacb7a3e4a87d0d5130bd1e99194bd44207582",
+      "validation.py": "7b96a43aebf8b43463c879cb1b42d04f0925b4d192d28465ccef6a23107435e3"
+    },
+    "blas": [
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "version": "0.3.34.106.0",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      },
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "version": "0.3.31.dev",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      }
+    ]
+  },
+  "input_sha256": {
+    "extended/controls.json": "0d8a1ccb349ce5663a8004ff5d21a972c3f040a463877a95120249998ac7ab7b",
+    "structure.json": "011a12920ca2a27cb960b93a39b3e1d6270598f3eeba57d528e2c267f976d4c1"
+  },
+  "results": {
+    "coordinates": "unscaled Euclidean",
+    "bound_definitions": {
+      "residual_angle_bound": "min(1, norm(F, fro)/eta), eta > 0 and full retained rank",
+      "coupling_angle_bound": "min(1, norm(M0_IJ Phi_J, fro)/(sigma_min(Phi_I)*eta)), eta > 0",
+      "unavailable": "rank loss or nonpositive separation; null differs from the trivial bound one"
+    },
+    "rank_loss": {
+      "requested_rank": 2,
+      "retained_rank": 1,
+      "minimum_restricted_singular_value": 0.0,
+      "subspace_residual_frobenius": 0.0,
+      "separation": 6.0,
+      "cutoff_gap": 4.0,
+      "largest_angle_degrees": null,
+      "actual_sine": null,
+      "residual_angle_bound": null,
+      "separation_status": "rank_loss",
+      "bound_status": "unavailable",
+      "retained_rank_comparison_angle_degrees": 0.0,
+      "full_operator": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          2.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          4.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          8.0
+        ]
+      ],
+      "reference": [
+        [
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0
+        ],
+        [
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0
+        ]
+      ],
+      "inactive_indices": [
+        1,
+        2,
+        3
+      ]
+    },
+    "repeated_cutoff": {
+      "requested_rank": 1,
+      "retained_rank": 1,
+      "minimum_restricted_singular_value": 1.0,
+      "subspace_residual_frobenius": 0.0,
+      "separation": 0.0,
+      "cutoff_gap": 0.0,
+      "largest_angle_degrees": 90.0,
+      "actual_sine": 1.0,
+      "residual_angle_bound": null,
+      "separation_status": "nonpositive",
+      "bound_status": "unavailable",
+      "comparison": "two exact rank-one choices within the repeated lowest cluster"
+    },
+    "complete_cluster": {
+      "requested_rank": 2,
+      "retained_rank": 2,
+      "minimum_restricted_singular_value": 1.0,
+      "subspace_residual_frobenius": 0.0,
+      "separation": 2.0,
+      "cutoff_gap": 2.0,
+      "largest_angle_degrees": 0.0,
+      "actual_sine": 0.0,
+      "residual_angle_bound": 0.0,
+      "separation_status": "positive",
+      "bound_status": "nontrivial"
+    },
+    "eigenvalue_crossing": {
+      "requested_rank": 1,
+      "retained_rank": 1,
+      "minimum_restricted_singular_value": 1.0,
+      "subspace_residual_frobenius": 0.0,
+      "separation": 0.0,
+      "cutoff_gap": 0.20000000000000018,
+      "largest_angle_degrees": 90.0,
+      "actual_sine": 1.0,
+      "residual_angle_bound": null,
+      "separation_status": "nonpositive",
+      "bound_status": "unavailable",
+      "reference_operator": [
+        [
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          2.0
+        ]
+      ],
+      "current_operator": [
+        [
+          1.6,
+          0.0
+        ],
+        [
+          0.0,
+          1.4
+        ]
+      ],
+      "reference_gap": 1.0,
+      "perturbation_norm": 0.6,
+      "unconditional_delta_over_gap": 0.6,
+      "sufficient_no_crossing": false
+    },
+    "controlled_spd": {
+      "coordinates": "unscaled",
+      "full_dimension": 8,
+      "inactive_indices_zero_based": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "reference_eigenvalues": [
+        1.0,
+        2.0,
+        5.0,
+        8.0,
+        11.0,
+        14.0,
+        17.0,
+        20.0
+      ],
+      "rotations": [
+        [
+          0,
+          7,
+          0.2
+        ],
+        [
+          1,
+          7,
+          0.15
+        ],
+        [
+          0,
+          2,
+          0.1
+        ]
+      ],
+      "rows": [
+        {
+          "amplitude": 0.0,
+          "retained_rank": 2,
+          "minimum_restricted_singular_value": 0.9692644355310218,
+          "removed_mass": 0.24602124707986023,
+          "coupling_frobenius": 1.0963252996937478,
+          "subspace_residual_frobenius": 0.07549834232084669,
+          "residual_identity_error": 1.4548393500336874e-15,
+          "separation": 2.319947427320402,
+          "largest_angle_degrees": 1.7729728028933778,
+          "actual_sine": 0.03093927478603034,
+          "residual_angle_bound": 0.032543126379397824,
+          "sufficient_angle_bound": 0.4875498365393508,
+          "separation_status": "positive",
+          "bound_status": "nontrivial"
+        },
+        {
+          "amplitude": 0.01,
+          "retained_rank": 2,
+          "minimum_restricted_singular_value": 0.9692644355310218,
+          "removed_mass": 0.24602124707986023,
+          "coupling_frobenius": 1.0963252996937478,
+          "subspace_residual_frobenius": 0.07549834232084676,
+          "residual_identity_error": 1.3013209398649997e-15,
+          "separation": 2.311595687987449,
+          "largest_angle_degrees": 1.7801914867198663,
+          "actual_sine": 0.03106520402497819,
+          "residual_angle_bound": 0.03266070390820728,
+          "sufficient_angle_bound": 0.4956232529887533,
+          "separation_status": "positive",
+          "bound_status": "nontrivial"
+        },
+        {
+          "amplitude": 0.1,
+          "retained_rank": 2,
+          "minimum_restricted_singular_value": 0.9692644355310218,
+          "removed_mass": 0.24602124707986023,
+          "coupling_frobenius": 1.0963252996937478,
+          "subspace_residual_frobenius": 0.07549834232084675,
+          "residual_identity_error": 1.5819333041515655e-15,
+          "separation": 2.2354974313515643,
+          "largest_angle_degrees": 1.8479016360475853,
+          "actual_sine": 0.03224637673349825,
+          "residual_angle_bound": 0.03377250238001886,
+          "sufficient_angle_bound": 0.571235657045483,
+          "separation_status": "positive",
+          "bound_status": "nontrivial"
+        },
+        {
+          "amplitude": 0.5,
+          "retained_rank": 2,
+          "minimum_restricted_singular_value": 0.9692644355310218,
+          "removed_mass": 0.24602124707986023,
+          "coupling_frobenius": 1.0963252996937478,
+          "subspace_residual_frobenius": 0.07549834232084679,
+          "residual_identity_error": 1.6365199752979684e-15,
+          "separation": 1.881576181923116,
+          "largest_angle_degrees": 2.2236804635396483,
+          "actual_sine": 0.03880080321608787,
+          "residual_angle_bound": 0.04012505209525009,
+          "sufficient_angle_bound": 0.9888620413585952,
+          "separation_status": "positive",
+          "bound_status": "nontrivial"
+        },
+        {
+          "amplitude": 1.0,
+          "retained_rank": 2,
+          "minimum_restricted_singular_value": 0.9692644355310218,
+          "removed_mass": 0.24602124707986023,
+          "coupling_frobenius": 1.0963252996937478,
+          "subspace_residual_frobenius": 0.07549834232084676,
+          "residual_identity_error": 1.595378657953551e-15,
+          "separation": 1.4172253859457546,
+          "largest_angle_degrees": 2.980536820091006,
+          "actual_sine": 0.05199672219987303,
+          "residual_angle_bound": 0.053271937596901416,
+          "sufficient_angle_bound": 1.0,
+          "separation_status": "positive",
+          "bound_status": "trivial_one"
+        },
+        {
+          "amplitude": 2.0,
+          "retained_rank": 2,
+          "minimum_restricted_singular_value": 0.9692644355310218,
+          "removed_mass": 0.24602124707986023,
+          "coupling_frobenius": 1.0963252996937478,
+          "subspace_residual_frobenius": 0.0754983423208467,
+          "residual_identity_error": 1.7986729641763637e-15,
+          "separation": 0.46194181003357393,
+          "largest_angle_degrees": 9.170658291324326,
+          "actual_sine": 0.15937564496436551,
+          "residual_angle_bound": 0.1634369106259498,
+          "sufficient_angle_bound": 1.0,
+          "separation_status": "positive",
+          "bound_status": "trivial_one"
+        },
+        {
+          "amplitude": 4.0,
+          "retained_rank": 2,
+          "minimum_restricted_singular_value": 0.9692644355310218,
+          "removed_mass": 0.24602124707986023,
+          "coupling_frobenius": 1.0963252996937478,
+          "subspace_residual_frobenius": 0.07549834232084666,
+          "residual_identity_error": 1.5318947521691372e-15,
+          "separation": 0.0037066606945685976,
+          "largest_angle_degrees": 87.17663693513441,
+          "actual_sine": 0.9987861352065212,
+          "residual_angle_bound": 1.0,
+          "sufficient_angle_bound": 1.0,
+          "separation_status": "positive",
+          "bound_status": "trivial_one"
+        },
+        {
+          "amplitude": 8.0,
+          "retained_rank": 2,
+          "minimum_restricted_singular_value": 0.9692644355310218,
+          "removed_mass": 0.24602124707986023,
+          "coupling_frobenius": 1.0963252996937478,
+          "subspace_residual_frobenius": 0.07549834232084676,
+          "residual_identity_error": 1.8513313995746432e-15,
+          "separation": -2.5068256138913547,
+          "largest_angle_degrees": 89.21485096315062,
+          "actual_sine": 0.9999061093927526,
+          "residual_angle_bound": null,
+          "sufficient_angle_bound": null,
+          "separation_status": "nonpositive",
+          "bound_status": "unavailable"
+        }
+      ]
+    },
+    "diffusion": [
+      {
+        "requested_rank": 1,
+        "retained_rank": 1,
+        "minimum_restricted_singular_value": 0.9904048159401765,
+        "subspace_residual_frobenius": 0.9870273609115403,
+        "separation": 1.367977511657203,
+        "cutoff_gap": 1.4667901912450576,
+        "largest_angle_degrees": 8.340251458254174,
+        "actual_sine": 0.14505132744899651,
+        "residual_angle_bound": 0.7215230897442386,
+        "separation_status": "positive",
+        "bound_status": "nontrivial",
+        "n": 4,
+        "corner_width": 1,
+        "alpha": 0.001,
+        "active_indices": [
+          0
+        ],
+        "restriction_coupling_frobenius": 0.9998383219644238,
+        "coupling_angle_bound": 0.737968929008281,
+        "coupling_bound_status": "nontrivial",
+        "original_condition": 22.57537405139287,
+        "deflated_condition_upper_bound": 47.22964043311525
+      },
+      {
+        "requested_rank": 1,
+        "retained_rank": 1,
+        "minimum_restricted_singular_value": 0.8660254037844388,
+        "subspace_residual_frobenius": 2.205388750409811,
+        "separation": 0.6367092536441206,
+        "cutoff_gap": 1.224676436807179,
+        "largest_angle_degrees": 19.068172132339285,
+        "actual_sine": 0.32669292837384895,
+        "residual_angle_bound": 1.0,
+        "separation_status": "positive",
+        "bound_status": "trivial_one",
+        "n": 4,
+        "corner_width": 2,
+        "alpha": 0.001,
+        "active_indices": [
+          0,
+          1,
+          4,
+          5
+        ],
+        "restriction_coupling_frobenius": 2.209099755596357,
+        "coupling_angle_bound": 1.0,
+        "coupling_bound_status": "trivial_one",
+        "original_condition": 14.9618598415825,
+        "deflated_condition_upper_bound": 48.03742872967088
+      },
+      {
+        "requested_rank": 1,
+        "retained_rank": 1,
+        "minimum_restricted_singular_value": 0.507242448625424,
+        "subspace_residual_frobenius": 2.0797352352299607,
+        "separation": 0.5056794530705497,
+        "cutoff_gap": 1.023659700414135,
+        "largest_angle_degrees": 18.048884176768983,
+        "actual_sine": 0.30982831355856527,
+        "residual_angle_bound": 1.0,
+        "separation_status": "positive",
+        "bound_status": "trivial_one",
+        "n": 4,
+        "corner_width": 3,
+        "alpha": 0.001,
+        "active_indices": [
+          0,
+          1,
+          2,
+          4,
+          5,
+          6,
+          8,
+          9,
+          10
+        ],
+        "restriction_coupling_frobenius": 2.1825325018162602,
+        "coupling_angle_bound": 1.0,
+        "coupling_bound_status": "trivial_one",
+        "original_condition": 5.011967611740618,
+        "deflated_condition_upper_bound": 18.182051261180856
+      },
+      {
+        "requested_rank": 1,
+        "retained_rank": 1,
+        "minimum_restricted_singular_value": 0.9985524223686397,
+        "subspace_residual_frobenius": 1.491936254918293,
+        "separation": 1.670790343483104,
+        "cutoff_gap": 1.737120152863955,
+        "largest_angle_degrees": 5.089802341566673,
+        "actual_sine": 0.08871701736566148,
+        "residual_angle_bound": 0.8929524046733758,
+        "separation_status": "positive",
+        "bound_status": "nontrivial",
+        "n": 6,
+        "corner_width": 1,
+        "alpha": 0.001,
+        "active_indices": [
+          0
+        ],
+        "restriction_coupling_frobenius": 1.4949382815507426,
+        "coupling_angle_bound": 0.896046271612031,
+        "coupling_bound_status": "nontrivial",
+        "original_condition": 97.28942333755309,
+        "deflated_condition_upper_bound": 239.38181538014263
+      },
+      {
+        "requested_rank": 1,
+        "retained_rank": 1,
+        "minimum_restricted_singular_value": 0.9735596313988392,
+        "subspace_residual_frobenius": 4.10967146326194,
+        "separation": 0.9174261662250922,
+        "cutoff_gap": 1.568580741328137,
+        "largest_angle_degrees": 15.4373359438489,
+        "actual_sine": 0.2661842995138924,
+        "residual_angle_bound": 1.0,
+        "separation_status": "positive",
+        "bound_status": "trivial_one",
+        "n": 6,
+        "corner_width": 2,
+        "alpha": 0.001,
+        "active_indices": [
+          0,
+          1,
+          6,
+          7
+        ],
+        "restriction_coupling_frobenius": 4.10792177614161,
+        "coupling_angle_bound": 1.0,
+        "coupling_bound_status": "trivial_one",
+        "original_condition": 81.82065131490644,
+        "deflated_condition_upper_bound": 241.87111087933383
+      },
+      {
+        "requested_rank": 1,
+        "retained_rank": 1,
+        "minimum_restricted_singular_value": 0.8660254037844388,
+        "subspace_residual_frobenius": 6.614055960944499,
+        "separation": -0.3956347079281164,
+        "cutoff_gap": 1.4971381381041988,
+        "largest_angle_degrees": 24.066586946650865,
+        "actual_sine": 0.40779805548458975,
+        "residual_angle_bound": null,
+        "separation_status": "nonpositive",
+        "bound_status": "unavailable",
+        "n": 6,
+        "corner_width": 3,
+        "alpha": 0.001,
+        "active_indices": [
+          0,
+          1,
+          2,
+          6,
+          7,
+          8,
+          12,
+          13,
+          14
+        ],
+        "restriction_coupling_frobenius": 6.25423951827289,
+        "coupling_angle_bound": null,
+        "coupling_bound_status": "unavailable",
+        "original_condition": 55.390674265931835,
+        "deflated_condition_upper_bound": null
+      },
+      {
+        "requested_rank": 1,
+        "retained_rank": 1,
+        "minimum_restricted_singular_value": 0.999961181725686,
+        "subspace_residual_frobenius": 2.9129354125954614,
+        "separation": 1.9301460960601895,
+        "cutoff_gap": 1.9531835742053325,
+        "largest_angle_degrees": 1.697302969257317,
+        "actual_sine": 0.029619192704067602,
+        "residual_angle_bound": 1.0,
+        "separation_status": "positive",
+        "bound_status": "trivial_one",
+        "n": 12,
+        "corner_width": 1,
+        "alpha": 0.001,
+        "active_indices": [
+          0
+        ],
+        "restriction_coupling_frobenius": 2.9130953764231187,
+        "coupling_angle_bound": 1.0,
+        "coupling_bound_status": "trivial_one",
+        "original_condition": 1266.1847850611755,
+        "deflated_condition_upper_bound": 3432.6484298345754
+      },
+      {
+        "requested_rank": 1,
+        "retained_rank": 1,
+        "minimum_restricted_singular_value": 0.9991160603720672,
+        "subspace_residual_frobenius": 9.33371685032465,
+        "separation": 1.5752093680567425,
+        "cutoff_gap": 1.892743965043857,
+        "largest_angle_degrees": 6.574843321435302,
+        "actual_sine": 0.1145009823573484,
+        "residual_angle_bound": 1.0,
+        "separation_status": "positive",
+        "bound_status": "trivial_one",
+        "n": 12,
+        "corner_width": 2,
+        "alpha": 0.001,
+        "active_indices": [
+          0,
+          1,
+          12,
+          13
+        ],
+        "restriction_coupling_frobenius": 9.333931807523122,
+        "coupling_angle_bound": 1.0,
+        "coupling_bound_status": "trivial_one",
+        "original_condition": 1210.8006413706855,
+        "deflated_condition_upper_bound": 3339.199526647886
+      },
+      {
+        "requested_rank": 1,
+        "retained_rank": 1,
+        "minimum_restricted_singular_value": 0.9939660794863145,
+        "subspace_residual_frobenius": 18.503610251635514,
+        "separation": 0.3883432660979462,
+        "cutoff_gap": 1.8027291802549361,
+        "largest_angle_degrees": 13.038012943557804,
+        "actual_sine": 0.22559745160510705,
+        "residual_angle_bound": 1.0,
+        "separation_status": "positive",
+        "bound_status": "trivial_one",
+        "n": 12,
+        "corner_width": 3,
+        "alpha": 0.001,
+        "active_indices": [
+          0,
+          1,
+          2,
+          12,
+          13,
+          14,
+          24,
+          25,
+          26
+        ],
+        "restriction_coupling_frobenius": 18.46241969973611,
+        "coupling_angle_bound": 1.0,
+        "coupling_bound_status": "trivial_one",
+        "original_condition": 1112.7493930229641,
+        "deflated_condition_upper_bound": 3158.92181757526
+      }
+    ]
+  }
+}

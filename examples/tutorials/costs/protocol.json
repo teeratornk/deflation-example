@@ -1,0 +1,24 @@
+{
+  "tutorial": "costs",
+  "version": 1,
+  "threads": 1,
+  "examples": [
+    "resource persistence and hierarchy rebuilding",
+    "preparation-inclusive CHT cost",
+    "rank and memory",
+    "last-window recycling",
+    "constant-cost break-even model"
+  ],
+  "source_configuration": "each original record retains its predeclared configuration and numerical environment",
+  "scope": "read-only summaries of stored measurements; no benchmark timing rerun",
+  "cost_units": "seconds",
+  "memory_units": "GiB",
+  "constant_cost_examples": {
+    "additional_setup_seconds": 1.2,
+    "per_instance_savings_seconds": [
+      0.1,
+      0.0,
+      -0.1
+    ]
+  }
+}

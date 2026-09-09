@@ -1,0 +1,37 @@
+protocol,n,warm_start,method,passed_sequences,attempted_sequences,accepted_median_seconds,failed_target_statuses
+extended-cht-pdas-v1,24,cold,deflated_gpu_qr,5,5,17.460884490050375,{}
+extended-cht-pdas-v1,24,cold,amgx_persistent_resources,0,5,,{'inner_residual_failed': 5}
+extended-cht-pdas-v1,24,outer,deflated_gpu_qr,5,5,6.299135257489979,{}
+extended-cht-pdas-v1,24,outer,amgx_persistent_resources,5,5,9.607882310636342,{}
+extended-cht-pdas-v1,24,outer_inner,deflated_gpu_qr,5,5,5.361700934357941,{}
+extended-cht-pdas-v1,24,outer_inner,amgx_persistent_resources,5,5,7.420069018378854,{}
+extended-cht-pdas-v1,32,cold,deflated_gpu_qr,5,5,37.64986274763942,{}
+extended-cht-pdas-v1,32,cold,amgx_persistent_resources,0,5,,{'inner_residual_failed': 65}
+extended-cht-pdas-v1,32,outer,deflated_gpu_qr,5,5,13.029013084247708,{}
+extended-cht-pdas-v1,32,outer,amgx_persistent_resources,0,5,,{'inner_residual_failed': 55}
+extended-cht-pdas-v1,32,outer_inner,deflated_gpu_qr,5,5,10.71511164214462,{}
+extended-cht-pdas-v1,32,outer_inner,amgx_persistent_resources,5,5,20.793749171309173,{}
+extended-cht-pdas-v2,24,cold,deflated_gpu_qr,5,5,18.95793397910893,{}
+extended-cht-pdas-v2,24,cold,amgx_persistent_resources,5,5,29.64588945452124,{}
+extended-cht-pdas-v2,24,outer,deflated_gpu_qr,5,5,6.846854455769062,{}
+extended-cht-pdas-v2,24,outer,amgx_persistent_resources,5,5,10.109992161393166,{}
+extended-cht-pdas-v2,24,outer_inner,deflated_gpu_qr,5,5,5.948588944971561,{}
+extended-cht-pdas-v2,24,outer_inner,amgx_persistent_resources,5,5,7.839522403664887,{}
+extended-cht-pdas-v2,32,cold,deflated_gpu_qr,0,5,,{'inner_breakdown': 45}
+extended-cht-pdas-v2,32,cold,amgx_persistent_resources,5,5,83.87360866740346,{}
+extended-cht-pdas-v2,32,outer,deflated_gpu_qr,0,5,,{'inner_breakdown': 10}
+extended-cht-pdas-v2,32,outer,amgx_persistent_resources,5,5,28.649901936762035,{}
+extended-cht-pdas-v2,32,outer_inner,deflated_gpu_qr,0,5,,{'inner_breakdown': 10}
+extended-cht-pdas-v2,32,outer_inner,amgx_persistent_resources,5,5,22.381686804816127,{}
+extended-cht-pdas-v3,24,cold,deflated_gpu_qr,5,5,17.55448157992214,{}
+extended-cht-pdas-v3,24,cold,amgx_persistent_resources,5,5,30.063050642609596,{}
+extended-cht-pdas-v3,24,outer,deflated_gpu_qr,5,5,6.340127602219582,{}
+extended-cht-pdas-v3,24,outer,amgx_persistent_resources,5,5,9.985010273754597,{}
+extended-cht-pdas-v3,24,outer_inner,deflated_gpu_qr,5,5,5.383885296992958,{}
+extended-cht-pdas-v3,24,outer_inner,amgx_persistent_resources,5,5,8.08884901739657,{}
+extended-cht-pdas-v3,32,cold,deflated_gpu_qr,5,5,37.86557377316058,{}
+extended-cht-pdas-v3,32,cold,amgx_persistent_resources,5,5,86.6853090049699,{}
+extended-cht-pdas-v3,32,outer,deflated_gpu_qr,5,5,13.29523582290858,{}
+extended-cht-pdas-v3,32,outer,amgx_persistent_resources,5,5,29.903787658549845,{}
+extended-cht-pdas-v3,32,outer_inner,deflated_gpu_qr,5,5,10.804710963740945,{}
+extended-cht-pdas-v3,32,outer_inner,amgx_persistent_resources,5,5,22.954989257268608,{}
