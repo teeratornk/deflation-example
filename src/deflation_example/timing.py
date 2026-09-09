@@ -5,9 +5,18 @@ import time
 
 
 PHASES = (
-    "conversion", "resource_creation", "handle_creation", "upload",
-    "basis_processing", "coarse_or_hierarchy_setup", "initialization",
-    "iteration", "download", "verification", "cleanup", "synchronization",
+    "conversion",
+    "resource_creation",
+    "handle_creation",
+    "upload",
+    "basis_processing",
+    "coarse_or_hierarchy_setup",
+    "initialization",
+    "iteration",
+    "download",
+    "verification",
+    "cleanup",
+    "synchronization",
     "host_bookkeeping",
 )
 

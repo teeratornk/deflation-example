@@ -28,10 +28,15 @@ def environment():
                 stderr=subprocess.DEVNULL,
                 timeout=2,
             ).strip()
-            source_tree_clean = not bool(subprocess.check_output(
-                ["git", "status", "--porcelain", "--", "src"], cwd=candidate,
-                text=True, stderr=subprocess.DEVNULL, timeout=2,
-            ).strip())
+            source_tree_clean = not bool(
+                subprocess.check_output(
+                    ["git", "status", "--porcelain", "--", "src"],
+                    cwd=candidate,
+                    text=True,
+                    stderr=subprocess.DEVNULL,
+                    timeout=2,
+                ).strip()
+            )
         except (OSError, subprocess.SubprocessError):
             pass
     fields = {
@@ -48,6 +53,7 @@ def environment():
         package_version = importlib.metadata.version("deflation-example")
     except importlib.metadata.PackageNotFoundError:
         from . import __version__
+
         package_version = __version__
     return {
         "python": platform.python_version(),

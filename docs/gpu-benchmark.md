@@ -44,8 +44,8 @@ The measured kernel starts with CPU inputs and ends after the solution is return
 | Upload | Matrix, vectors and basis host-to-device copies |
 | Basis processing | CPU SVD or GPU thin QR plus small-factor SVD |
 | Coarse/hierarchy setup | Deflation coarse assembly/condition/factor or AmgX hierarchy |
-| Initialization | Initial deflation correction and search-direction preparation |
-| Iteration | Krylov loop, including its recurrence checks and internal residual refresh |
+| Initialization | Initial deflation correction and residual preparation |
+| Iteration | Initial search direction and Krylov loop, including recurrence checks and internal residual refresh |
 | Download | Return of the solution to CPU |
 | Verification | Independent original CPU residual and native-status query |
 | Cleanup | Per-call tensor or handle destruction |

@@ -16,20 +16,36 @@ def amgx_configuration(rtol=1e-10, maxiter=10000):
     positive_real(rtol, "Relative tolerance")
     integer(maxiter, "Iteration limit", 1)
     return {
-        "config_version": 2, "determinism_flag": 1,
+        "config_version": 2,
+        "determinism_flag": 1,
         "solver": {
-            "scope": "main", "solver": "PCG",
+            "scope": "main",
+            "solver": "PCG",
             "preconditioner": {
-                "scope": "amg", "solver": "AMG", "algorithm": "CLASSICAL",
-                "selector": "PMIS", "interpolator": "D2",
-                "smoother": {"solver": "MULTICOLOR_GS", "relaxation_factor": 1.0,
-                             "symmetric_GS": 1},
-                "presweeps": 1, "postsweeps": 1, "cycle": "V", "max_iters": 1,
-                "max_levels": 25, "coarse_solver": "DENSE_LU_SOLVER",
+                "scope": "amg",
+                "solver": "AMG",
+                "algorithm": "CLASSICAL",
+                "selector": "PMIS",
+                "interpolator": "D2",
+                "smoother": {
+                    "solver": "MULTICOLOR_GS",
+                    "relaxation_factor": 1.0,
+                    "symmetric_GS": 1,
+                },
+                "presweeps": 1,
+                "postsweeps": 1,
+                "cycle": "V",
+                "max_iters": 1,
+                "max_levels": 25,
+                "coarse_solver": "DENSE_LU_SOLVER",
             },
-            "tolerance": rtol, "max_iters": maxiter, "norm": "L2",
-            "convergence": "RELATIVE_INI_CORE", "monitor_residual": 1,
-            "obtain_timings": 1, "print_solve_stats": 0,
+            "tolerance": rtol,
+            "max_iters": maxiter,
+            "norm": "L2",
+            "convergence": "RELATIVE_INI_CORE",
+            "monitor_residual": 1,
+            "obtain_timings": 1,
+            "print_solve_stats": 0,
         },
     }
 
@@ -137,6 +153,7 @@ def amgx_cg(A, b, *, api, synchronize, session=None, rtol=1e-10, maxiter=10000):
             timer.mark("cleanup")
             timer.synchronize(synchronize)
     metrics = timer.finish()
-    metrics.update(native_status=native_status, hierarchy_reused=False,
-                   resources_reused=not own_session)
+    metrics.update(
+        native_status=native_status, hierarchy_reused=False, resources_reused=not own_session
+    )
     return LinearResult(solution, iterations, residual, status), metrics

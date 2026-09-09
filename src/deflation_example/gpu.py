@@ -28,9 +28,7 @@ def orthonormalize_gpu(basis, torch, tolerance=1e-12):
     if 0 in basis.shape:
         return basis[:, :0].clone()
     Q, R = torch.linalg.qr(basis, mode="reduced")
-    U, values, _ = torch.linalg.svd(
-        R, full_matrices=False, driver="gesvd" if R.is_cuda else None
-    )
+    U, values, _ = torch.linalg.svd(R, full_matrices=False, driver="gesvd" if R.is_cuda else None)
     keep = values > tolerance * values[0]
     return Q if bool(keep.all()) else Q @ U[:, keep]
 
@@ -45,7 +43,10 @@ def _gpu_deflated_cg(
     maxiter=20000,
     refresh=1000,
     condition_limit=1e10,
-    *, basis_backend, timer, torch,
+    *,
+    basis_backend,
+    timer,
+    torch,
 ):
     """Return (LinearResult, timing/memory metrics), verified with the CPU matrix.
 
@@ -102,9 +103,11 @@ def _gpu_deflated_cg(
         E = V.T @ torch.mm(H, V)
         E = (E + E.T) / 2
         eigenvalues = torch.linalg.eigvalsh(E)
-        condition = (float(eigenvalues[-1] / eigenvalues[0])
-                     if bool(torch.isfinite(eigenvalues).all()) and float(eigenvalues[0]) > 0
-                     else float("inf"))
+        condition = (
+            float(eigenvalues[-1] / eigenvalues[0])
+            if bool(torch.isfinite(eigenvalues).all()) and float(eigenvalues[0]) > 0
+            else float("inf")
+        )
         if not np.isfinite(condition) or condition > condition_limit:
             rank, V, fallback = 0, None, "coarse_condition_limit"
         else:
@@ -201,8 +204,17 @@ def _gpu_deflated_cg(
 
 
 def gpu_deflated_cg(
-    A, b, basis=None, diagonal=None, x0=None, rtol=1e-10, maxiter=20000,
-    refresh=1000, condition_limit=1e10, *, basis_backend="cpu_svd",
+    A,
+    b,
+    basis=None,
+    diagonal=None,
+    x0=None,
+    rtol=1e-10,
+    maxiter=20000,
+    refresh=1000,
+    condition_limit=1e10,
+    *,
+    basis_backend="cpu_svd",
 ):
     """Verified CUDA solve, including conversion, transfers and temporary cleanup.
 
@@ -216,8 +228,18 @@ def gpu_deflated_cg(
     torch = require_cuda()
     timer = PhaseTimer()
     result, metrics = _gpu_deflated_cg(
-        A, b, basis, diagonal, x0, rtol, maxiter, refresh, condition_limit,
-        basis_backend=basis_backend, timer=timer, torch=torch,
+        A,
+        b,
+        basis,
+        diagonal,
+        x0,
+        rtol,
+        maxiter,
+        refresh,
+        condition_limit,
+        basis_backend=basis_backend,
+        timer=timer,
+        torch=torch,
     )
     # Returning from the helper releases its temporary GPU tensors. The
     # returned solution owns CPU storage only. No empty_cache() is charged.

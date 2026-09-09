@@ -9,9 +9,11 @@ def lowest_modes(n, dimension, rank):
     n, rank = integer(n, "Grid", 1), integer(rank, "Rank")
     if dimension not in (2, 3) or rank > n**dimension:
         raise ValueError("Invalid reference dimension or rank")
-    values = 4 * (n + 1)**2 * np.sin(np.pi * np.arange(1, n + 1) / (2 * (n + 1)))**2
+    values = 4 * (n + 1) ** 2 * np.sin(np.pi * np.arange(1, n + 1) / (2 * (n + 1))) ** 2
+
     def value(mode):
         return float(sum(values[j - 1] for j in mode))
+
     first = (1,) * dimension
     heap, seen, result = [(value(first), first)], {first}, []
     while len(result) < rank:
@@ -32,9 +34,7 @@ def analytical_reference(n, dimension, rank):
     """Match the manuscript benchmark's eigenvalue/lexicographic ordering."""
     modes = lowest_modes(n, dimension, rank)
     coordinate = np.arange(1, n + 1) / (n + 1)
-    one_d = np.sqrt(2 / (n + 1)) * np.sin(
-        np.pi * np.arange(1, n + 1)[:, None] * coordinate
-    )
+    one_d = np.sqrt(2 / (n + 1)) * np.sin(np.pi * np.arange(1, n + 1)[:, None] * coordinate)
     basis = np.empty((n**dimension, rank))
     for column, mode in enumerate(modes):
         vector = one_d[mode[0] - 1]
