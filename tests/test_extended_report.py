@@ -17,7 +17,7 @@ RECORDS = Path(__file__).resolve().parents[1] / "examples/benchmarks/extended/ch
 
 
 def test_recorded_initial_protocol_retains_failures():
-    report, sequences = checked_sequences(RECORDS / "results.json")
+    report, sequences = checked_sequences(RECORDS / "results.json", require_clean_source=True)
     summary = summarize(report, sequences)
     assert len(sequences) == 60
     assert len(summary["rows"]) == 12

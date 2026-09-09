@@ -29,9 +29,14 @@ def check_partition(parts, total):
         raise ValueError("Timing components do not sum to the total")
 
 
-def checked_sequences(index_path):
+def checked_sequences(index_path, *, require_clean_source=False):
     index_path = Path(index_path)
     report = json.loads(index_path.read_text())
+    if require_clean_source and (
+        not report["environment"]["source_tree_clean"]
+        or len(report["environment"]["git_head"]) != 40
+    ):
+        raise ValueError("Measurement source must be frozen and clean")
     spec = report["specification"]
     controls = spec["controls"]
     spec_hash = hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()
@@ -204,7 +209,12 @@ def summarize(report, sequences):
                         ),
                     }
                 )
-    return {"protocol": report["specification"]["protocol"], "common_seconds": common, "rows": rows}
+    return {
+        "protocol": report["specification"]["protocol"],
+        "environment": report["environment"],
+        "common_seconds": common,
+        "rows": rows,
+    }
 
 
 def plot_sequences(report, sequences, output):
@@ -280,8 +290,11 @@ def main():
     parser.add_argument("input", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--plot", action="store_true")
+    parser.add_argument("--require-clean-source", action="store_true")
     args = parser.parse_args()
-    report, sequences = checked_sequences(args.input)
+    report, sequences = checked_sequences(
+        args.input, require_clean_source=args.require_clean_source
+    )
     summary = summarize(report, sequences)
     args.output.mkdir(parents=True, exist_ok=False)
     write_report(args.output / "summary.json", summary)

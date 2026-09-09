@@ -103,6 +103,30 @@ def test_amgx_rhs_threshold_and_nonzero_initial_guess():
     assert created == destroyed
 
 
+def test_native_success_cannot_override_failed_original_residual():
+    api, created, destroyed, _ = fake_amgx()
+    vector_factory = api.Vector
+
+    def inaccurate_vector():
+        vector = vector_factory()
+        vector.download = lambda target: target.fill(0.0)
+        return vector
+
+    api.Vector = inaccurate_vector
+    result, _ = amgx_cg(
+        sparse.eye(3),
+        np.ones(3),
+        api=api,
+        synchronize=lambda: None,
+        rtol=1e-11,
+        acceptance_rtol=1e-10,
+        rhs_relative=True,
+    )
+    assert result.status == "residual_failed"
+    assert result.residual == pytest.approx(1.0)
+    assert created == destroyed
+
+
 def test_pdas_timing_covers_accepted_outer_steps():
     result = pdas(sparse.diags([2.0, 4.0, 8.0]), np.array([3.0, 5.0, 7.0]), 0.1)
     assert result["status"] == "converged"
