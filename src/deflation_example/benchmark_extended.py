@@ -100,7 +100,7 @@ def protocol(config):
     if not 0 < controls["calibration_activity"] < 1:
         raise ValueError("Calibration activity must lie strictly between zero and one")
     return {
-        "protocol": "extended-cht-pdas-v2",
+        "protocol": "extended-cht-pdas-v3",
         "controls": controls,
         "target_parameters": [
             target_parameters(i, controls["targets"]) for i in range(controls["targets"])
@@ -116,7 +116,8 @@ def protocol(config):
         ),
         "amgx_rhs_scaling": "original b and x0; per-solve ABSOLUTE threshold = internal relative tolerance times ||b||_2",
         "resource_policy": "base Config/Resources persist per sequence; new solver Config sets the RHS-dependent threshold; matrix, vectors, solver and hierarchy recreated per inner solve",
-        "amendment": "Version 1 native convergence sometimes failed fresh residual acceptance. Version 2 preserves all targets and acceptance limits, leaves the AmgX RHS unscaled, and adds the same internal stopping margin to both solvers. Every Version 1 attempt is retained separately.",
+        "amendment": "Version 1 AmgX native convergence sometimes failed fresh residual acceptance. Version 2 used original AmgX right-hand sides and tightened both internal stopping targets; deflation then broke down on some 32^3 solves. Version 3 retains the original-residual acceptance tolerance as the deflation recurrence trigger, with fresh checks during CG, and applies the internal stopping factor to AmgX, whose CPU check occurs after the native solve. Targets, ranks, final residual and KKT limits are unchanged. Every earlier attempt is retained separately.",
+        "stopping_policy": "Deflation triggers fresh residual checks at rtol and every 1000 iterations; AmgX uses native threshold rtol*inner_stopping_factor*||b||_2. Both require the same final CPU relative residual <= rtol.",
         "warm_start_policy": {
             "cold": "empty active set for every target; zero initial guess for every inner solve",
             "outer": "previous converged target active set; zero initial guess for every inner solve",
@@ -130,7 +131,9 @@ def protocol(config):
 
 def complete_sequence(n, bound, method, warm, specification, torch, api):
     controls = specification["controls"]
-    iteration_rtol = controls["rtol"] * controls["inner_stopping_factor"]
+    iteration_rtol = controls["rtol"] * (
+        controls["inner_stopping_factor"] if method == METHODS[1] else 1.0
+    )
     torch.cuda.synchronize()
     start = tick = time.perf_counter()
     problem = build_problem("cht", n)

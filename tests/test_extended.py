@@ -39,6 +39,14 @@ def test_targets_are_distinct_and_have_different_weight_sets():
     )
 
 
+@pytest.mark.parametrize("factor", [0, -0.1, 2, float("nan")])
+def test_invalid_internal_margin_is_rejected(factor):
+    controls = small_protocol()["controls"]
+    controls["inner_stopping_factor"] = factor
+    with pytest.raises(ValueError):
+        protocol(controls)
+
+
 @pytest.mark.parametrize("warm", ["cold", "outer", "outer_inner"])
 def test_complete_sequence_warm_start_and_timing(warm):
     api, created, destroyed, _ = fake_amgx()

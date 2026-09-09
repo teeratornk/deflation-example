@@ -109,8 +109,10 @@ initial guess. This uses the documented
 and [PyAMGX supplied-initial-guess interface](https://github.com/shwina/pyamgx/blob/master/pyamgx/Solver.pyx).
 Both solvers require an original CPU residual of `1e-10` and every PDAS
 KKT component below `1e-8`. The limits are 10,000 inner and 100 outer steps.
-Both methods use an internal stopping target of `1e-11`, with the final
-original-residual acceptance limit fixed at `1e-10`.
+Deflation triggers a fresh residual check when its recurrence reaches
+`1e-10`. AmgX uses a native target of `1e-11` because its independent CPU
+check follows the native solve. Both methods use the same final original
+residual limit of `1e-10`.
 GPU QR, the `1e-12` numerical-rank threshold, the `1e10` coarse-condition
 limit and the 1,000-iteration residual refresh follow the current method.
 
@@ -136,7 +138,12 @@ solves failed the original CPU residual check. Its complete raw experiment
 is retained. Protocol version 2 removes this rescaling and predeclares the
 same factor-0.1 internal stopping margin for both methods. Targets, bounds,
 ranks, warm-start policies, failure handling and final acceptance criteria
-remain unchanged. Results from the two protocols are reported separately.
+remain unchanged. At `32^3`, the tighter deflation trigger exposed breakdown
+before accepted convergence in some solves. Protocol version 3 retains the
+`1e-10` deflation trigger and fresh checks during iteration, and keeps the
+AmgX native margin. This matches the final accuracy criterion through the
+two backends' different verification mechanisms. Every attempt from all
+three protocols is retained and reported separately.
 
 ## Matrix-free rank controls
 

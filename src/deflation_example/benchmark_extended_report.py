@@ -39,7 +39,11 @@ def checked_sequences(index_path):
         raise ValueError("Protocol hash differs")
     if not report.get("complete"):
         raise ValueError("Complete-sequence experiment is unfinished")
-    if spec["protocol"] not in {"extended-cht-pdas-v1", "extended-cht-pdas-v2"}:
+    if spec["protocol"] not in {
+        "extended-cht-pdas-v1",
+        "extended-cht-pdas-v2",
+        "extended-cht-pdas-v3",
+    }:
         raise ValueError("Unknown protocol")
     expected = {
         (n, w, m, r)
