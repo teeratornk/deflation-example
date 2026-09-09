@@ -34,7 +34,20 @@ def worker():
         pyamgx.finalize()
         torch.cuda.synchronize()
         parts["gpu_runtime_finalization"] = time.perf_counter() - tick
-    print(PREFIX + json.dumps({"components_seconds": parts}), flush=True)
+    print(
+        PREFIX
+        + json.dumps(
+            {
+                "components_seconds": parts,
+                "environment": {
+                    "torch": torch.__version__,
+                    "cuda": torch.version.cuda,
+                    "gpu": torch.cuda.get_device_name(),
+                },
+            }
+        ),
+        flush=True,
+    )
 
 
 def run(output, repeats=5):
@@ -51,7 +64,7 @@ def run(output, repeats=5):
         "parent_interpretation": "launch/serialization/exit interval is the parent wall time minus the disjoint child intervals; parent launcher startup is outside the measured workload",
     }
     write_report(output / "protocol.json", specification)
-    rows = []
+    rows, gpu_environment = [], None
     for repetition in range(repeats):
         tick = time.perf_counter()
         child = subprocess.run(
@@ -74,19 +87,24 @@ def run(output, repeats=5):
                 }
             )
             continue
-        parts = json.loads(payloads[0])["components_seconds"]
+        payload = json.loads(payloads[0])
+        parts = payload["components_seconds"]
+        measured_environment = payload.get("environment", {})
+        if gpu_environment is None:
+            gpu_environment = measured_environment
         parts["python_launch_serialization_and_exit"] = total - sum(parts.values())
         rows.append(
             {
                 "repetition": repetition,
-                "success": all(v >= 0 for v in parts.values()),
+                "success": all(v >= 0 for v in parts.values())
+                and measured_environment == gpu_environment,
                 "total_seconds": total,
                 "components_seconds": parts,
             }
         )
     report = {
         "specification": specification,
-        "environment": environment(),
+        "environment": {**environment(), **(gpu_environment or {})},
         "rows": rows,
         "complete": len(rows) == repeats,
         "success": all(r["success"] for r in rows),
