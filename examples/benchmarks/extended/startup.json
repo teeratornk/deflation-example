@@ -1,0 +1,131 @@
+{
+  "specification": {
+    "protocol": "fresh-process-startup-v1",
+    "repetitions": 5,
+    "threads": 4,
+    "scope": "fresh child process launch, benchmark and GPU imports, GPU initialization/finalization and process exit; no problem construction or optimization",
+    "parent_interpretation": "launch/serialization/exit interval is the parent wall time minus the disjoint child intervals; parent launcher startup is outside the measured workload"
+  },
+  "environment": {
+    "python": "3.12.3",
+    "system": "Linux",
+    "machine": "x86_64",
+    "numpy": "2.4.2",
+    "scipy": "1.17.1",
+    "package": "0.3.0",
+    "git_head": "0c72aab28f609de245fb75eca01c6e10cc4028a2",
+    "source_tree_clean": true,
+    "source_sha256": {
+      "__init__.py": "376656ea3f917f1c943f52862508fb479269ce04cdf67cf39a5b028244329065",
+      "__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+      "amgx.py": "cb31696bad8e1791ef398a058fbf55c48df1410a100223cd80b7771a3b0d0fd3",
+      "backends.py": "69c6c2ad0c6c5ca577339ae32ec8a2939efd1938e66f39555324127421951af6",
+      "benchmark_controls.py": "855d58ec5716a5effe3c868115b4269d79f7013d7fd96361262db4e9b07e0257",
+      "benchmark_extended.py": "0d647fd11829d7c957715703061e70ffd088d8fceef616e50b66601519c138d8",
+      "benchmark_extended_report.py": "2fd7a0774bd7fadc44704708ecbde638a4be24c1d012d493f970a97132285b28",
+      "benchmark_gpu.py": "b77fc512598a32b5bc85fc1dc397b95b108aea182c36186b3e2dbd71c3e09556",
+      "benchmark_matrix_free.py": "c24b43ee4be409434e6a52a4e8bd852af4e2aeeeef6e4abc434bed030c8dfa27",
+      "benchmark_report.py": "c01ef955d7d2e537ae48a65b34bc3f044609ba5e552ad79cae3371b94c822f3b",
+      "benchmark_sequence.py": "e9382352ad01acd0adbb21d3d19703a26a885ea82dbc25fc30730e7f2decfa97",
+      "benchmark_startup.py": "4cf4957ef78436af4a17495f67cca452f14c42738b03a8a90167398f8eed2280",
+      "benchmark_structure.py": "2ae29002797eb35241cdc4a10bd13cef752d0417db877b8d27e886ae7b535eb5",
+      "cli.py": "e15017ca7d3dff0be2d900bfb6cb7f5df5d3ec690b3c0539c522b6862b9ff302",
+      "gpu.py": "ecb87b21d7e5af48a8b8f39e8154568c5a0dc65447f90b076adea16d1a7e6200",
+      "plotting.py": "cf82f9b04ce9184b7595e01648d1f1ada7f3a2068360c1aeb7c1d5c9f75e1873",
+      "problems.py": "000dab0a63b47d346bee3ccc339e2965422f6981fd6e988296b85354ec3dac60",
+      "reporting.py": "02b9e3cbdfeb105306febe624e7188a29632817cbec775bb287c54fb37a63c79",
+      "runner.py": "8d86f85578020a040b9397cba3fca45a0421edcc7a65896140cb807a1a7fb7b9",
+      "solvers.py": "4c9160abf71a170497c6af1a6011f78d122b5f03d02ab8254c338e46a255be8a",
+      "spectral.py": "2f60157678ba907197d3a29d5a82c51744ca64e8d2c0ffc71307a8778a1ca8f4",
+      "timing.py": "d9713051c2e5728906a4396acbcfa7222111a3a9a31db6d56c7795a1a560f103",
+      "validation.py": "7b96a43aebf8b43463c879cb1b42d04f0925b4d192d28465ccef6a23107435e3"
+    },
+    "blas": [
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 4,
+        "prefix": "libscipy_openblas",
+        "version": "0.3.31.dev",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      },
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 4,
+        "prefix": "libscipy_openblas",
+        "version": "0.3.30",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      }
+    ],
+    "torch": "2.10.0+cu128",
+    "cuda": "12.8",
+    "gpu": "NVIDIA H200"
+  },
+  "rows": [
+    {
+      "repetition": 0,
+      "success": true,
+      "total_seconds": 14.792652813717723,
+      "components_seconds": {
+        "scientific_module_loading": 1.8030567970126867,
+        "gpu_module_loading_and_device_check": 9.914508054964244,
+        "gpu_runtime_initialization": 0.20286563504487276,
+        "gpu_runtime_finalization": 0.00021572690457105637,
+        "python_launch_serialization_and_exit": 2.872006599791348
+      }
+    },
+    {
+      "repetition": 1,
+      "success": true,
+      "total_seconds": 11.448783510364592,
+      "components_seconds": {
+        "scientific_module_loading": 1.2050807978957891,
+        "gpu_module_loading_and_device_check": 7.1427646251395345,
+        "gpu_runtime_initialization": 0.210754725150764,
+        "gpu_runtime_finalization": 0.00021704751998186111,
+        "python_launch_serialization_and_exit": 2.8899663146585226
+      }
+    },
+    {
+      "repetition": 2,
+      "success": true,
+      "total_seconds": 11.28590616863221,
+      "components_seconds": {
+        "scientific_module_loading": 1.2106673792004585,
+        "gpu_module_loading_and_device_check": 6.952373594976962,
+        "gpu_runtime_initialization": 0.3599577834829688,
+        "gpu_runtime_finalization": 0.00022317282855510712,
+        "python_launch_serialization_and_exit": 2.7626842381432652
+      }
+    },
+    {
+      "repetition": 3,
+      "success": true,
+      "total_seconds": 11.079679798334837,
+      "components_seconds": {
+        "scientific_module_loading": 1.2454675203189254,
+        "gpu_module_loading_and_device_check": 6.978988028131425,
+        "gpu_runtime_initialization": 0.20773648377507925,
+        "gpu_runtime_finalization": 0.00022461358457803726,
+        "python_launch_serialization_and_exit": 2.647263152524829
+      }
+    },
+    {
+      "repetition": 4,
+      "success": true,
+      "total_seconds": 11.059917664155364,
+      "components_seconds": {
+        "scientific_module_loading": 1.2803354850038886,
+        "gpu_module_loading_and_device_check": 7.105757403187454,
+        "gpu_runtime_initialization": 0.19750143308192492,
+        "gpu_runtime_finalization": 0.00022157281637191772,
+        "python_launch_serialization_and_exit": 2.476101770065725
+      }
+    }
+  ],
+  "complete": true,
+  "success": true
+}

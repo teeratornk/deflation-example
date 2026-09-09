@@ -6,6 +6,11 @@
 - Match outer active-set and inner-solution warm starts across GPU solvers.
 - Record complete-sequence cost components, failures and per-target KKT checks.
 - Support right-hand-side-relative AmgX stopping with nonzero initial guesses.
+- Preserve all three complete-sequence stopping protocols and their failures.
+- Add rank-matched previous-system Krylov recycling and a controlled PDE angle bound.
+- Release matrix-free ranks 0, 20 and 200 through 128 cubed with independent CPU and GPU residuals.
+- Validate sequence hashes, populations, acceptance, resource policies and nonoverlapping timing components before reporting.
+- Measure fresh-process imports, GPU initialization and shutdown separately, with preparation totals that avoid double counting.
 
 ## 0.2.0
 

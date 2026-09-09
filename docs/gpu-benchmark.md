@@ -197,3 +197,68 @@ Calibration and common PDAS mask construction are separate. These costs are
 sums of measured kernels within each repeated control sequence; they exclude
 complete optimization. A failed kernel clears the retained history. All
 attempts remain visible. The comparison tests this bounded-history policy.
+
+## Check recorded evidence and regenerate presentation files
+
+The repository contains complete records under `examples/benchmarks/extended`.
+The `cht_v1`, `cht_v2` and `cht_v3` directories keep the three protocols
+separate. Each contains its specification, sequence index and every raw
+sequence file. The validator accepts a complete experiment containing failures
+and reports the failed counts explicitly. It rejects missing repetitions,
+changed hashes, mismatched targets and invalid acceptance or timing claims.
+
+```bash
+uv run --locked --extra plot python -m deflation_example.benchmark_extended_report \
+  examples/benchmarks/extended/cht_v3/results.json \
+  --startup examples/benchmarks/extended/startup.json \
+  --output runs/cht-report --plot --require-clean-source
+```
+
+This exports sequence-level CSV, checked summary JSON and a cumulative PDF.
+Thin curves are individual complete measurements; thick curves are pointwise
+medians of their measured cumulative prefixes. The final point includes
+cleanup. These curves are distinct from sums of per-instance median kernels
+in the separate Laplacian report.
+The clean-source flag enforces a recorded clean Git source for publication
+checks. Omit it for reports from an installed wheel; source-module hashes
+remain in those reports even when Git metadata is unavailable.
+
+To regenerate manuscript tables from a clean checkout of both repositories,
+run the following in `opt_control` (adjust only the sibling repository path):
+
+```bash
+python3 tools/extended_results.py \
+  --controls ../deflation-example/examples/benchmarks/extended/controls.json \
+  --scale ../deflation-example/examples/benchmarks/extended/scale.json \
+  --startup ../deflation-example/examples/benchmarks/extended/startup.json \
+  --cht-v1 ../deflation-example/examples/benchmarks/extended/cht_v1/results.json \
+  --cht-v2 ../deflation-example/examples/benchmarks/extended/cht_v2/results.json \
+  --cht-v3 ../deflation-example/examples/benchmarks/extended/cht_v3/results.json
+python3 tools/extended_results.py --check
+```
+
+The importer verifies hashes and refuses to replace a different existing raw
+record. CPU controls and the scale study include every declared configuration;
+rank-zero iteration caps remain in the resulting tables. Timing reproduction
+requires the stated hardware and software environment. Numerical acceptance
+and report validation remain independently checkable.
+
+## Fresh-process startup and shutdown
+
+```bash
+uv run --no-sync python -m deflation_example.benchmark_startup --output runs/startup
+```
+
+Five fresh child processes load the same scientific and GPU modules, initialize
+the CUDA and AmgX runtimes, finalize them, and exit. The parent measures each
+whole child lifetime. Child intervals identify scientific imports, GPU loading,
+runtime initialization and finalization; the remaining parent interval covers
+Python launch, serialization and exit. These components sum to each total.
+This separate measurement includes imports absent from the CHT runtime timer.
+The parent launcher is outside the measured child workload.
+
+For a cost including preparation, add this separately measured median startup
+and shutdown cost, the once-per-study bound calibration, and a measured complete
+CHT sequence. The smaller CUDA/AmgX initialization/finalization intervals already
+inside the startup experiment are excluded from that sum to avoid double counting.
+The resulting sum is distinct from the independently repeated sequence interval.

@@ -7,8 +7,10 @@ optimality checks and linear iterations.
 
 The manuscript contains the analysis and broader experiments. Its
 [sources](https://github.com/teeratornk/opt_control) are maintained separately
-and may require repository access. This package demonstrates the method on
-three small quadratic problems; it does not reproduce every table in the paper.
+and may require repository access. The quickstart solves three small quadratic
+presets. Separate benchmarks reproduce the matched GPU comparison, complete
+CHT sequences, scaled Ritz control, conditional spectral examples,
+history-based recycling control and matrix-free rank study.
 
 ## Quickstart
 
@@ -94,7 +96,11 @@ a wall-time speedup, and these examples make no general GPU performance claim.
 For the manuscript timing comparison, use the separate
 [GPU benchmark](docs/gpu-benchmark.md). It includes GPU QR, AmgX with fresh
 and persistent resources, all repetitions, itemized timing and plot generation.
-It also supplies complete CHT PDAS sequence and scaled-Ritz controls.
+It also supplies sixteen-target CHT PDAS sequences at two grids, matched warm
+starts, scaled-Ritz and history controls, and ranks 0, 20 and 200 through
+`128^3`. Checked-in raw records retain all repetitions and failed attempts.
+The CPU quickstart and installed wheel remain small; full evidence records
+are included in the repository and source distribution.
 
 ## Python use and verification
 

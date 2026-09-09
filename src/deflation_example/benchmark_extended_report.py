@@ -144,7 +144,7 @@ def checked_sequences(index_path, *, require_clean_source=False):
     return report, sequences
 
 
-def summarize(report, sequences):
+def summarize(report, sequences, startup_report=None):
     controls = report["specification"]["controls"]
     common = sum(
         report[k]
@@ -154,6 +154,21 @@ def summarize(report, sequences):
             "runtime_finalization_seconds",
         )
     )
+    preparation_scope = "calibration plus recorded GPU runtime initialization/finalization"
+    if startup_report is not None:
+        runs = startup_report["rows"]
+        if (
+            not startup_report["complete"]
+            or not startup_report["success"]
+            or len(runs) != startup_report["specification"]["repetitions"]
+            or not runs
+            or any(not r["success"] for r in runs)
+        ):
+            raise ValueError("Incomplete process-startup measurements")
+        for run in runs:
+            check_partition(run["components_seconds"], run["total_seconds"])
+        common = report["calibration_seconds"] + median(r["total_seconds"] for r in runs)
+        preparation_scope = "calibration plus independently measured median child-process startup/shutdown, including imports; GPU runtime initialization/finalization counted once"
     rows = []
     for n in controls["grids"]:
         for warm in controls["warm_starts"]:
@@ -213,6 +228,7 @@ def summarize(report, sequences):
         "protocol": report["specification"]["protocol"],
         "environment": report["environment"],
         "common_seconds": common,
+        "preparation_scope": preparation_scope,
         "rows": rows,
     }
 
@@ -291,11 +307,13 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--plot", action="store_true")
     parser.add_argument("--require-clean-source", action="store_true")
+    parser.add_argument("--startup", type=Path, help="Separate fresh-process startup report")
     args = parser.parse_args()
     report, sequences = checked_sequences(
         args.input, require_clean_source=args.require_clean_source
     )
-    summary = summarize(report, sequences)
+    startup = json.loads(args.startup.read_text()) if args.startup else None
+    summary = summarize(report, sequences, startup)
     args.output.mkdir(parents=True, exist_ok=False)
     write_report(args.output / "summary.json", summary)
     with atomic_output(args.output / "sequences.csv") as stream:

@@ -38,7 +38,7 @@ uv run --locked python tools/check_release.py --source . --history
 ```
 
 The check intentionally accepts text-only release contents and limits individual
-files to 5 MiB and archives to 20 MiB / 2,000 entries. It rejects duplicate paths,
+files to 5 MiB and source archives to 64 MiB / 2,000 entries. It rejects duplicate paths,
 Windows drive paths, links, special files and oversized members without extracting
 them. History checking refuses shallow clones. Source-archive users can run the
 ordinary source/archive checks without Git.
@@ -55,58 +55,33 @@ CPU CI runs on Python 3.11 and 3.12, builds the distributions, and executes a wh
 from outside the source tree. CUDA tests are marked separately because ordinary
 hosted CI has no GPU. Passing CPU CI does not imply that CUDA was exercised.
 
-## Versions 0.1.1–0.1.2 verification
+## Current benchmark coverage
 
-The expanded suite passes 93 CPU tests on Python 3.11.14 and 3.12.3 using the
-lockfile. Tests cover integer bounds, extreme load magnitudes, failed-inner-solve
-diagnostics, invalid inputs, kernel substitution, atomic report replacement and
-credentials removed from the current tree but retained in Git history, and
-sweep-mode rejection without metadata files. The historical test uses a synthetic
-credential in a temporary test repository; no live credential is included.
+The release includes matched GPU QR and AmgX kernels, complete sixteen-target
+CHT sequences at two grids, scaled Ritz selection, controlled spectral
+examples, previous-system recycling, and matrix-free ranks 0, 20 and 200.
+The [benchmark guide](gpu-benchmark.md) gives commands, fixed configurations,
+timing boundaries and source identifiers. Checked-in raw records retain every
+repetition, iteration cap and failed stopping protocol.
 
-All nine default CPU queries and all 18 corresponding CUDA kernels passed their
-accuracy checks. CUDA validation used PyTorch 2.10.0 / CUDA 12.8 on an H200, and
-the CUDA regression test includes the extreme-scale and coarse-failure cases.
-The executed numerical source is commit `c92e9d8`. Version 0.1.2 changes the
-release workflow and rejects Hydra sweep mode; its numerical implementations
-are unchanged.
+The complete-sequence validator checks hashes, distinct targets, requested and
+deployed ranks, original residuals, KKT components, resource policies and timing
+partitions. Separate startup measurements include fresh Python processes,
+scientific/GPU imports, runtime initialization and shutdown. The manuscript
+table generator charges these preparation costs without double counting GPU
+runtime initialization.
 
-A wheel installed outside the checkout ran the thermal CLI and generated plots.
-The unpacked source archive passed all CPU tests in a fresh locked environment.
-These checks were repeated on the downloaded 0.1.2 release assets: all 93 CPU
-tests passed, and both asset hashes matched the locally built distributions.
-Source, reachable Git history, distributions and generated numerical reports were
-checked for credentials and machine-specific information, with no findings.
-This evidence supports the tested contracts and cases; it is not a guarantee of
-bug-free behavior for every possible input or environment.
-
-## Version 0.1.0 verification
-
-Linux x86-64 checks on 8 September 2026 passed all 44 CPU tests with Python 3.12.3
-(NumPy 2.5.3, SciPy 1.18.1) and Python 3.11.14 (NumPy 2.4.6, SciPy 1.17.1).
-The unpacked source archive passed the same tests in a fresh uv environment.
-A separately installed wheel ran the Hydra command and generated plots from
-outside the checkout, with no Torch installed and no Git source available.
-
-All nine default CPU queries passed: diffusion and thermal at 32 × 32, and
-CHT at 12 × 12 × 12, each at three angles. The largest deflated-PDAS KKT
-component was below `1.2e-11`, state error against direct PDAS below `1.6e-13`,
-and every independently checked kernel residual below `1e-10`. The documented
-40 × 40 diffusion override with rank 40 and alpha `0.0001` also passed.
-These accuracy results are not performance guarantees for other settings.
-
-The CUDA regression test and all nine default queries also passed with PyTorch
-2.10.0, CUDA 12.8 and an NVIDIA H200. All 18 CUDA kernels (Jacobi and deflated
-for each query) passed fresh CPU residual checks below `1e-10`. The largest
-reported Torch allocation was about 33 MiB; this excludes non-Torch allocations.
-The executed package source was commit `50588d5`. Version 0.1.0's solvers and
-benchmark definitions were unchanged from that commit.
+The installed wheel excludes the full raw benchmark records. The repository
+and source distribution include those records for independent inspection.
+The larger archive limit accommodates all repetitions, including failures.
+Earlier release checks remain documented in Git history and the changelog.
 
 ## Scope
 
-The examples are small Cartesian, linear-quadratic control problems. They do not
-validate nonlinear optimization, industrial scalability, unstructured meshes,
-automatic reference selection or every manuscript experiment. The default rank
+The optimization examples use Cartesian, linear-quadratic control problems.
+Nonlinear optimization, unstructured meshes, industrial-scale optimization and
+automatic reference selection require separate validation. Large matrix-free
+systems have manufactured solutions and prescribed inactive sets. The default rank
 is 20. Thermal eigenmodes are computed directly at that rank, so iteration counts
 need not match experiments that selected modes from a larger precomputed pool.
 

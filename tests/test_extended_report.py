@@ -27,6 +27,39 @@ def test_recorded_initial_protocol_retains_failures():
     )
 
 
+def test_final_protocol_accepts_every_target_in_every_sequence():
+    report, sequences = checked_sequences(
+        RECORDS.parent / "cht_v3/results.json", require_clean_source=True
+    )
+    assert report["specification"]["protocol"] == "extended-cht-pdas-v3"
+    assert len(sequences) == 60 and all(s["success"] for s in sequences)
+    assert sum(len(s["cases"]) for s in sequences) == 960
+
+
+def test_process_startup_replaces_gpu_initialization_without_double_counting():
+    report, sequences = checked_sequences(RECORDS / "results.json")
+    startup = {
+        "complete": True,
+        "success": True,
+        "specification": {"repetitions": 2},
+        "rows": [
+            {"success": True, "total_seconds": t, "components_seconds": {"all": t}}
+            for t in (4.0, 6.0)
+        ],
+    }
+    summary = summarize(report, sequences, startup)
+    assert summary["common_seconds"] == report["calibration_seconds"] + 5
+    for row in summary["rows"]:
+        assert row["with_common_seconds"] == row["median_seconds"] + summary["common_seconds"]
+
+
+def test_failed_process_startup_cannot_supply_a_preparation_total():
+    report, sequences = checked_sequences(RECORDS / "results.json")
+    startup = {"complete": False, "success": False, "rows": []}
+    with pytest.raises(ValueError, match="Incomplete process-startup"):
+        summarize(report, sequences, startup)
+
+
 @pytest.mark.parametrize(
     "mutation, match",
     [

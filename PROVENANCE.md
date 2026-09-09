@@ -6,10 +6,12 @@ Choi and Sanghyun Lee. The
 [reviewed manuscript version](https://github.com/teeratornk/opt_control/tree/reviewed-main-si-2026-09-08)
 defines the methods and problem conventions used here.
 
-Version 0.2.0 additionally supplies the matched GPU and complete-sequence
-benchmarks used in the submission revision. Their reports identify the exact
+Version 0.3.0 supplies the matched GPU, extended complete-sequence,
+conditional PDE, recycling and matrix-free benchmarks. Their reports identify the exact
 source commit and per-module SHA-256 values used for each measurement; these
 are authoritative when comparing records with a later documentation release.
+The earlier complete-sequence stopping protocols retain all failed attempts
+in separate datasets. Later reports use their declared source and protocol.
 
 The numerical core and problem definitions were adapted from the authors'
 verified implementation. Packaging adds typed configuration, portable execution,

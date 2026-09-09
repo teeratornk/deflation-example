@@ -1,0 +1,1291 @@
+{
+  "protocol_sha256": "95e7d1e6742654b64d8ff5b0b6207961fa0d7364ace5d72e81b46e108feb7018",
+  "specification": {
+    "protocol": "extended-cht-pdas-v2",
+    "controls": {
+      "grids": [
+        24,
+        32
+      ],
+      "targets": 16,
+      "rank": 100,
+      "repeats": 5,
+      "warm_starts": [
+        "cold",
+        "outer",
+        "outer_inner"
+      ],
+      "rtol": 1e-10,
+      "inner_stopping_factor": 0.1,
+      "outer_tolerance": 1e-08,
+      "inner_cap": 10000,
+      "outer_cap": 100,
+      "threads": 4,
+      "calibration_grid": 24,
+      "calibration_steps": 8,
+      "calibration_activity": 0.2
+    },
+    "target_parameters": [
+      {
+        "index": 0,
+        "t": 0.0,
+        "angle": 0.0,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.3,
+            0.3,
+            0.265
+          ],
+          [
+            0.3,
+            0.7,
+            0.265
+          ],
+          [
+            0.7,
+            0.3,
+            0.6649999999999999
+          ],
+          [
+            0.7,
+            0.7,
+            0.6649999999999999
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.8,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 1,
+        "t": 0.06666666666666667,
+        "angle": 0.08,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.3166225975333106,
+            0.28465671994564157,
+            0.26966666666666667
+          ],
+          [
+            0.28465671994564157,
+            0.6833774024666893,
+            0.26966666666666667
+          ],
+          [
+            0.7153432800543584,
+            0.3166225975333106,
+            0.6696666666666666
+          ],
+          [
+            0.6833774024666893,
+            0.7153432800543584,
+            0.6696666666666666
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.81,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 2,
+        "t": 0.13333333333333333,
+        "angle": 0.16,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.33441818464772377,
+            0.2706909020020254,
+            0.2743333333333333
+          ],
+          [
+            0.2706909020020254,
+            0.6655818153522761,
+            0.2743333333333333
+          ],
+          [
+            0.7293090979979745,
+            0.33441818464772377,
+            0.6743333333333332
+          ],
+          [
+            0.6655818153522761,
+            0.7293090979979745,
+            0.6743333333333332
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.8200000000000001,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 3,
+        "t": 0.2,
+        "angle": 0.24,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.35327293031502094,
+            0.25819187974416713,
+            0.27899999999999997
+          ],
+          [
+            0.25819187974416713,
+            0.646727069684979,
+            0.27899999999999997
+          ],
+          [
+            0.7418081202558328,
+            0.35327293031502094,
+            0.6789999999999999
+          ],
+          [
+            0.646727069684979,
+            0.7418081202558328,
+            0.6789999999999999
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.8300000000000001,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 4,
+        "t": 0.26666666666666666,
+        "angle": 0.32,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.37306622850673543,
+            0.2472396042602883,
+            0.2836666666666667
+          ],
+          [
+            0.2472396042602883,
+            0.6269337714932646,
+            0.2836666666666667
+          ],
+          [
+            0.7527603957397117,
+            0.3730662285067354,
+            0.6836666666666666
+          ],
+          [
+            0.6269337714932646,
+            0.7527603957397117,
+            0.6836666666666666
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.8400000000000001,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 5,
+        "t": 0.3333333333333333,
+        "angle": 0.39999999999999997,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.3936714696611531,
+            0.23790413273769284,
+            0.28833333333333333
+          ],
+          [
+            0.2379041327376929,
+            0.6063285303388468,
+            0.28833333333333333
+          ],
+          [
+            0.762095867262307,
+            0.3936714696611531,
+            0.6883333333333332
+          ],
+          [
+            0.6063285303388469,
+            0.762095867262307,
+            0.6883333333333332
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.8500000000000001,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 6,
+        "t": 0.4,
+        "angle": 0.48,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.41495685055243975,
+            0.23024518033584657,
+            0.293
+          ],
+          [
+            0.23024518033584662,
+            0.5850431494475602,
+            0.293
+          ],
+          [
+            0.7697548196641534,
+            0.4149568505524397,
+            0.693
+          ],
+          [
+            0.5850431494475602,
+            0.7697548196641534,
+            0.693
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.8600000000000001,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 7,
+        "t": 0.4666666666666667,
+        "angle": 0.5599999999999999,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.4367862173814935,
+            0.2243117382131401,
+            0.29766666666666663
+          ],
+          [
+            0.2243117382131401,
+            0.5632137826185065,
+            0.29766666666666663
+          ],
+          [
+            0.7756882617868599,
+            0.4367862173814934,
+            0.6976666666666667
+          ],
+          [
+            0.5632137826185065,
+            0.7756882617868599,
+            0.6976666666666667
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.87,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 8,
+        "t": 0.5333333333333333,
+        "angle": 0.64,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.4590199366956199,
+            0.22014176015066306,
+            0.30233333333333334
+          ],
+          [
+            0.22014176015066306,
+            0.5409800633043801,
+            0.30233333333333334
+          ],
+          [
+            0.779858239849337,
+            0.45901993669561986,
+            0.7023333333333333
+          ],
+          [
+            0.5409800633043801,
+            0.7798582398493369,
+            0.7023333333333333
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.88,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 9,
+        "t": 0.6,
+        "angle": 0.72,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.4815157885661156,
+            0.21776191977752635,
+            0.307
+          ],
+          [
+            0.2177619197775264,
+            0.5184842114338843,
+            0.307
+          ],
+          [
+            0.7822380802224735,
+            0.4815157885661156,
+            0.707
+          ],
+          [
+            0.5184842114338843,
+            0.7822380802224735,
+            0.707
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.89,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 10,
+        "t": 0.6666666666666666,
+        "angle": 0.7999999999999999,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.5041298763104715,
+            0.21718743995066236,
+            0.31166666666666665
+          ],
+          [
+            0.21718743995066236,
+            0.49587012368952854,
+            0.31166666666666665
+          ],
+          [
+            0.7828125600493376,
+            0.5041298763104713,
+            0.7116666666666667
+          ],
+          [
+            0.49587012368952854,
+            0.7828125600493376,
+            0.7116666666666667
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.9,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 11,
+        "t": 0.7333333333333333,
+        "angle": 0.8799999999999999,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.5267175469400778,
+            0.21842199538049006,
+            0.3163333333333333
+          ],
+          [
+            0.21842199538049012,
+            0.47328245305992217,
+            0.3163333333333333
+          ],
+          [
+            0.7815780046195099,
+            0.5267175469400778,
+            0.7163333333333333
+          ],
+          [
+            0.4732824530599222,
+            0.7815780046195098,
+            0.7163333333333333
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.91,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 12,
+        "t": 0.8,
+        "angle": 0.96,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.5491343164457083,
+            0.221457689125309,
+            0.321
+          ],
+          [
+            0.22145768912530905,
+            0.4508656835542917,
+            0.321
+          ],
+          [
+            0.778542310874691,
+            0.5491343164457083,
+            0.721
+          ],
+          [
+            0.4508656835542917,
+            0.778542310874691,
+            0.721
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.92,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 13,
+        "t": 0.8666666666666667,
+        "angle": 1.04,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.571236794002112,
+            0.2262751031047766,
+            0.32566666666666666
+          ],
+          [
+            0.22627510310477666,
+            0.428763205997888,
+            0.32566666666666666
+          ],
+          [
+            0.7737248968952233,
+            0.5712367940021119,
+            0.7256666666666667
+          ],
+          [
+            0.428763205997888,
+            0.7737248968952233,
+            0.7256666666666667
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.93,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 14,
+        "t": 0.9333333333333333,
+        "angle": 1.1199999999999999,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.5928835991799586,
+            0.2328434223093565,
+            0.3303333333333333
+          ],
+          [
+            0.23284342230935662,
+            0.4071164008200414,
+            0.3303333333333333
+          ],
+          [
+            0.7671565776906435,
+            0.5928835991799585,
+            0.7303333333333333
+          ],
+          [
+            0.40711640082004147,
+            0.7671565776906434,
+            0.7303333333333333
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.9400000000000001,
+          0.65,
+          0.45
+        ]
+      },
+      {
+        "index": 15,
+        "t": 1.0,
+        "angle": 1.2,
+        "sigma": 0.12,
+        "centers": [
+          [
+            0.6139362662981105,
+            0.24112063191122002,
+            0.33499999999999996
+          ],
+          [
+            0.24112063191122007,
+            0.38606373370188946,
+            0.33499999999999996
+          ],
+          [
+            0.75887936808878,
+            0.6139362662981105,
+            0.735
+          ],
+          [
+            0.3860637337018895,
+            0.75887936808878,
+            0.735
+          ]
+        ],
+        "weights": [
+          1.0,
+          0.9500000000000001,
+          0.65,
+          0.45
+        ]
+      }
+    ],
+    "alpha": 0.001,
+    "conductivity_ratio": 100.0,
+    "transport_amplitude": 50.0,
+    "reference": "Laplacian tensor sine modes; eigenvalue then lexicographic ordering",
+    "rank_policy": "fixed requested rank; GPU thin QR/small-factor SVD cutoff 1e-12; coarse limit 1e10",
+    "residual_refresh": 1000,
+    "amgx_configuration": {
+      "config_version": 2,
+      "determinism_flag": 1,
+      "solver": {
+        "scope": "main",
+        "solver": "PCG",
+        "preconditioner": {
+          "scope": "amg",
+          "solver": "AMG",
+          "algorithm": "CLASSICAL",
+          "selector": "PMIS",
+          "interpolator": "D2",
+          "smoother": {
+            "solver": "MULTICOLOR_GS",
+            "relaxation_factor": 1.0,
+            "symmetric_GS": 1
+          },
+          "presweeps": 1,
+          "postsweeps": 1,
+          "cycle": "V",
+          "max_iters": 1,
+          "max_levels": 25,
+          "coarse_solver": "DENSE_LU_SOLVER"
+        },
+        "tolerance": 1.0000000000000001e-11,
+        "max_iters": 10000,
+        "norm": "L2",
+        "convergence": "ABSOLUTE",
+        "monitor_residual": 1,
+        "obtain_timings": 1,
+        "print_solve_stats": 0
+      }
+    },
+    "amgx_rhs_scaling": "original b and x0; per-solve ABSOLUTE threshold = internal relative tolerance times ||b||_2",
+    "resource_policy": "base Config/Resources persist per sequence; new solver Config sets the RHS-dependent threshold; matrix, vectors, solver and hierarchy recreated per inner solve",
+    "amendment": "Version 1 native convergence sometimes failed fresh residual acceptance. Version 2 preserves all targets and acceptance limits, leaves the AmgX RHS unscaled, and adds the same internal stopping margin to both solvers. Every Version 1 attempt is retained separately.",
+    "warm_start_policy": {
+      "cold": "empty active set for every target; zero initial guess for every inner solve",
+      "outer": "previous converged target active set; zero initial guess for every inner solve",
+      "outer_inner": "previous converged target active set; previous full state restricted to each inner system; update that state after each inner solve"
+    },
+    "failure_policy": "record a failed target and continue at the next target with empty history; numerical exceptions retained; no parameter adjustment",
+    "timing_scope": "independently repeated complete sequences, assembly through final cleanup; calibration and runtime initialization/finalization separately measured",
+    "calibration": "one n=calibration_grid bound at t=0.5, fixed as a physical scalar on every grid and target"
+  },
+  "environment": {
+    "python": "3.12.3",
+    "system": "Linux",
+    "machine": "x86_64",
+    "numpy": "2.4.2",
+    "scipy": "1.17.1",
+    "package": "0.3.0",
+    "git_head": "9939c1103d4a1d6dd3172dba6158f5c0931c38ba",
+    "source_tree_clean": true,
+    "source_sha256": {
+      "__init__.py": "376656ea3f917f1c943f52862508fb479269ce04cdf67cf39a5b028244329065",
+      "__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+      "amgx.py": "cb31696bad8e1791ef398a058fbf55c48df1410a100223cd80b7771a3b0d0fd3",
+      "backends.py": "69c6c2ad0c6c5ca577339ae32ec8a2939efd1938e66f39555324127421951af6",
+      "benchmark_controls.py": "855d58ec5716a5effe3c868115b4269d79f7013d7fd96361262db4e9b07e0257",
+      "benchmark_extended.py": "4a5517b9466579a52e8f27fa635a8c6945c3b0b262b4707ae974e9c018a88380",
+      "benchmark_extended_report.py": "5946e9f117b31648755ec754f76262ed61444b8f0ad2c7c5d4cd4bed7807aa3f",
+      "benchmark_gpu.py": "b77fc512598a32b5bc85fc1dc397b95b108aea182c36186b3e2dbd71c3e09556",
+      "benchmark_matrix_free.py": "c24b43ee4be409434e6a52a4e8bd852af4e2aeeeef6e4abc434bed030c8dfa27",
+      "benchmark_report.py": "c01ef955d7d2e537ae48a65b34bc3f044609ba5e552ad79cae3371b94c822f3b",
+      "benchmark_sequence.py": "e9382352ad01acd0adbb21d3d19703a26a885ea82dbc25fc30730e7f2decfa97",
+      "benchmark_structure.py": "2ae29002797eb35241cdc4a10bd13cef752d0417db877b8d27e886ae7b535eb5",
+      "cli.py": "e15017ca7d3dff0be2d900bfb6cb7f5df5d3ec690b3c0539c522b6862b9ff302",
+      "gpu.py": "ecb87b21d7e5af48a8b8f39e8154568c5a0dc65447f90b076adea16d1a7e6200",
+      "plotting.py": "cf82f9b04ce9184b7595e01648d1f1ada7f3a2068360c1aeb7c1d5c9f75e1873",
+      "problems.py": "000dab0a63b47d346bee3ccc339e2965422f6981fd6e988296b85354ec3dac60",
+      "reporting.py": "02b9e3cbdfeb105306febe624e7188a29632817cbec775bb287c54fb37a63c79",
+      "runner.py": "8d86f85578020a040b9397cba3fca45a0421edcc7a65896140cb807a1a7fb7b9",
+      "solvers.py": "4c9160abf71a170497c6af1a6011f78d122b5f03d02ab8254c338e46a255be8a",
+      "spectral.py": "2f60157678ba907197d3a29d5a82c51744ca64e8d2c0ffc71307a8778a1ca8f4",
+      "timing.py": "d9713051c2e5728906a4396acbcfa7222111a3a9a31db6d56c7795a1a560f103",
+      "validation.py": "7b96a43aebf8b43463c879cb1b42d04f0925b4d192d28465ccef6a23107435e3"
+    },
+    "blas": [
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 4,
+        "prefix": "libscipy_openblas",
+        "version": "0.3.31.dev",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      },
+      {
+        "user_api": "blas",
+        "internal_api": "openblas",
+        "num_threads": 4,
+        "prefix": "libscipy_openblas",
+        "version": "0.3.30",
+        "threading_layer": "pthreads",
+        "architecture": "SkylakeX"
+      }
+    ],
+    "torch": "2.10.0+cu128",
+    "cuda": "12.8",
+    "gpu": "NVIDIA H200"
+  },
+  "sequences": [
+    {
+      "path": "sequences/n24_cold_deflated_gpu_qr_0.json",
+      "sha256": "f84d8c1abf4474fc7a45cb2b5c22d101eaf51d9d5e1ce972baf55d8c26f0fc7e",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "cold",
+      "repetition": 0,
+      "total_seconds": 19.785866050049663,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_cold_amgx_persistent_resources_0.json",
+      "sha256": "fd1eeae6e8d3bff0fb6763df7ef71f10e5a91363ff08248300ae0ce5e22a6bcb",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "cold",
+      "repetition": 0,
+      "total_seconds": 29.669712303206325,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_deflated_gpu_qr_0.json",
+      "sha256": "8fb0c93f50595ecb635142d9af42d953dc04a49493025e0fab4c76f93412e82f",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer",
+      "repetition": 0,
+      "total_seconds": 6.9520716946572065,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_amgx_persistent_resources_0.json",
+      "sha256": "d4650fa52222143efd84e5ab73e784e80da15d9ad04caafa59b83fd805ea4ec9",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer",
+      "repetition": 0,
+      "total_seconds": 10.109992161393166,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_inner_deflated_gpu_qr_0.json",
+      "sha256": "28e5f00e1de53843c0eaccd746b440691ec88604d20c61d49dc22faeacf32fe0",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer_inner",
+      "repetition": 0,
+      "total_seconds": 5.983184132725,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_inner_amgx_persistent_resources_0.json",
+      "sha256": "2d7311ba7e2d4328e8d4d7851779d86922b3ad47657997484f822fc749db2746",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer_inner",
+      "repetition": 0,
+      "total_seconds": 8.469668353907764,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_inner_amgx_persistent_resources_1.json",
+      "sha256": "bde54155d9e6abe8c058e061e2a9c483f0dabd0ada8189532b6815e4702a8e5e",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer_inner",
+      "repetition": 1,
+      "total_seconds": 8.092297305352986,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_inner_deflated_gpu_qr_1.json",
+      "sha256": "c6b3cb9acf864826b08db0fe443f90735da00779cd2c8937fb00cfd34aa176f9",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer_inner",
+      "repetition": 1,
+      "total_seconds": 5.971503798849881,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_amgx_persistent_resources_1.json",
+      "sha256": "91419d40807dc16fa094679645e6919914fb0e6d897e1b78e530a294e87113e9",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer",
+      "repetition": 1,
+      "total_seconds": 10.25984775647521,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_deflated_gpu_qr_1.json",
+      "sha256": "532a0fb20b99ce409f5f86dea4bcd32d5f81dbeb58856c0dfc9f039fa06bfa4a",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer",
+      "repetition": 1,
+      "total_seconds": 6.948526058346033,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_cold_amgx_persistent_resources_1.json",
+      "sha256": "b41873d1a96f2edca6f95a25af7a23698efd7aa9105b5dba3c486b5d6c6be47b",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "cold",
+      "repetition": 1,
+      "total_seconds": 29.982751400209963,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_cold_deflated_gpu_qr_1.json",
+      "sha256": "1d2a81ede5e2d4ff060d8e2ff0b5787d7cee5a0b7a81604f7cface4fe55f8855",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "cold",
+      "repetition": 1,
+      "total_seconds": 19.1951103489846,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_cold_deflated_gpu_qr_2.json",
+      "sha256": "202082ae7a46fd939fa38893b39e8f65b998b213ff0196c5bb163bb9f077ca98",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "cold",
+      "repetition": 2,
+      "total_seconds": 18.94816825632006,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_cold_amgx_persistent_resources_2.json",
+      "sha256": "b7efe15493c120ed6675bbd4b945b6f8e21eaf1fefe18185bbd066d19bf17670",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "cold",
+      "repetition": 2,
+      "total_seconds": 29.180553453043103,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_deflated_gpu_qr_2.json",
+      "sha256": "26006791e8e8e8262d62812b07c2c59e3008bd6956de6d76ceaa82f59bcd2238",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer",
+      "repetition": 2,
+      "total_seconds": 6.846854455769062,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_amgx_persistent_resources_2.json",
+      "sha256": "d285546259039fd6f7bf9b0a484734aeff07ba2aa09b71d2bf474beb8faf0815",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer",
+      "repetition": 2,
+      "total_seconds": 10.399778191000223,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_inner_deflated_gpu_qr_2.json",
+      "sha256": "7b5bc6ddd02ade612d23f54a5a2ab12d766316caa39e5f4494ca91598662362f",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer_inner",
+      "repetition": 2,
+      "total_seconds": 5.948588944971561,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_inner_amgx_persistent_resources_2.json",
+      "sha256": "41fb30321b72dafe4e816959f6bc9d2faf0ca55f521a8f21b1c6041af5cb4f5a",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer_inner",
+      "repetition": 2,
+      "total_seconds": 7.838257779367268,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_inner_amgx_persistent_resources_3.json",
+      "sha256": "669c13a8f8f41122867a42043f8605fb01238bdd78b81dd1d36178eb1c43b82f",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer_inner",
+      "repetition": 3,
+      "total_seconds": 7.839522403664887,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_inner_deflated_gpu_qr_3.json",
+      "sha256": "0b96a5ee6e6e3c0401d00a80fddbdc6649f1fae2b5abd61658742eac38f92201",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer_inner",
+      "repetition": 3,
+      "total_seconds": 5.824114801362157,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_amgx_persistent_resources_3.json",
+      "sha256": "3bc228430bdab8600d235366542352450ceedb4928dbefc5b99ccab9615d6a61",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer",
+      "repetition": 3,
+      "total_seconds": 9.742697045207024,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_deflated_gpu_qr_3.json",
+      "sha256": "dac6d5a1ffa7983303e853a8d36da0b81a0d93f60684a0606875f843a9974367",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer",
+      "repetition": 3,
+      "total_seconds": 6.82625322137028,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_cold_amgx_persistent_resources_3.json",
+      "sha256": "517b5d0e557b9833ae81f9b428b37c21509604c5b3bcdf4b9da4f0ee0fd0d8fa",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "cold",
+      "repetition": 3,
+      "total_seconds": 29.19610370043665,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_cold_deflated_gpu_qr_3.json",
+      "sha256": "864854e5491da18b1cb65926701996e8776c4d07fa83a57e4c5823574eff969c",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "cold",
+      "repetition": 3,
+      "total_seconds": 18.95793397910893,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_cold_deflated_gpu_qr_4.json",
+      "sha256": "79e780b9f2d7719c6745d3ec22b6a695129837aaffc36ee7b8afde74b5f55f6f",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "cold",
+      "repetition": 4,
+      "total_seconds": 18.909342288039625,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_cold_amgx_persistent_resources_4.json",
+      "sha256": "9f3027a657372ed95a6626a459d210450f4f68c3f3b95fc63989578d08f9c937",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "cold",
+      "repetition": 4,
+      "total_seconds": 29.64588945452124,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_deflated_gpu_qr_4.json",
+      "sha256": "d7df115097ea8066a4ea95ef541149ef7b9f6b366f2ed1b82447aede4bb09fac",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer",
+      "repetition": 4,
+      "total_seconds": 6.785715315490961,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_amgx_persistent_resources_4.json",
+      "sha256": "6fa4015fe8278efd406d1937087374b17aa197cd9cb9538b755856a10adcf32d",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer",
+      "repetition": 4,
+      "total_seconds": 9.759259723126888,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_inner_deflated_gpu_qr_4.json",
+      "sha256": "4b9bcad19b06d9bda80d838cde5d7159326cc5ac5a51873631eacde6ec0f2104",
+      "n": 24,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer_inner",
+      "repetition": 4,
+      "total_seconds": 5.809846132993698,
+      "success": true
+    },
+    {
+      "path": "sequences/n24_outer_inner_amgx_persistent_resources_4.json",
+      "sha256": "a3adea3dd5f340ee235fb78b658648fdd0c122481e855403df4b7bbf2f82289e",
+      "n": 24,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer_inner",
+      "repetition": 4,
+      "total_seconds": 7.838455704972148,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_cold_deflated_gpu_qr_0.json",
+      "sha256": "ac7e92f3cd3b140dd45f77936c29092781a39da93d2894cace4fc301278ad88e",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "cold",
+      "repetition": 0,
+      "total_seconds": 20.90498887747526,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_cold_amgx_persistent_resources_0.json",
+      "sha256": "ad5d31a2dfa7615ea624cd11cb894a740576ffc36e3094b32466d26265352b1c",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "cold",
+      "repetition": 0,
+      "total_seconds": 83.85956475604326,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_outer_deflated_gpu_qr_0.json",
+      "sha256": "93bb671fce7a16c107a8b66fa6fcbc4de3e457bba2e7f05c5e769899436b5e0c",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer",
+      "repetition": 0,
+      "total_seconds": 13.066035703755915,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_outer_amgx_persistent_resources_0.json",
+      "sha256": "a949700c4be125f3ccd72facea07bcf19be7dba7e69f910200f3db71b52af705",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer",
+      "repetition": 0,
+      "total_seconds": 28.64334870968014,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_outer_inner_deflated_gpu_qr_0.json",
+      "sha256": "e218d0a7e7307a4339ac1596a30c58d6bce1b83661c0e03854c49add9036864f",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer_inner",
+      "repetition": 0,
+      "total_seconds": 11.066447145305574,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_outer_inner_amgx_persistent_resources_0.json",
+      "sha256": "5690908566ca0389e3e28eb842ed54310ea14c14a71cee4d9faa041abff0caae",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer_inner",
+      "repetition": 0,
+      "total_seconds": 22.057646674104035,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_outer_inner_amgx_persistent_resources_1.json",
+      "sha256": "6b99ac6f7bfb45fb7249358ae13d23d6fac0a4d0c8dc4972c607ad7587143e97",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer_inner",
+      "repetition": 1,
+      "total_seconds": 22.41946868225932,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_outer_inner_deflated_gpu_qr_1.json",
+      "sha256": "def9a77b33633997f94c5cc87bbce284b3fe66c0b83f9f148b925e2f01a5effa",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer_inner",
+      "repetition": 1,
+      "total_seconds": 11.07308055460453,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_outer_amgx_persistent_resources_1.json",
+      "sha256": "5a87633025ebe77d79df5ffd70b6aa6c6dc62e700656058d7525171fb7103485",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer",
+      "repetition": 1,
+      "total_seconds": 28.649901936762035,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_outer_deflated_gpu_qr_1.json",
+      "sha256": "a4fea84f352debb45deede415f610f93941e618c9c7c3546ee4b8cc1442a2b0c",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer",
+      "repetition": 1,
+      "total_seconds": 13.206597531214356,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_cold_amgx_persistent_resources_1.json",
+      "sha256": "e48d4792da4b578421ca51306f1bce6dd7f0d6a5a4ec624455b65e5a0f356f40",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "cold",
+      "repetition": 1,
+      "total_seconds": 84.06660083588213,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_cold_deflated_gpu_qr_1.json",
+      "sha256": "ff43b3142a7d99487094ac23ba83c8f1e7ce349b5db301a2b8fe443eb0f6637f",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "cold",
+      "repetition": 1,
+      "total_seconds": 21.24140202999115,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_cold_deflated_gpu_qr_2.json",
+      "sha256": "05e127a8cb45b97be0244bd2e9f0a1d9f741bf291bfb00c9f139b002e9fabad4",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "cold",
+      "repetition": 2,
+      "total_seconds": 20.936066014692187,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_cold_amgx_persistent_resources_2.json",
+      "sha256": "20268792d0b9d9ab45421e402e83fe6b0c54fc793c372fc6fc574f08b5c05c7c",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "cold",
+      "repetition": 2,
+      "total_seconds": 83.87360866740346,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_outer_deflated_gpu_qr_2.json",
+      "sha256": "9f8ae1f5c3069d58b76e5af49d5154af2788532cead9a079e1c90e4d33f71542",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer",
+      "repetition": 2,
+      "total_seconds": 13.018205172382295,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_outer_amgx_persistent_resources_2.json",
+      "sha256": "4450e144fdca99bc3164f41af4b0fa47a7058c7055c5ad15b71001ae88b993da",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer",
+      "repetition": 2,
+      "total_seconds": 28.719622508622706,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_outer_inner_deflated_gpu_qr_2.json",
+      "sha256": "57b50a921fe3343b07d1fe7f5061e32f8afe14dcc89b2e8e9137785a2c0ad127",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer_inner",
+      "repetition": 2,
+      "total_seconds": 11.091439550742507,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_outer_inner_amgx_persistent_resources_2.json",
+      "sha256": "9cfc76b783bfe512ec8d5e15ee43733d4c2cbca79b151f90ba18d8a08a2164ac",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer_inner",
+      "repetition": 2,
+      "total_seconds": 22.381686804816127,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_outer_inner_amgx_persistent_resources_3.json",
+      "sha256": "0f81c0b9aece2c9abb8fc9743b3dd009123d239fc333767075e7949812c35d75",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer_inner",
+      "repetition": 3,
+      "total_seconds": 22.155261454172432,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_outer_inner_deflated_gpu_qr_3.json",
+      "sha256": "9fa69594fae216fe6bea93fb20a1e49e31aeda5db37eb6fc1613d5029f63a163",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer_inner",
+      "repetition": 3,
+      "total_seconds": 11.147635286673903,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_outer_amgx_persistent_resources_3.json",
+      "sha256": "50e081ca29f0727b3888d14a766e062c0d1929d6334c98f5ee1fcdea7cf0bc77",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer",
+      "repetition": 3,
+      "total_seconds": 28.710270046256483,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_outer_deflated_gpu_qr_3.json",
+      "sha256": "180e372b4433f0a4ac0a3fdfc7a9c27f5b6882712199c598efdd077aab94e5f5",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer",
+      "repetition": 3,
+      "total_seconds": 12.967876295559108,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_cold_amgx_persistent_resources_3.json",
+      "sha256": "2bd56593abfd6e0002f0a0ff0e368fdf4480ff042666470658a25c4eba3c92e4",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "cold",
+      "repetition": 3,
+      "total_seconds": 83.79328281246126,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_cold_deflated_gpu_qr_3.json",
+      "sha256": "41efc03b7342f7c222fcde3a7c22f98126a8253f86a2786881d88227b3e08a27",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "cold",
+      "repetition": 3,
+      "total_seconds": 20.88059225771576,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_cold_deflated_gpu_qr_4.json",
+      "sha256": "10d6e2674d6fede4fa090986f0ba64f0360bbb854b65206d0b23573e2b3186d9",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "cold",
+      "repetition": 4,
+      "total_seconds": 20.839844724163413,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_cold_amgx_persistent_resources_4.json",
+      "sha256": "f345838ae13ac475a82503c5c37799d5e33dfd4d88c18deb34fcf7b336568fb5",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "cold",
+      "repetition": 4,
+      "total_seconds": 83.91699658986181,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_outer_deflated_gpu_qr_4.json",
+      "sha256": "05ee9b0895e5e7ed1f29489d232d6eb2a982f1aa300ba55efb9a00e8041be1cb",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer",
+      "repetition": 4,
+      "total_seconds": 12.99232230708003,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_outer_amgx_persistent_resources_4.json",
+      "sha256": "f1335e2931069fc3c8a835f1bbc3c83d927801ed5b1a4d294d4ccc87f39787f3",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer",
+      "repetition": 4,
+      "total_seconds": 28.440004412084818,
+      "success": true
+    },
+    {
+      "path": "sequences/n32_outer_inner_deflated_gpu_qr_4.json",
+      "sha256": "98c53438b3066ed15b25e423b6f6b529762f7ac70ef16e652dcaaf60cc32a1e3",
+      "n": 32,
+      "method": "deflated_gpu_qr",
+      "warm_start": "outer_inner",
+      "repetition": 4,
+      "total_seconds": 11.044450977817178,
+      "success": false
+    },
+    {
+      "path": "sequences/n32_outer_inner_amgx_persistent_resources_4.json",
+      "sha256": "0e152fc1e254318def65e9c050bfd3a3c6434c97abc283ed54b50b467157aa44",
+      "n": 32,
+      "method": "amgx_persistent_resources",
+      "warm_start": "outer_inner",
+      "repetition": 4,
+      "total_seconds": 22.39531902782619,
+      "success": true
+    }
+  ],
+  "success": false,
+  "bound": 0.00019498904452558432,
+  "calibrated_activity": 0.18844039351851852,
+  "calibration_seconds": 212.29662764072418,
+  "runtime_initialization_seconds": 0.25906725600361824,
+  "runtime_finalization_seconds": 0.0004077525809407234,
+  "complete": true
+}
