@@ -5,6 +5,7 @@ handles; matrix, vectors, solver and hierarchy are recreated for each solve.
 The caller initializes/finalizes the AmgX library once per process.
 """
 
+from copy import deepcopy
 import numpy as np
 from scipy import sparse
 from scipy.linalg import norm
@@ -93,7 +94,17 @@ class AmgxSession:
 
 
 def amgx_cg(
-    A, b, *, api, synchronize, session=None, rtol=1e-10, maxiter=10000, x0=None, rhs_relative=False
+    A,
+    b,
+    *,
+    api,
+    synchronize,
+    session=None,
+    rtol=1e-10,
+    maxiter=10000,
+    x0=None,
+    rhs_relative=False,
+    acceptance_rtol=None,
 ):
     timer = PhaseTimer()
     timer.synchronize(synchronize)
@@ -104,13 +115,17 @@ def amgx_cg(
     if max(A.shape) > np.iinfo(np.int32).max or A.nnz > np.iinfo(np.int32).max:
         raise ValueError("AmgX dDDI requires 32-bit matrix indices")
     A.indptr, A.indices = A.indptr.astype(np.int32), A.indices.astype(np.int32)
-    # ABSOLUTE convergence on b/||b|| gives the same RHS-relative criterion
-    # for zero and nonzero initial guesses. The matrix and hierarchy are unchanged.
-    scale = float(norm(b)) if rhs_relative else 1.0
-    scale = scale or 1.0
-    rhs_values = np.ascontiguousarray(b / scale)
-    initial = np.ascontiguousarray(initial / scale)
-    initial_residual = independent_residual(A, initial * scale, b)
+    acceptance_rtol = (
+        rtol if acceptance_rtol is None else positive_real(acceptance_rtol, "Acceptance tolerance")
+    )
+    if acceptance_rtol < rtol:
+        raise ValueError("Acceptance tolerance must be at least the iteration tolerance")
+    absolute_tolerance = rtol * (float(norm(b)) or 1.0)
+    if rhs_relative and not 0 < absolute_tolerance < float("inf"):
+        raise ValueError("Native absolute tolerance is outside the finite range")
+    rhs_values = np.ascontiguousarray(b)
+    initial = np.ascontiguousarray(initial)
+    initial_residual = independent_residual(A, initial, b)
     timer.mark("conversion")
     own_session = session is None
     objects = []
@@ -126,13 +141,19 @@ def amgx_cg(
             raise ValueError("AmgX session is closed or has different solver controls")
         timer.mark("resource_creation")
         timer.synchronize(synchronize)
+        solver_config = session.config
+        if rhs_relative:
+            configuration = deepcopy(session.configuration)
+            configuration["solver"]["tolerance"] = absolute_tolerance
+            solver_config = api.Config().create_from_dict(configuration)
+            objects.append(solver_config)
         gpu_matrix = api.Matrix().create(session.resources, "dDDI")
         objects.append(gpu_matrix)
         x = api.Vector().create(session.resources, "dDDI")
         objects.append(x)
         rhs = api.Vector().create(session.resources, "dDDI")
         objects.append(rhs)
-        solver = api.Solver().create(session.resources, session.config, "dDDI")
+        solver = api.Solver().create(session.resources, solver_config, "dDDI")
         objects.append(solver)
         timer.mark("handle_creation")
         timer.synchronize(synchronize)
@@ -149,7 +170,6 @@ def amgx_cg(
         timer.synchronize(synchronize)
         solution = np.empty_like(b)
         x.download(solution)
-        solution *= scale
         timer.mark("download")
         timer.synchronize(synchronize)
         iterations, native_status = int(solver.iterations_number), str(solver.status)
@@ -157,7 +177,7 @@ def amgx_cg(
         # Retain native status independently; fresh original equations are
         # always required. A cap is not converted into success.
         native_converged = native_status.lower() in {"success", "amgx_solve_success", "0"}
-        accepted = native_converged and np.isfinite(residual) and residual <= rtol
+        accepted = native_converged and np.isfinite(residual) and residual <= acceptance_rtol
         status = "converged" if accepted else "residual_failed"
         timer.mark("verification")
     finally:
@@ -175,5 +195,9 @@ def amgx_cg(
         resources_reused=not own_session,
         rhs_relative=rhs_relative,
         initial_residual=initial_residual,
+        iteration_rtol=rtol,
+        acceptance_rtol=acceptance_rtol,
+        native_absolute_tolerance=absolute_tolerance if rhs_relative else None,
+        solver_configuration_per_call=rhs_relative,
     )
     return LinearResult(solution, iterations, residual, status), metrics

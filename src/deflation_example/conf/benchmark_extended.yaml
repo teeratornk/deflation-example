@@ -9,6 +9,7 @@ rank: 100
 repeats: 5
 warm_starts: [cold, outer, outer_inner]
 rtol: 1.0e-10
+inner_stopping_factor: 0.1
 outer_tolerance: 1.0e-8
 inner_cap: 10000
 outer_cap: 100

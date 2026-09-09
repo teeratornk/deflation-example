@@ -5,7 +5,7 @@ import numpy as np
 from scipy import sparse
 from scipy.linalg import norm
 from .solvers import LinearResult, independent_residual, orthonormalize, validate_linear_inputs
-from .validation import matrix
+from .validation import matrix, positive_real
 from .timing import PhaseTimer
 
 
@@ -47,6 +47,7 @@ def _gpu_deflated_cg(
     basis_backend,
     timer,
     torch,
+    acceptance_rtol,
 ):
     """Return (LinearResult, timing/memory metrics), verified with the CPU matrix.
 
@@ -184,7 +185,7 @@ def _gpu_deflated_cg(
     timer.mark("download")
     timer.synchronize(torch.cuda.synchronize)
     residual = independent_residual(A, x_cpu, b)
-    if residual <= rtol and not coarse_failed:
+    if residual <= acceptance_rtol and not coarse_failed:
         status = "converged"
     elif status == "converged":
         status = "residual_failed"
@@ -200,6 +201,8 @@ def _gpu_deflated_cg(
         "requested_rank": requested_rank,
         "orthogonalized_rank": orthogonalized_rank,
         "basis_backend": basis_backend,
+        "iteration_rtol": rtol,
+        "acceptance_rtol": acceptance_rtol,
     }
 
 
@@ -215,6 +218,7 @@ def gpu_deflated_cg(
     condition_limit=1e10,
     *,
     basis_backend="cpu_svd",
+    acceptance_rtol=None,
 ):
     """Verified CUDA solve, including conversion, transfers and temporary cleanup.
 
@@ -225,6 +229,11 @@ def gpu_deflated_cg(
     """
     if basis_backend not in {"cpu_svd", "gpu_qr"}:
         raise ValueError("Basis backend must be cpu_svd or gpu_qr")
+    acceptance_rtol = (
+        rtol if acceptance_rtol is None else positive_real(acceptance_rtol, "Acceptance tolerance")
+    )
+    if acceptance_rtol < rtol:
+        raise ValueError("Acceptance tolerance must be at least the iteration tolerance")
     torch = require_cuda()
     timer = PhaseTimer()
     result, metrics = _gpu_deflated_cg(
@@ -240,6 +249,7 @@ def gpu_deflated_cg(
         basis_backend=basis_backend,
         timer=timer,
         torch=torch,
+        acceptance_rtol=acceptance_rtol,
     )
     # Returning from the helper releases its temporary GPU tensors. The
     # returned solution owns CPU storage only. No empty_cache() is charged.

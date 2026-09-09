@@ -78,7 +78,7 @@ def test_failed_targets_remain_visible_and_reset_history():
     assert created == destroyed
 
 
-def test_amgx_normalized_rhs_and_nonzero_initial_guess():
+def test_amgx_rhs_threshold_and_nonzero_initial_guess():
     api, created, destroyed, _ = fake_amgx()
     session = AmgxSession(api, rhs_relative=True).open()
     A, b, x0 = sparse.diags([2.0, 4.0, 8.0]), np.array([3.0, 5.0, 7.0]), np.ones(3)
@@ -90,6 +90,8 @@ def test_amgx_normalized_rhs_and_nonzero_initial_guess():
     np.testing.assert_array_equal(x0, np.ones(3))
     assert session.configuration["solver"]["convergence"] == "ABSOLUTE"
     assert metrics["rhs_relative"] and result.residual <= 1e-10
+    assert metrics["native_absolute_tolerance"] == pytest.approx(1e-10 * np.linalg.norm(b))
+    assert metrics["solver_configuration_per_call"]
     assert created == destroyed
 
 
@@ -108,7 +110,7 @@ def test_amgx_real_warm_start_uses_rhs_tolerance():
     if not torch.cuda.is_available():
         pytest.skip("CUDA unavailable")
     api.initialize()
-    session = AmgxSession(api, rhs_relative=True).open()
+    session = AmgxSession(api, rtol=1e-11, rhs_relative=True).open()
     try:
         A = sparse.diags([-np.ones(19), 3 * np.ones(20), -np.ones(19)], [-1, 0, 1], format="csr")
         b = np.linspace(0.1, 2.0, 20)
@@ -119,6 +121,8 @@ def test_amgx_real_warm_start_uses_rhs_tolerance():
                 api=api,
                 synchronize=torch.cuda.synchronize,
                 session=session,
+                rtol=1e-11,
+                acceptance_rtol=1e-10,
                 rhs_relative=True,
                 x0=initial,
             )

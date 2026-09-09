@@ -94,11 +94,13 @@ def protocol(config):
     ):
         raise ValueError("Unknown or duplicate warm-start policy")
     positive_real(controls["rtol"], "Inner tolerance")
+    if not 0 < positive_real(controls["inner_stopping_factor"], "Inner stopping factor") <= 1:
+        raise ValueError("Inner stopping factor must lie in (0, 1]")
     positive_real(controls["outer_tolerance"], "Outer tolerance")
     if not 0 < controls["calibration_activity"] < 1:
         raise ValueError("Calibration activity must lie strictly between zero and one")
     return {
-        "protocol": "extended-cht-pdas-v1",
+        "protocol": "extended-cht-pdas-v2",
         "controls": controls,
         "target_parameters": [
             target_parameters(i, controls["targets"]) for i in range(controls["targets"])
@@ -109,9 +111,12 @@ def protocol(config):
         "reference": "Laplacian tensor sine modes; eigenvalue then lexicographic ordering",
         "rank_policy": "fixed requested rank; GPU thin QR/small-factor SVD cutoff 1e-12; coarse limit 1e10",
         "residual_refresh": 1000,
-        "amgx_configuration": amgx_configuration(controls["rtol"], controls["inner_cap"], True),
-        "amgx_rhs_scaling": "b and x0 divided by ||b||_2; ABSOLUTE native tolerance; original CPU residual required",
-        "resource_policy": "one Config/Resources per full sequence; new matrix, vectors, solver and hierarchy per inner solve",
+        "amgx_configuration": amgx_configuration(
+            controls["rtol"] * controls["inner_stopping_factor"], controls["inner_cap"], True
+        ),
+        "amgx_rhs_scaling": "original b and x0; per-solve ABSOLUTE threshold = internal relative tolerance times ||b||_2",
+        "resource_policy": "base Config/Resources persist per sequence; new solver Config sets the RHS-dependent threshold; matrix, vectors, solver and hierarchy recreated per inner solve",
+        "amendment": "Version 1 native convergence sometimes failed fresh residual acceptance. Version 2 preserves all targets and acceptance limits, leaves the AmgX RHS unscaled, and adds the same internal stopping margin to both solvers. Every Version 1 attempt is retained separately.",
         "warm_start_policy": {
             "cold": "empty active set for every target; zero initial guess for every inner solve",
             "outer": "previous converged target active set; zero initial guess for every inner solve",
@@ -125,6 +130,7 @@ def protocol(config):
 
 def complete_sequence(n, bound, method, warm, specification, torch, api):
     controls = specification["controls"]
+    iteration_rtol = controls["rtol"] * controls["inner_stopping_factor"]
     torch.cuda.synchronize()
     start = tick = time.perf_counter()
     problem = build_problem("cht", n)
@@ -138,7 +144,7 @@ def complete_sequence(n, bound, method, warm, specification, torch, api):
             basis, modes = analytical_reference(n, 3, controls["rank"])
             parts["reference_construction"] = time.perf_counter() - tick
         elif method == METHODS[1]:
-            session = AmgxSession(api, controls["rtol"], controls["inner_cap"], True).open()
+            session = AmgxSession(api, iteration_rtol, controls["inner_cap"], True).open()
             parts["persistent_resources"] = time.perf_counter() - tick
             modes = []
         else:
@@ -169,7 +175,8 @@ def complete_sequence(n, bound, method, warm, specification, torch, api):
                         restricted,
                         B.diagonal(),
                         x0=initial,
-                        rtol=controls["rtol"],
+                        rtol=iteration_rtol,
+                        acceptance_rtol=controls["rtol"],
                         maxiter=controls["inner_cap"],
                         basis_backend="gpu_qr",
                     )
@@ -180,7 +187,8 @@ def complete_sequence(n, bound, method, warm, specification, torch, api):
                         api=api,
                         synchronize=torch.cuda.synchronize,
                         session=session,
-                        rtol=controls["rtol"],
+                        rtol=iteration_rtol,
+                        acceptance_rtol=controls["rtol"],
                         maxiter=controls["inner_cap"],
                         x0=initial,
                         rhs_relative=True,

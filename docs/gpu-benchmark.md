@@ -99,14 +99,18 @@ new inactive system, and updates it after every inner solve. Both competitors
 have identical access to their own previously accepted solutions.
 
 The native AmgX convergence rule is `ABSOLUTE` for this experiment.
-The right-hand side and initial solution are divided by the right-hand-side
-norm, and the returned solution is rescaled. This gives RHS-relative
-stopping for every initial guess. The matrix and hierarchy construction
-are unchanged. This uses the documented
+The original right-hand side and initial solution are uploaded unchanged.
+A per-solve configuration sets the native threshold to the internal relative
+tolerance times the right-hand-side norm. Base configuration and resources
+remain persistent; the additional solver configuration is included in handle
+creation and cleanup costs. This gives RHS-relative stopping for every
+initial guess. This uses the documented
 [AmgX absolute residual rule](https://github.com/NVIDIA/AMGX/blob/v2.5.0/src/convergence/absolute.cu)
 and [PyAMGX supplied-initial-guess interface](https://github.com/shwina/pyamgx/blob/master/pyamgx/Solver.pyx).
 Both solvers require an original CPU residual of `1e-10` and every PDAS
 KKT component below `1e-8`. The limits are 10,000 inner and 100 outer steps.
+Both methods use an internal stopping target of `1e-11`, with the final
+original-residual acceptance limit fixed at `1e-10`.
 GPU QR, the `1e-12` numerical-rank threshold, the `1e10` coarse-condition
 limit and the 1,000-iteration residual refresh follow the current method.
 
@@ -125,6 +129,14 @@ raw file, hash, target cumulative costs, outer history, inner diagnostics
 and all five final KKT components. Summary medians use independently timed
 complete sequences. The original three-target benchmark remains available
 through `benchmark_sequence` and the version 0.2.0 source.
+
+Protocol version 1 normalized the AmgX right-hand side and solution and used
+the same `1e-10` internal and acceptance tolerances. Some native-success
+solves failed the original CPU residual check. Its complete raw experiment
+is retained. Protocol version 2 removes this rescaling and predeclares the
+same factor-0.1 internal stopping margin for both methods. Targets, bounds,
+ranks, warm-start policies, failure handling and final acceptance criteria
+remain unchanged. Results from the two protocols are reported separately.
 
 ## Matrix-free rank controls
 
