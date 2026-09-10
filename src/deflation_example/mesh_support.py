@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from .reporting import atomic_output, environment, write_report
+from .mesh_report import NAMES
 
 
 def run(validation, transfers, pilots, output):
@@ -82,7 +83,8 @@ def run(validation, transfers, pilots, output):
                       "newly_inactive": sum(r["newly_inactive"] for r in source["rows"]),
                       "maximum_original_residual": max(p["original_residual"] for p in repetitions),
                       "maximum_transfer_identity_error": max(r["transfer_identity_error"] for r in source["rows"])}
-            rows.append([name, label, len(selected), "--".join(map(str, record["rank_range"])),
+            rank_label = str(min(ranks)) if min(ranks) == max(ranks) else "--".join(map(str, record["rank_range"]))
+            rows.append([name, label, len(selected), rank_label,
                          f"{record['median_energy_removed']:.3f}", f"{record['summed_median_iterations']:.0f}",
                          f"{record['summed_median_seconds']:.3f}"])
             summarized.append(record)
@@ -102,7 +104,7 @@ def run(validation, transfers, pilots, output):
             record_summary = {"study": name, "method": method, "accepted_targets": accepted,
                               "declared_targets": protocol["targets"], "complete_success": record["success"],
                               "attempt_seconds": record.get("seconds"), "failure_statuses": statuses}
-            rows.append([name, method.title(), f"{accepted}/{protocol['targets']}",
+            rows.append([name, NAMES[method], f"{accepted}/{protocol['targets']}",
                          "Accepted" if record["success"] else ", ".join(s.replace("_", " ") for s in statuses),
                          f"{record['seconds']:.3f}" if record.get("seconds") is not None else "---"])
             summarized.append(record_summary)

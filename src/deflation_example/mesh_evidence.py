@@ -5,7 +5,7 @@ import hashlib
 import json
 from pathlib import Path, PurePosixPath
 
-from .mesh_report import generate
+from .mesh_report import generate, NAMES
 from .mesh_figures import plot_showcases
 from .mesh_support import run as support
 from .reporting import atomic_output, write_report
@@ -52,7 +52,7 @@ def memory_envelope(studies, output, budgets=(1.5, 2.5, 5.0)):
         "rows": rows})
     with atomic_output(Path(output) / "memory_rows.tex") as stream:
         for row in rows:
-            values = [f"{row['gpu_budget_gib']:.1f}", row["method"].title(),
+            values = [f"{row['gpu_budget_gib']:.1f}", NAMES[row["method"]],
                       str(row["requested_rank"]) if row["requested_rank"] is not None else "---"]
             values += [f"{row[k]:.3f}" if row[k] is not None else "---"
                        for k in ("median_seconds", "sampled_peak_gpu_gib")]
