@@ -1,0 +1,10 @@
+defaults:
+  - mesh_final
+  - _self_
+
+geometry: transformer_2d
+level: 0
+alpha: 1.0e-14
+bound: 0.8
+# Ten minutes in the dimensionless time unit recorded with the mesh.
+horizon: 0.000048444553995823255

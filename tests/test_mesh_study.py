@@ -132,3 +132,11 @@ def test_rank_zero_path_does_not_construct_reference(monkeypatch):
     assert record["success"]
     assert all(i["deployed_rank"] == 0 for case in record["cases"] for i in case["inner"])
     np.testing.assert_allclose(sum(record["components_seconds"].values()), record["seconds"])
+    assert 0 <= record["initial_setup_seconds"] <= record["cases"][0]["cumulative_seconds"] <= record["seconds"]
+
+
+def test_recycling_budget_defaults_to_reference_rank_and_accepts_separate_budget():
+    assert study.controls(OmegaConf.create({"rank": 40}))["recycle_rank"] == 40
+    assert study.controls(OmegaConf.create({"rank": 40, "recycle_rank": 60}))["recycle_rank"] == 60
+    with pytest.raises(ValueError):
+        study.controls(OmegaConf.create({"recycle_rank": 0}))

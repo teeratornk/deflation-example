@@ -1,0 +1,21 @@
+defaults:
+  - mesh_study
+  - _self_
+
+# Frozen complete-sequence protocol for the body-fitted engine hierarchy.
+phase: final
+device: cuda
+reference_device: cuda
+methods: [jacobi, reference, recycling, amgx]
+level: 1
+rank: 100
+recycle_rank: 100
+spatial_reference: scaled_schur
+temporal_metric: jacobi
+construction: mode_dependent
+targets: 16
+repeats: 5
+inner_cap: 50000
+residual_refresh: 10000
+monitor_memory: true
+timeout_seconds: 14400.0

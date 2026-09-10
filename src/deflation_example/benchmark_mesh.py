@@ -38,6 +38,7 @@ class MeshStudyConfig:
     initial_temperature: float = 0.
     targets: int = 3
     rank: int = 20
+    recycle_rank: int | None = None
     construction: str = "mode_dependent"
     spatial_reference: str = "diffusion"
     temporal_metric: str = "euclidean"
@@ -65,6 +66,8 @@ class MeshStudyConfig:
 def controls(config):
     c = OmegaConf.to_container(OmegaConf.merge(OmegaConf.structured(MeshStudyConfig), config),
                                resolve=True, throw_on_missing=True)
+    c["recycle_rank"] = c["rank"] if c["recycle_rank"] is None else c["recycle_rank"]
+    integer(c["recycle_rank"], "Recycling rank", 1)
     for key in ("level",):
         integer(c[key], key)
     for key in ("slabs", "targets", "rank", "repeats", "threads", "inner_cap", "outer_cap", "residual_refresh"):
@@ -141,6 +144,7 @@ def sequence(c, method, torch=None, api=None):
     cases, fields, components, storage = [], [], {}, {}
     problem = showcase = None
     failure = None
+    initial_setup_seconds = None
     try:
         showcase, problem = build_model(c)
         components["assembly"] = time.perf_counter() - tick
@@ -158,12 +162,14 @@ def sequence(c, method, torch=None, api=None):
         components["reference_construction"] = time.perf_counter() - tick
         tick = time.perf_counter()
         if method != "direct":
-            adapter = StudySolver(method, device=c["device"], rank=c["rank"], window=c["rank"],
+            retained_rank = c["recycle_rank"] if method == "recycling" else c["rank"]
+            adapter = StudySolver(method, device=c["device"], rank=retained_rank, window=retained_rank,
                                    reference=reference, rtol=c["rtol"], cg_factor=c["cg_factor"],
                                    amgx_factor=c["amgx_factor"], maxiter=c["inner_cap"],
                                    refresh=c["residual_refresh"], torch=torch, api=api,
                                    resident_recycling=c["reference_device"] == "cuda")
         components["solver_resources"] = time.perf_counter() - tick
+        initial_setup_seconds = time.perf_counter() - start
         previous = None
         for query in range(c["targets"]):
             tick = time.perf_counter()
@@ -225,6 +231,7 @@ def sequence(c, method, torch=None, api=None):
                 masks = solved["active"].reshape(c["slabs"], -1)
                 case["time_newly_active"] = np.sum(masks[1:] & ~masks[:-1], axis=1).tolist()
                 case["time_newly_inactive"] = np.sum(~masks[1:] & masks[:-1], axis=1).tolist()
+            case["cumulative_seconds"] = time.perf_counter() - start
             cases.append(case)
             if c["save_fields"]:
                 fields.append({"state": solved["y"].copy(), "desired": desired.copy(),
@@ -251,6 +258,7 @@ def sequence(c, method, torch=None, api=None):
     components["bookkeeping_and_unfinished_work"] = seconds - sum(components.values())
     mesh = None if showcase is None else showcase.assembly.mesh
     return {"method": method, "seconds": seconds, "components_seconds": components,
+            "initial_setup_seconds": initial_setup_seconds,
             "success": failure is None and len(cases) == c["targets"]
             and all(row["status"] == "converged" for row in cases),
             "failure": failure, "cases": cases, "storage": storage,

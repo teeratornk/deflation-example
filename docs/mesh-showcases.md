@@ -34,14 +34,18 @@ Use `spatial_reference=diffusion` for generalized diffusion modes or
 `spatial_reference=scaled_schur` for modes of the coarse Jacobi-scaled reduced
 operator. The latter includes the prescribed transport. Temporal construction
 uses `construction=mode_dependent` or `construction=tensor`.
+`temporal_metric=jacobi` selects the temporal directions in Jacobi-scaled
+coordinates. `reference_device=cuda` retains reference factors on the GPU and
+forms restrictions there. Recycling then retains and transfers its selected
+vectors on the same device. Its candidate pool includes the existing coarse
+vectors and new projected search directions.
 
 The GPU comparison requires the existing optional PyTorch and native AmgX
 installation described in the companion's GPU instructions:
 
 ```bash
 uv run --locked --extra gpu --extra study python -m deflation_example.benchmark_mesh \
-  device=cuda 'methods=[jacobi,reference,recycling,amgx]' \
-  level=1 rank=100 targets=16 repeats=5 monitor_memory=true phase=final \
+  --config-name mesh_final \
   output=runs/engine-gpu
 ```
 
@@ -137,3 +141,35 @@ uv run --locked --extra mesh python -m deflation_example.generate_engine_mesh \
 
 Gmsh may require platform OpenGL system libraries. The packaged examples have
 no Gmsh runtime dependency and require no access to AI4PDEs or application data.
+
+## Repeated comparison protocol
+
+The declared population comprises engine refinement levels 1 and 2, each in
+steady and four-slab transient form, and the packaged transformer mesh in both
+forms. Every configuration uses 16 distinct desired-temperature profiles,
+five complete repetitions, four solvers, rank 100, and matched outer and inner
+warm starts. The engine uses a dimensionless horizon of 0.1; the transformer
+uses a 600-second horizon. Bounds, material properties, and prescribed
+velocities remain fixed within each sequence. The profiles use the same
+physical-coordinate functions across refinement.
+
+Run the six configurations in separate output directories:
+
+```bash
+uv run --locked --extra gpu --extra study python -m deflation_example.benchmark_mesh \
+  --config-name mesh_final -m level=1,2 transient=false,true
+uv run --locked --extra gpu --extra study python -m deflation_example.benchmark_mesh \
+  --config-name mesh_final_transformer -m transient=false,true
+```
+
+The temporal construction was selected after a four-target pilot compared
+mode-dependent and tensor candidates with identical spatial modes, rank,
+operator, and accuracy. Their engine costs were close; the final study uses
+mode-dependent compression consistently for both geometries. Pilot records
+remain separate from the repeated population. Larger-mesh failures and
+alternative ranks remain identifiable in the supporting scaling records.
+
+Each worker records actual elapsed cumulative time after each target and the
+complete time after cleanup. Cumulative plots use these timestamps from each
+independent repetition. `recycle_rank` permits an explicitly declared
+alternative recycling budget; its default equals the reference rank.

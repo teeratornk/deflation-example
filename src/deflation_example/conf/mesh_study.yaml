@@ -13,6 +13,7 @@ bound: 0.2
 initial_temperature: 0.0
 targets: 3
 rank: 20
+recycle_rank: null
 construction: mode_dependent
 spatial_reference: diffusion
 temporal_metric: euclidean
