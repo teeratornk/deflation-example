@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.2
+
+- Enlarge transformer panels, share spatial axes and separate target labels from physical time.
+- Plot complete-sequence costs at integer completed-target counts, including initialization and the final cleanup-inclusive endpoint.
+- Document the explicit residual-correction recommendation, local error-equation acceptance and final original-system acceptance.
+- Test scalar-failure continuation, locally rejected improving corrections and preservation of all timing repetitions.
+- Preserve the numerical kernels, frozen benchmark presets and all primary and follow-up timing records.
+
 ## 0.6.1
 
 - Keep the complete normalized-temperature labels inside the saved body-fitted figure.

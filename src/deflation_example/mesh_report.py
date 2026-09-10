@@ -294,9 +294,13 @@ def plot_sequences(loaded, output):
             )
         ax.set(
             title=_label(report),
-            xlabel="Accepted target index",
+            xlabel="Completed targets",
             ylabel="Complete elapsed time (s)",
             xlim=(0, report["controls"]["targets"]),
+            xticks=sorted(
+                set(range(0, report["controls"]["targets"] + 1, 4))
+                | {report["controls"]["targets"]}
+            ),
             ylim=(0, None),
         )
         ax.grid(alpha=0.2)

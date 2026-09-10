@@ -70,6 +70,53 @@ def test_correction_budget_is_bounded():
     assert len(calls) == 5 and result.status == "residual_failed"
 
 
+@pytest.mark.parametrize(
+    "scalar, expected, calls_expected",
+    [
+        ("nonpositive_rz", "converged", 2),
+        ("nonpositive_curvature", "breakdown", 1),
+        ("nonfinite_scalar", "breakdown", 1),
+    ],
+)
+def test_only_projected_scalar_breakdown_allows_an_error_equation(scalar, expected, calls_expected):
+    kernel, calls = controlled_solver(status="breakdown")
+
+    def solve(*args):
+        result, timing = kernel(*args)
+        timing["termination_test"] = scalar
+        return result, timing
+
+    result, _ = verified_refinement(solve, sparse.eye(3), np.ones(3), None, 1e-10, 10)
+    assert result.status == expected and len(calls) == calls_expected
+
+
+def test_improving_error_candidate_can_miss_its_local_target():
+    solve, calls = controlled_solver(quality=0.5, status="residual_failed")
+    result, metrics = verified_refinement(solve, sparse.eye(3), np.ones(3), None, 1e-10, 100)
+    assert len(calls) == 5
+    attempts = metrics["refinement_attempts"]
+    assert all(a["local_residual"] > a["local_relative_target"] for a in attempts[1:])
+    assert all(
+        b["original_residual"] < a["original_residual"] for a, b in zip(attempts, attempts[1:])
+    )
+    assert result.residual == pytest.approx(0.1 * 0.5**4)
+    assert result.status == "residual_failed"
+
+
+def test_final_acceptance_precedes_scalar_failure_and_continuation():
+    kernel, calls = controlled_solver(status="breakdown")
+
+    def solve(*args):
+        result, timing = kernel(*args)
+        result.x = np.ones(3)
+        timing["termination_test"] = "nonpositive_curvature"
+        return result, timing
+
+    result, _ = verified_refinement(solve, sparse.eye(3), np.ones(3), None, 1e-10, 10)
+    assert len(calls) == 1
+    assert result.status == "converged" and result.residual == 0
+
+
 def test_projected_scalar_can_be_negative_after_coarse_orthogonality_is_lost():
     B = np.array([[2.0, 1.0], [1.0, 2.0]])
     Q = np.diag([0.5, 0.0])

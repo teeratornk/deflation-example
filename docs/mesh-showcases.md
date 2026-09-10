@@ -73,6 +73,13 @@ and their timings must remain identifiable.
 
 ## Finer-transformer residual correction
 
+For new GPU body-fitted studies, we recommend the explicit
+`residual_policy=refine` option used by `mesh_refinement_transformer`.
+The six primary comparison presets keep `residual_policy=terminal` to reproduce
+their measured procedure. The Python `StudySolver` default also remains
+`terminal`; callers select `refine` explicitly. This recommendation concerns
+the tested residual-gap correction and its unchanged final accuracy checks.
+
 The finer transformer has 42,180 spatial state degrees of freedom, or
 168,720 for a four-slab trajectory. Instrumented projected-CG runs identify
 negative `r @ z` with positive `p @ B @ p`, full retained rank, and moderate
@@ -83,12 +90,22 @@ their gap, coarse orthogonality, and the exact failing scalar.
 The correction preset returns a candidate for independent verification before
 restarting the projected recurrence. A rejected candidate defines an error
 equation with right-hand side `b - B @ x`. Each error solve starts from zero
-and requests relative residual 0.1, with internal target 0.01. The updated
+and requests relative residual 0.1, with internal target 0.01. The local
+acceptance test is `norm(e - B @ delta) / norm(e) <= 0.1`, where
+`e = b - B @ x`. The factor-ten internal margin allows for the difference
+between internal and independently evaluated residuals. A locally rejected
+candidate can still be retained if it improves the original residual.
+The local status governs recycling updates; the independently evaluated
+original residual governs final acceptance. The updated
 solution must satisfy the original `1e-10` residual criterion. PDAS retains
 its `1e-8` KKT criterion. This is residual-based
 [iterative refinement](https://epubs.siam.org/doi/10.1137/1.9780898718027.ch12).
 At most four error equations share the original 50,000-iteration budget.
 Stagnation, exhausted budgets, and all local termination statuses are recorded.
+A nonpositive `r @ z` permits another error solve after an improving candidate.
+Other scalar breakdowns terminate the solve when final acceptance fails.
+The original-residual check precedes these continuation decisions, so a
+candidate that already meets the final criterion requires no correction.
 
 All four solvers receive this policy. Each error equation rebuilds the
 matrix-specific GPU objects and coarse or hierarchy setup. AmgX retains its

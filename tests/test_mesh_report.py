@@ -7,7 +7,7 @@ from threadpoolctl import threadpool_limits
 
 from deflation_example.benchmark_mesh import controls, sequence
 from deflation_example.mesh_presentation import summarize
-from deflation_example.mesh_report import components, generate
+from deflation_example.mesh_report import components, generate, plot_sequences
 
 
 @pytest.fixture
@@ -87,3 +87,52 @@ def test_component_check_rejects_nested_timer_disagreement(records):
     r["cases"][0]["inner"][0]["components_seconds"]["iteration"] += 10
     with pytest.raises(ValueError, match="Inner timing"):
         components(r)
+
+
+@pytest.mark.parametrize("targets", [1, 4, 16, 17])
+def test_sequence_plot_counts_completed_targets_and_preserves_repetitions(
+    targets, tmp_path, monkeypatch
+):
+    pytest.importorskip("matplotlib")
+    from matplotlib.figure import Figure
+
+    saved = []
+    monkeypatch.setattr(Figure, "savefig", lambda figure, *args, **kwargs: saved.append(figure))
+    report = {
+        "controls": {
+            "geometry": "engine_3d",
+            "level": 1,
+            "transient": False,
+            "rank": 100,
+            "targets": targets,
+            "repeats": 5,
+        }
+    }
+    records = {
+        method: [
+            {
+                "initial_setup_seconds": 0.25,
+                "cases": [
+                    {"cumulative_seconds": (i + 1) * slope + rep * 0.01} for i in range(targets)
+                ],
+                "seconds": targets * slope + rep * 0.01 + 0.2,
+            }
+            for rep in range(5)
+        ]
+        for method, slope in (("jacobi", 2), ("reference", 1), ("recycling", 3), ("amgx", 4))
+    }
+    plot_sequences([(report, records)], tmp_path / "plot.pdf")
+    axis = saved[0].axes[0]
+    ticks = axis.get_xticks()
+    assert axis.get_xlabel() == "Completed targets"
+    assert ticks[0] == 0 and ticks[-1] == targets
+    assert all(float(tick).is_integer() for tick in ticks)
+    if targets == 16:
+        np.testing.assert_array_equal(ticks, [0, 4, 8, 12, 16])
+    assert len(axis.lines) == 4 * 6  # Five repetitions and their pointwise median.
+    for method_index, method in enumerate(records):
+        for rep in range(5):
+            line = axis.lines[method_index * 6 + rep]
+            assert line.get_xdata()[-1] == targets
+            assert line.get_ydata()[-1] == records[method][rep]["seconds"]
+    assert "Fastest alternative: Jacobi-CG" in axis.texts[0].get_text()

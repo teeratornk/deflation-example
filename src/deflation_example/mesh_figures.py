@@ -26,8 +26,13 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
 
     if not queries or len(set(queries)) != len(queries):
         raise ValueError("Choose distinct target indices")
-    fig = plt.figure(figsize=(1.9 * (len(queries) + 1), 6.2), constrained_layout=True)
-    grid = fig.add_gridspec(4, len(queries) + 1, width_ratios=[1.35] + [1] * len(queries))
+    fig = plt.figure(figsize=(2.1 * (len(queries) + 1), 7.4), constrained_layout=True)
+    grid = fig.add_gridspec(
+        4,
+        len(queries) + 1,
+        width_ratios=[1.4] + [1] * len(queries),
+        height_ratios=[1.3, 1.3, 1, 1],
+    )
     materials_cmap = ListedColormap(["#56b4e9", "#e69f00", "#332288"])
     for row, directory in enumerate((transformer, engine)):
         directory = Path(directory)
@@ -83,13 +88,12 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
                 norm=BoundaryNorm(np.arange(4) - 0.5, 3),
                 rasterized=True,
             )
-            geometry.set(xlabel="$z$ (m)", ylabel="$r$ (m)", title="Oil, winding, and baffles")
+            geometry.set(xlabel="$z$ (m)", ylabel="$r$ (m)", title="Transformer")
             colorbar = fig.colorbar(
-                im, ax=geometry, orientation="horizontal", ticks=[0, 1, 2], pad=0.12
+                im, ax=geometry, orientation="horizontal", ticks=[0, 1, 2], pad=0.09
             )
-            colorbar.ax.set_xticklabels(
-                ["Oil", "Winding", "Baffle"], fontsize=9, rotation=45, ha="right"
-            )
+            colorbar.ax.set_xticklabels(["Oil", "Winding", "Baffle"], fontsize=8)
+        shared_axis = None
         for col, query in enumerate(queries, 1):
             if query not in range(c["targets"]):
                 raise ValueError("A requested target lies outside the recorded sequence")
@@ -104,20 +108,30 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
             active = unpack_mask(record["cases"][query]["active_mask_bits"], model.size)
             for k, field in enumerate((desired, active)):
                 values[free, k] = field.reshape(-1, len(free))[selected_slab]
-            axis = fig.add_subplot(grid[2 * row, col])
-            active_axis = fig.add_subplot(grid[2 * row + 1, col])
+            axis = fig.add_subplot(grid[2 * row, col], sharex=shared_axis, sharey=shared_axis)
+            if shared_axis is None:
+                shared_axis = axis
+            active_axis = fig.add_subplot(
+                grid[2 * row + 1, col], sharex=shared_axis, sharey=shared_axis
+            )
             if row:
                 xy, triangles, sampled, owners = tetrahedral_slice(
                     nodes, cells, values, coordinate=0.5, axis=2
                 )
                 tri = mtri.Triangulation(xy[:, 0], xy[:, 1], triangles)
-                axis.set(xlabel="$x_1/L$", ylabel="$x_2/L$", aspect="equal")
-                active_axis.set(xlabel="$x_1/L$", ylabel="$x_2/L$", aspect="equal")
+                ylabel, xlabel = "$x_2/L$", "$x_1/L$"
+                axis.set_aspect("equal")
+                active_axis.set_aspect("equal")
             else:
                 tri = mtri.Triangulation(nodes[:, 1], nodes[:, 0], cells[:, [0, 2, 1]])
                 sampled = values
-                axis.set(xlabel="$z$ (m)", ylabel="$r$ (m)")
-                active_axis.set(xlabel="$z$ (m)", ylabel="$r$ (m)")
+                ylabel, xlabel = "$r$ (m)", "$z$ (m)"
+            active_axis.set_xlabel(xlabel)
+            axis.tick_params(labelbottom=False, labelleft=col == 1, labelsize=8)
+            active_axis.tick_params(labelleft=col == 1, labelsize=8)
+            if col == 1:
+                axis.set_ylabel(ylabel)
+                active_axis.set_ylabel(ylabel)
             artist = axis.tripcolor(
                 tri,
                 sampled[:, 0],
@@ -133,16 +147,15 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
                 levels=[-0.01, 0.5, 1.01],
                 colors=["#f2f2f2", "#0072b2"],
             )
-            active_axis.set_title(f"Active set, target {query + 1}", fontsize=9)
-            title = f"Target {query + 1}"
-            if c["transient"]:
+            axis.set_title(f"Target {query + 1}", fontsize=10)
+            if c["transient"] and col == 1:
                 time = (selected_slab + 1) * c["horizon"] / c["slabs"]
-                title += (
-                    f", $t={time * record['parameters']['physical']['time_scale_s']:.0f}$ s"
+                time_label = (
+                    f"$t={time * record['parameters']['physical']['time_scale_s']:.0f}$ s"
                     if not row
-                    else f", $t={time:.3f}$"
+                    else f"$t={time:.3f}$"
                 )
-            axis.set_title(title, fontsize=9)
+                geometry.set_title(geometry.get_title() + "\n" + time_label, fontsize=10)
             if col == len(queries):
                 fig.colorbar(artist, ax=axis, label="Desired temperature\n(normalized)", shrink=0.8)
                 bar = fig.colorbar(active_artist, ax=active_axis, ticks=[0.25, 0.75], shrink=0.8)
