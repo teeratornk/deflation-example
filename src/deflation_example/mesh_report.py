@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from .mesh_presentation import summarize
-from .reporting import atomic_output, write_report
+from .reporting import atomic_output, write_report, environment
 
 
 NAMES = {"jacobi": "Jacobi-CG", "reference": "Reference", "recycling": "Recycling", "amgx": "AmgX"}
@@ -59,7 +59,7 @@ def load_study(directory):
         method["components_seconds"] = [components(r) for r in accepted]
         method["startup_seconds"] = [r["startup_after_import_seconds"] for r in accepted]
         method["finalization_seconds"] = [r["finalization_seconds"] for r in accepted]
-        method["preparation_inclusive_seconds"] = [r["seconds"] + r["startup_after_import_seconds"] + r["finalization_seconds"] for r in accepted]
+        method["library_preparation_inclusive_seconds"] = [r["seconds"] + r["startup_after_import_seconds"] + r["finalization_seconds"] for r in accepted]
         method["whole_worker_process_seconds"] = [completed[(r["method"], r["repetition"])]["process_wall_seconds"] for r in accepted]
         method["max_original_residual"] = max((i["original_residual"] for r in accepted for c in r["cases"] for i in c["inner"]), default=None)
         method["max_kkt"] = max((max(c["kkt"].values()) for r in accepted for c in r["cases"]), default=None)
@@ -76,7 +76,7 @@ def _label(report):
     c = report["controls"]
     name = "Transformer" if c["geometry"] == "transformer_2d" else "Engine"
     form = f"{c['slabs']} slabs" if c["transient"] else "steady"
-    return f"{name}, level {c['level']}, {form}"
+    return f"{name}, level {c['level']}, {form}, rank {c['rank']}"
 
 
 def generate(directories, output, plots=True):
@@ -84,11 +84,14 @@ def generate(directories, output, plots=True):
     output.mkdir(parents=True, exist_ok=False)
     loaded = [load_study(d) for d in directories]
     reports = [r for r, _ in loaded]
-    write_report(output / "summary.json", {"protocol": "mesh-comparison-report-v1", "studies": reports})
-    main_rows, detail_rows, accuracy_rows = [], [], []
-    for report in reports:
+    write_report(output / "summary.json", {"protocol": "mesh-comparison-report-v1",
+                                           "generator_environment": environment(), "studies": reports})
+    main_rows, detail_rows, accuracy_rows, component_rows, preparation_rows = [], [], [], [], []
+    for report, records in loaded:
         c = report["controls"]
         name = ("Transformer" if c["geometry"] == "transformer_2d" else f"Engine {c['level']}")
+        if c["rank"] != 100:
+            name += f", $r={c['rank']}$"
         kind = f"{c['slabs']} slabs" if c["transient"] else "Steady"
         methods = {m["method"]: m for m in report["methods"]}
         entries = []
@@ -109,11 +112,20 @@ def generate(directories, output, plots=True):
                 accuracy_rows.append(" & ".join([name, kind, NAMES[m["method"]],
                     f"{m['max_original_residual']:.2e}", f"{m['max_kkt']:.2e}",
                     "--".join(map(str, m["deployed_rank_range"])), str(m["fallback_count"])]) + r" \\")
+                representative = sorted(records[m["method"]], key=lambda r: r["seconds"])[len(times)//2]
+                parts = components(representative)
+                component_rows.append(" & ".join([name, kind, NAMES[m["method"]]]
+                    + [f"{v:.3f}" for v in parts.values()] + [f"{representative['seconds']:.3f}"]) + r" \\")
+                preparation_rows.append(" & ".join([name, kind, NAMES[m["method"]]] + [
+                    f"{np.median(m[k]):.3f}" for k in ("complete_seconds", "startup_seconds",
+                    "finalization_seconds", "library_preparation_inclusive_seconds", "whole_worker_process_seconds")]) + r" \\")
             else:
                 timing, inner, outer, host, gpu = ("---",)*5
             detail_rows.append(" & ".join([name, kind, NAMES[m["method"]],
                 f"{m['accepted']}/{m['requested']}", timing, outer, inner, host, gpu]) + r" \\")
-    for name, rows in (("complete_rows.tex", main_rows), ("detail_rows.tex", detail_rows), ("accuracy_rows.tex", accuracy_rows)):
+    for name, rows in (("complete_rows.tex", main_rows), ("detail_rows.tex", detail_rows),
+                       ("accuracy_rows.tex", accuracy_rows), ("component_rows.tex", component_rows),
+                       ("preparation_rows.tex", preparation_rows)):
         with atomic_output(output / name) as stream:
             stream.write("\n".join(rows) + "\n")
     if plots:
@@ -151,7 +163,7 @@ def plot_sequences(loaded, output):
         ax.legend(fontsize=7, loc="lower right")
     for ax in list(axes.flat)[len(loaded):]:
         ax.set_visible(False)
-    fig.savefig(output)
+    fig.savefig(output, metadata={"CreationDate": None, "ModDate": None})
     plt.close(fig)
 
 
@@ -178,7 +190,7 @@ def plot_components(loaded, output):
         ax.legend(fontsize=6, loc="upper left")
     for ax in list(axes.flat)[len(loaded):]:
         ax.set_visible(False)
-    fig.savefig(output)
+    fig.savefig(output, metadata={"CreationDate": None, "ModDate": None})
     plt.close(fig)
 
 

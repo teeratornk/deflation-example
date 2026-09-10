@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "deflation-example"
-version = "0.4.0"
+version = "0.5.0"
 description = "A small, verified example of reference-space deflation for state-constrained control"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"

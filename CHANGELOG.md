@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0
+
+- Add self-contained axisymmetric transformer and three-dimensional bore-in-block meshes.
+- Assemble weighted P1 steady and complete transient thermal optimization with explicit material, source, boundary, and time conventions.
+- Prolong coarse spatial modes and construct mode-dependent space–time references.
+- Retain reference factors and recycling vectors on the GPU with matched GPU-QR processing.
+- Verify independent bounded least-squares solutions, temporal coupling, mesh integration, and control recovery.
+- Record independently repeated complete costs, actual cumulative timestamps, accepted ranks, failures, and comparable process memory.
+- Reconstruct target and constraint figures from numerical mesh inputs and recorded masks.
+- Audit mesh transfer replays and generate comparison tables from checked raw records.
+- Separate imported source version from installed-distribution metadata in environment reports.
+
 ## 0.4.0
 
 - Add complete coupled steady and transient CHT optimization with independent trajectory verification.

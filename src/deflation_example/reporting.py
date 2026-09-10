@@ -16,6 +16,7 @@ from threadpoolctl import threadpool_info
 
 def environment():
     """Record the installed source, even outside Git or after wheel installation."""
+    from . import __version__
     source = Path(__file__).resolve().parent
     head, source_tree_clean = None, None
     candidate = source.parent.parent
@@ -52,8 +53,6 @@ def environment():
     try:
         package_version = importlib.metadata.version("deflation-example")
     except importlib.metadata.PackageNotFoundError:
-        from . import __version__
-
         package_version = __version__
     cpu_model = None
     if platform.system() == "Linux":
@@ -76,6 +75,7 @@ def environment():
         "numpy": np.__version__,
         "scipy": scipy.__version__,
         "package": package_version,
+        "source_package": __version__,
         "git_head": head,
         "source_tree_clean": source_tree_clean,
         "source_sha256": {

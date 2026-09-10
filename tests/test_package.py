@@ -125,6 +125,8 @@ def test_no_cuda_is_an_error():
 
 def test_portable_metadata():
     record = environment()
+    from deflation_example import __version__
+    assert record["source_package"] == __version__
     assert not {"hostname", "slurm_job_id", "username"} & record.keys()
     assert all("filepath" not in entry for entry in record["blas"])
     assert all("/" not in name for name in record["source_sha256"])

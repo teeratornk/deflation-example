@@ -40,13 +40,22 @@ def transformer_subproblem(assembly):
                            restrict(assembly.stabilization), assembly.load[selected])
 
 
-def validate():
+def validate(settings="physical"):
+    if settings not in {"physical", "algebraic"}:
+        raise ValueError("Choose physical or algebraic verification settings")
     rows = []
-    for geometry, alpha, bound in (("engine_3d", 1e-6, .2), ("transformer_2d", 1e-12, .8)):
-        a = build_showcase(geometry).assembly
+    for geometry, alpha, bound in (("engine_3d", 1e-6, .2), ("transformer_2d", 1e-14, .8)):
+        showcase = build_showcase(geometry)
+        a = showcase.assembly
+        horizon = (.1 if geometry == "engine_3d" else
+                   600 / showcase.parameters["physical"]["time_scale_s"])
+        if settings == "algebraic":
+            horizon = .05
+            if geometry == "transformer_2d":
+                alpha = 1e-12
         if geometry == "transformer_2d":
             a = transformer_subproblem(a)
-        for steps in (None, [.025, .025], [.01, .04]):
+        for steps in (None, [.5*horizon, .5*horizon], [.2*horizon, .8*horizon]):
             model = build_mesh_control(a, alpha, time_steps=steps,
                                        initial=np.full(len(a.mesh.free), .03))
             root = np.sqrt(model.weights)
@@ -78,6 +87,7 @@ def validate():
                            and max(kkt.values()) <= 1e-8 and relative <= 1e-7
                            and forward_error <= 1e-8 and adjoint_error <= 1e-12)
                 rows.append({"geometry": geometry, "time_steps": steps, "query": query,
+                             "alpha": alpha, "bound": bound,
                              "dimension": model.size, "success": bool(success),
                              "scope": "full engine mesh" if geometry == "engine_3d"
                              else "transformer inlet-region principal subproblem",
@@ -89,7 +99,8 @@ def validate():
                              "forward_recovery_relative": forward_error,
                              "adjoint_action_relative": adjoint_error})
                 print(geometry, steps, query, success, relative, flush=True)
-    return {"protocol": "mesh-cht-independent-validation-v1", "environment": environment(),
+    return {"protocol": "mesh-cht-independent-validation-v2", "settings": settings,
+            "environment": environment(),
             "success": all(row["success"] for row in rows), "cases": rows,
             "independent_solver": "SciPy BVLS applied to the weighted tracking/control least-squares factor"}
 
@@ -97,10 +108,11 @@ def validate():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--settings", choices=("physical", "algebraic"), default="physical")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     with threadpool_limits(4):
-        result = validate()
+        result = validate(args.settings)
     write_report(args.output / "validation.json", result)
     raise SystemExit(0 if result["success"] else 1)
 

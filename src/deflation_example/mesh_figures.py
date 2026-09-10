@@ -1,6 +1,7 @@
 """Plot the body-fitted geometries and accepted changing temperature constraints."""
 
 import argparse
+import hashlib
 from itertools import combinations
 import json
 from pathlib import Path
@@ -8,6 +9,9 @@ from pathlib import Path
 import numpy as np
 
 from .mesh_presentation import tetrahedral_slice
+from .benchmark_mesh import build_model
+from .benchmark_cht import unpack_mask
+from .mesh_showcases import desired_temperature
 from .meshes import ThermalMesh
 
 
@@ -31,8 +35,11 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
         expected = "transformer_2d" if row == 0 else "engine_3d"
         if c["geometry"] != expected or not record["success"]:
             raise ValueError("Showcase figures require accepted transformer and engine sequences")
-        with np.load(directory / "geometry.npz", allow_pickle=False) as mesh:
-            nodes, cells, free, materials = (mesh[k] for k in ("nodes", "cells", "free", "materials"))
+        showcase, model = build_model(c)
+        if showcase.preparation["input_sha256"] != record["mesh"]["input_sha256"]:
+            raise ValueError("Figure reconstruction requires the recorded mesh input bundle")
+        mesh = showcase.assembly.mesh
+        nodes, cells, free, materials = mesh.nodes, mesh.cells, mesh.free, mesh.materials
         geometry = fig.add_subplot(grid[row, 0], projection="3d" if row else None)
         if row:
             coarse = ThermalMesh.load(Path(__file__).parent / "data" / expected / "mesh.npz")
@@ -66,9 +73,12 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
                 raise ValueError("A requested target lies outside the recorded sequence")
             values = np.zeros((len(nodes), 2))
             selected_slab = slab if c["transient"] else 0
-            with np.load(directory / f"fields-{query}.npz", allow_pickle=False) as fields:
-                for k, name in enumerate(("desired", "active")):
-                    values[free, k] = fields[name].reshape(-1, len(free))[selected_slab]
+            desired = desired_temperature(model, query, c["targets"])
+            if hashlib.sha256(np.ascontiguousarray(desired).tobytes()).hexdigest() != record["cases"][query]["target_sha256"]:
+                raise ValueError("Figure target differs from its recorded optimization query")
+            active = unpack_mask(record["cases"][query]["active_mask_bits"], model.size)
+            for k, field in enumerate((desired, active)):
+                values[free, k] = field.reshape(-1, len(free))[selected_slab]
             axis = fig.add_subplot(grid[row, col])
             if row:
                 xy, triangles, sampled, owners = tetrahedral_slice(nodes, cells, values, coordinate=.5, axis=2)
@@ -89,7 +99,8 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
             axis.set_title(title, fontsize=9)
             if col == len(queries):
                 fig.colorbar(artist, ax=axis, label="Desired temperature", shrink=.8)
-    fig.savefig(output, dpi=200)
+    metadata = {"CreationDate": None, "ModDate": None} if Path(output).suffix.lower() == ".pdf" else None
+    fig.savefig(output, dpi=200, metadata=metadata)
     plt.close(fig)
 
 

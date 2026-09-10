@@ -93,9 +93,13 @@ Conductivity is anisotropic in the winding. Oil properties are frozen at
 by 20 K. The input manifest records source, capacity, velocity, and time units.
 The quadratic Stokes field is integrated with degree-five triangle quadrature
 and evaluated exactly on each refined child element.
+Temperature is prescribed at the inlet. The other exterior boundaries use
+homogeneous natural conditions for the declared thermal bilinear form.
 
 The engine follows the documented bore dimensions, conductivity ratio of
 1000, inward interface heat flux, and fixed outer coolant temperature. Its
+interface load enters once as a surface heat source in the conforming
+temperature equation, giving a conductive-flux jump. Its
 prescribed circulation is independent of temperature. Time uses the fluid
 diffusion scale; both materials have unit dimensionless thermal capacity.
 The temperature scale is `q*L/k_s`, with the numerical physical parameters in
@@ -132,6 +136,11 @@ inner solve, transfer, verification, and solver cleanup belong to complete
 sequence cost. Common initialization and finalization are recorded separately.
 Field serialization and plotting occur after the timed sequence. Memory uses
 sampled process RSS and NVML process allocation when enabled.
+The library-preparation-inclusive total adds the recorded initialization
+after Python module imports and native finalization. The separately measured
+whole-worker wall time also includes module imports, memory-monitor startup,
+report serialization, and field output. These boundaries have distinct labels
+in the generated summary.
 
 The optional `mesh` dependency regenerates the engine mesh. It is unnecessary
 for running the packaged inputs:
@@ -196,3 +205,55 @@ The replay reports independent energy-error diagnostics, actual numerical
 ranks, constraint activations and releases, and alternating repeated kernel
 measurements. Its transfer-inclusive times are distinct from complete
 optimization timings.
+
+The complete numerical studies use source commit
+`dc89ae8518ff6a975eadf2f6f3bae1acbd17b83b`; the first checked transfer
+and validation tools use `774c5beccf1dd0b8788b9471b90440c0504ea424`.
+Workers select these source checkouts directly. Their Git identifiers and
+per-module hashes identify the implementation. The original GPU environment's
+installed-distribution metadata reports version 0.3.0; the selected numerical
+source declares version 0.4.0. Version 0.5.0 reports these two metadata fields
+separately and preserves the numerical source used in those records.
+
+## Rebuild the comparison artifacts
+
+Install the plotting extra for CPU-only artifact generation. The evidence
+checkout contains the six primary populations, four rank/time controls,
+independent verification, matched transfer records, and the pilot outcomes.
+It also retains the numerical sources used by the pilot implementations.
+The manifest covers their exact bytes. This command verifies that manifest
+before generating the complete-cost tables, repetition curves, timing
+components, and geometry/constraint figure:
+
+```bash
+git clone --branch mesh-cht-data-v1 --single-branch \
+  https://github.com/teeratornk/deflation-example.git mesh-evidence
+uv run --locked --extra plot python -m deflation_example.mesh_evidence \
+  --records mesh-evidence --output runs/reproduced-mesh-figures
+```
+
+The field figure reconstructs desired temperatures from the packaged inputs
+and reads the accepted active masks from the records. It checks the mesh-input
+and target hashes. It requires neither a GPU nor the optional full state-field
+archives. The full state, control, and multiplier fields remain available
+after a new benchmark run for additional inspection.
+
+The code release is `v0.5.0`. The separate `mesh-cht-data-v1` tag freezes
+the numerical records and source snapshots without installing them as package
+dependencies. The generated memory-budget table is a retrospective screen
+over measured ranks 20, 100, and 200. It uses the largest sampled GPU process
+allocation over all five repetitions. Execution did not impose these memory
+budgets. Host RSS is reported separately and includes retained output fields.
+
+The rank controls repeat the engine level-2 steady sequence at ranks 20 and
+200, matching the recycling rank to each reference rank. The time controls
+repeat the transformer and engine level-1 sequences with eight slabs over
+their existing horizons. Each control retains all four methods, 16 targets,
+five independent repetitions, and the primary accuracy criteria.
+
+```bash
+uv run --no-sync python -m deflation_example.benchmark_mesh --config-name mesh_final level=2 rank=20 recycle_rank=20
+uv run --no-sync python -m deflation_example.benchmark_mesh --config-name mesh_final level=2 rank=200 recycle_rank=200
+uv run --no-sync python -m deflation_example.benchmark_mesh --config-name mesh_final level=1 transient=true slabs=8
+uv run --no-sync python -m deflation_example.benchmark_mesh --config-name mesh_final_transformer transient=true slabs=8
+```
