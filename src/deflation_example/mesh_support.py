@@ -53,7 +53,7 @@ def run(validation, transfers, pilots, output):
             or c["adjoint_action_relative"] > 1e-12
         ):
             raise ValueError("A small mesh verification failed independent optimality")
-        name = "Engine" if c["geometry"] == "engine_3d" else "Transformer subproblem"
+        name = "Bore-in-block" if c["geometry"] == "engine_3d" else "Transformer subproblem"
         steps = c["time_steps"]
         kind = "Steady" if steps is None else "Uniform" if len(set(steps)) == 1 else "Unequal"
         rows.append(

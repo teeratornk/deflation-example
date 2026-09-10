@@ -7,7 +7,7 @@ This self-contained benchmark generates the six Laplacian inactive systems used 
 Use Linux, an NVIDIA GPU, a compatible driver and the locked Python environment:
 
 ```bash
-uv sync --locked --extra gpu --extra plot
+uv sync --locked --extra gpu --extra plot --extra study
 ```
 
 AmgX and its Python binding are optional native dependencies, not Python packages supplied by this repository. The measurements use AmgX **2.5.0**, PyAMGX reporting **0.1**, PyTorch 2.10.0, CUDA 12.8 and an H200. Build [NVIDIA AmgX](https://github.com/NVIDIA/AMGX/tree/v2.5.0) using the upstream CMake instructions; a single-GPU build can use `CMAKE_NO_MPI=ON`. The public v2.5.0 tag resolves to `cc1cebdbb32b14d33762d4ddabcb2e23c1669f47`. Set `AMGX_DIR` and, if needed, `AMGX_BUILD_DIR`, then build [PyAMGX](https://pyamgx.readthedocs.io/en/latest/install.html) against that library in this environment. Its build requires Cython and SciPy. Record the binding checkout commit when rebuilding: the measured installation reports a version and binary hash, but does not retain its original checkout commit.

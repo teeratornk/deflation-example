@@ -46,6 +46,12 @@ Python extras first, then install the native binding. Use `--no-sync` after
 that installation to preserve the binding:
 
 ```bash
+uv sync --locked --extra gpu --extra plot --extra study
+```
+
+After installing the native binding in this environment, run:
+
+```bash
 uv run --no-sync python -m deflation_example.benchmark_mesh \
   --config-name mesh_final \
   output=runs/engine-gpu
@@ -64,6 +70,76 @@ assembles each inactive Hessian for the shared sparse GPU solver interface.
 `matrix_free_inner=true` supports CPU Jacobi, reference, and recycling solves
 without assembling the inactive Hessian. These are distinct implementations
 and their timings must remain identifiable.
+
+## Finer-transformer residual correction
+
+The finer transformer has 42,180 spatial state degrees of freedom, or
+168,720 for a four-slab trajectory. Instrumented projected-CG runs identify
+negative `r @ z` with positive `p @ B @ p`, full retained rank, and moderate
+coarse conditioning. The recurrence residual differs from the independently
+recomputed residual near convergence. The diagnostics record both residuals,
+their gap, coarse orthogonality, and the exact failing scalar.
+
+The correction preset returns a candidate for independent verification before
+restarting the projected recurrence. A rejected candidate defines an error
+equation with right-hand side `b - B @ x`. Each error solve starts from zero
+and requests relative residual 0.1, with internal target 0.01. The updated
+solution must satisfy the original `1e-10` residual criterion. PDAS retains
+its `1e-8` KKT criterion. This is residual-based
+[iterative refinement](https://epubs.siam.org/doi/10.1137/1.9780898718027.ch12).
+At most four error equations share the original 50,000-iteration budget.
+Stagnation, exhausted budgets, and all local termination statuses are recorded.
+
+All four solvers receive this policy. Each error equation rebuilds the
+matrix-specific GPU objects and coarse or hierarchy setup. AmgX retains its
+resources and receives the remaining cap and local stopping target through
+a per-solve configuration. Recycling selects directions after locally
+converged Krylov solves. The complete clock charges every correction,
+transfer, setup, and independent check.
+
+These commands repeat the original four-target problems five times per method:
+
+```bash
+uv run --no-sync python -m deflation_example.benchmark_mesh \
+  --config-name mesh_refinement_transformer transient=false output=runs/refined-steady
+uv run --no-sync python -m deflation_example.benchmark_mesh \
+  --config-name mesh_refinement_transformer transient=true \
+  horizon=0.000048444553995823255 output=runs/refined-transient
+```
+
+The repeated correction study uses numerical source
+`926b37c40935fbbe7134a3ab5f87ebdfddb68837`. Its records remain separate from
+the six original sixteen-target benchmark cases. Their `terminal` policy and
+frozen timings remain available. The `refine` policy changes the finite-precision
+stopping procedure and retains the original discrete equations and final checks.
+
+Run `mesh_breakdown` with a saved protocol to reconstruct the diagnostic:
+
+```bash
+git clone --branch mesh-cht-refinement-data-v1 --single-branch \
+  https://github.com/teeratornk/deflation-example.git mesh-refinement-evidence
+uv run --no-sync python -m deflation_example.mesh_breakdown \
+  --protocol mesh-refinement-evidence/diagnostic/steady/protocol.json \
+  --output runs/breakdown-steady
+```
+
+The instrumented timing includes diagnostic work and snapshot serialization.
+Each rejected solve saves its exact CSR matrix, right-hand side, initial guess,
+candidate basis, and returned state as a numerical NPZ file. The compact public
+evidence contains the JSON traces; the command regenerates the larger snapshots.
+The report generator checks the unchanged physical settings, target hashes,
+assembly/reference/PDAS source hashes, iteration budgets, and timing partitions.
+
+Regenerate the diagnostic and repeated-comparison tables on a CPU:
+
+```bash
+uv run --locked --extra study python tools/summarize_mesh_refinement.py \
+  --diagnostic-steady mesh-refinement-evidence/diagnostic/steady \
+  --diagnostic-transient mesh-refinement-evidence/diagnostic/transient \
+  --repair-steady mesh-refinement-evidence/final/steady \
+  --repair-transient mesh-refinement-evidence/final/transient \
+  --output runs/refinement-tables
+```
 
 ## Discretization and units
 
@@ -238,7 +314,7 @@ and target hashes. It requires neither a GPU nor the optional full state-field
 archives. The full state, control, and multiplier fields remain available
 after a new benchmark run for additional inspection.
 
-The code release is `v0.5.1`. The separate `mesh-cht-data-v1` tag freezes
+The code release is `v0.6.0`. The separate `mesh-cht-data-v1` tag freezes
 the numerical records and source snapshots without installing them as package
 dependencies. The generated memory-budget table is a retrospective screen
 over measured ranks 20, 100, and 200. It uses the largest sampled GPU process

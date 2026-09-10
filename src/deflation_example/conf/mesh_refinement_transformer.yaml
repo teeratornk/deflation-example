@@ -1,0 +1,11 @@
+defaults:
+  - mesh_final_transformer
+  - _self_
+
+# Repeat the same four-target finer-transformer problems with residual correction.
+phase: pilot
+level: 1
+targets: 4
+repeats: 5
+residual_policy: refine
+horizon: 0.1

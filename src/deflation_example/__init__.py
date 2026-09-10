@@ -3,5 +3,5 @@
 from .problems import build_problem, reference_modes
 from .solvers import LinearResult, deflated_cg, pdas
 
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 __all__ = ["LinearResult", "build_problem", "reference_modes", "deflated_cg", "pdas"]

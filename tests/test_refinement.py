@@ -68,3 +68,20 @@ def test_correction_budget_is_bounded():
     solve, calls = controlled_solver(quality=0.1)
     result, _ = verified_refinement(solve, sparse.eye(3), np.ones(3), None, 1e-10, 100)
     assert len(calls) == 5 and result.status == "residual_failed"
+
+
+def test_projected_scalar_can_be_negative_after_coarse_orthogonality_is_lost():
+    B = np.array([[2.0, 1.0], [1.0, 2.0]])
+    Q = np.diag([0.5, 0.0])
+    P = np.eye(2) - Q @ B
+    K = 0.5 * np.eye(2)
+    r = np.array([3.0, 1.0])
+    z = P @ K @ r
+    assert r @ z == -0.25
+    assert z @ B @ z > 0
+    balanced = P @ K @ P.T + Q
+    assert np.linalg.eigvalsh(balanced)[0] > 0
+    assert r @ balanced @ r > 0
+    corrected = (np.eye(2) - B @ Q) @ r
+    assert corrected[0] == 0
+    assert corrected @ P @ K @ corrected > 0

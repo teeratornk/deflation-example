@@ -75,7 +75,7 @@ def plot_fields(record_directory, output, query=0, slab=-1):
     geometry = record["controls"]["geometry"]
     if nodes.shape[1] == 3:
         xy, triangles, values, owners = tetrahedral_slice(nodes, cells, values)
-        label = "Engine: section at x2/L = 0.5; P1 interpolation on intersected tetrahedra"
+        label = "Bore-in-block: section at x2/L = 0.5; P1 interpolation on intersected tetrahedra"
         xlab, ylab = "x1/L", "x3/L"
         aspect = "equal"
     else:

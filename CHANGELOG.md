@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0
+
+- Diagnose projected-CG scalar breakdown with recurrence, original residual, curvature and coarse-orthogonality measurements.
+- Add bounded residual correction within the original iteration and final-accuracy limits.
+- Retain AmgX resources when changing the error-equation stopping target and remaining iteration budget.
+- Provide a four-target finer-transformer correction preset and formula-checked comparison summaries.
+- Separate temperature and active-set panels and identify the fastest tested alternative in body-fitted figures.
+- Preserve the original complete-sequence records and their numerical protocols.
+
 ## 0.5.1
 
 - Apply the configured source formatting; the formatted Python syntax trees are unchanged.

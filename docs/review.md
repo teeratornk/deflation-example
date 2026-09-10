@@ -40,7 +40,7 @@ In a full Git clone, also scan all reachable historical blobs:
 uv run --locked python tools/check_release.py --source . --history
 ```
 
-The check intentionally accepts text-only release contents and limits individual
+The check accepts text and the three reviewed numerical mesh bundles. It limits individual
 files to 5 MiB and source archives to 64 MiB / 2,000 entries. It rejects duplicate paths,
 Windows drive paths, links, special files and oversized members without extracting
 them. History checking refuses shallow clones. Source-archive users can run the
@@ -86,9 +86,11 @@ Earlier release checks remain documented in Git history and the changelog.
 
 ## Scope
 
-The optimization examples use Cartesian, linear-quadratic control problems.
-Nonlinear optimization, unstructured meshes, industrial-scale optimization and
-automatic reference selection require separate validation. Large matrix-free
+The optimization examples use linear-quadratic control problems on Cartesian
+grids and body-fitted triangular and tetrahedral meshes. Independent checks
+cover the coupled discrete trajectories and spatial assembly. Physical temporal
+convergence, coupled nonlinear flow, industrial-scale optimization and automatic
+reference selection require separate validation. Large matrix-free
 systems have manufactured solutions and prescribed inactive sets. The default rank
 is 20. Thermal eigenmodes are computed directly at that rank, so iteration counts
 need not match experiments that selected modes from a larger precomputed pool.
@@ -96,6 +98,8 @@ need not match experiments that selected modes from a larger precomputed pool.
 The lockfile fixes the tested dependencies. Timings and last-digit differences
 can change with the platform, BLAS library and GPU driver. A kernel comparison
 uses the same matrix and right-hand side; it is not an end-to-end CPU/GPU timing
-comparison. GPU memory reports cover Torch's allocator, not total process or
-device memory. The source archive includes tests and this checklist; the wheel
+comparison. Individual GPU kernels report Torch allocation. The complete
+Cartesian and body-fitted studies separately sample process RSS and NVML GPU
+allocation, including library caches. These sampled peaks support retrospective
+memory comparisons. The source archive includes tests and this checklist; the wheel
 contains only the installed package, configuration, metadata and license.

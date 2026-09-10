@@ -28,7 +28,7 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
         raise ValueError("Choose distinct target indices")
     fig = plt.figure(figsize=(1.9 * (len(queries) + 1), 6.2), constrained_layout=True)
     grid = fig.add_gridspec(4, len(queries) + 1, width_ratios=[1.35] + [1] * len(queries))
-    materials_cmap = ListedColormap(["#66c2a5", "#c5c5c5", "#8da0cb"])
+    materials_cmap = ListedColormap(["#56b4e9", "#e69f00", "#332288"])
     for row, directory in enumerate((transformer, engine)):
         directory = Path(directory)
         record = json.loads((directory / "record.json").read_text())
@@ -87,7 +87,7 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
             colorbar = fig.colorbar(
                 im, ax=geometry, orientation="horizontal", ticks=[0, 1, 2], pad=0.12
             )
-            colorbar.ax.set_xticklabels(["Oil", "Winding", "Baffle"], fontsize=7)
+            colorbar.ax.set_xticklabels(["Oil", "Winding", "Baffle"], fontsize=9)
         for col, query in enumerate(queries, 1):
             if query not in range(c["targets"]):
                 raise ValueError("A requested target lies outside the recorded sequence")

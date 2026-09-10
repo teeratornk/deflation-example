@@ -122,10 +122,10 @@ matched replays, and independent verification records.
 ## Body-fitted thermal meshes
 
 The [mesh examples](docs/mesh-showcases.md) provide an axisymmetric transformer
-and a three-dimensional engine bore. They include steady and complete transient
+and a three-dimensional bore-in-block model. They include steady and complete transient
 optimization, nested mesh refinement, mesh-based reference construction, and
 matched solver comparisons. The packaged inputs require no application-data
-download. Start with the small CPU engine example:
+download. Start with the small CPU bore-in-block example:
 
 ```bash
 uv run --locked python -m deflation_example.benchmark_mesh
