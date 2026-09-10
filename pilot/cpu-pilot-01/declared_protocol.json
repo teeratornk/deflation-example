@@ -1,0 +1,186 @@
+{
+  "protocol": "full-reference-cht-study-v1",
+  "controls": {
+    "phase": "pilot",
+    "device": "cpu",
+    "n": 4,
+    "targets": 3,
+    "rank": 5,
+    "recycle_rank": 5,
+    "window": 10,
+    "repeats": 1,
+    "methods": [
+      "jacobi",
+      "reference",
+      "recycling"
+    ],
+    "warm_starts": [
+      "outer_inner"
+    ],
+    "rtol": 1e-10,
+    "amgx_factor": 0.1,
+    "outer_tolerance": 1e-08,
+    "inner_cap": 10000,
+    "outer_cap": 100,
+    "threads": 4,
+    "bound": null,
+    "calibration_grid": 4,
+    "calibration_steps": 8,
+    "calibration_activity": 0.2,
+    "memory_interval": 0.01,
+    "sequence_timeout": 7200.0
+  },
+  "physics": {
+    "alpha": 0.001,
+    "conductivity_ratio": 100.0,
+    "transport_amplitude": 50.0
+  },
+  "targets": [
+    {
+      "index": 0,
+      "t": 0.0,
+      "angle": 0.0,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.3,
+          0.3,
+          0.265
+        ],
+        [
+          0.3,
+          0.7,
+          0.265
+        ],
+        [
+          0.7,
+          0.3,
+          0.6649999999999999
+        ],
+        [
+          0.7,
+          0.7,
+          0.6649999999999999
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.8,
+        0.65,
+        0.45
+      ]
+    },
+    {
+      "index": 1,
+      "t": 0.5,
+      "angle": 0.6,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.4478613716970714,
+          0.22200438233905723,
+          0.3
+        ],
+        [
+          0.22200438233905728,
+          0.5521386283029286,
+          0.3
+        ],
+        [
+          0.7779956176609427,
+          0.44786137169707135,
+          0.7
+        ],
+        [
+          0.5521386283029286,
+          0.7779956176609426,
+          0.7
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.875,
+        0.65,
+        0.45
+      ]
+    },
+    {
+      "index": 2,
+      "t": 1.0,
+      "angle": 1.2,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.6139362662981105,
+          0.24112063191122002,
+          0.33499999999999996
+        ],
+        [
+          0.24112063191122007,
+          0.38606373370188946,
+          0.33499999999999996
+        ],
+        [
+          0.75887936808878,
+          0.6139362662981105,
+          0.735
+        ],
+        [
+          0.3860637337018895,
+          0.75887936808878,
+          0.735
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.9500000000000001,
+        0.65,
+        0.45
+      ]
+    }
+  ],
+  "reference_policy": "one full-domain analytical Laplacian space per sequence; restrict at every inner solve",
+  "recycling_policy": "empty initial history; retain deployed coarse vectors and the last window new directions from each accepted CG solve; normalize columns in Jacobi coordinates; QR/small-factor SVD rank threshold 1e-12; retain the lowest scaled Ritz vectors; transfer by zero extension; coarse space fixed during a solve and residual restarts; clear history after a failed target",
+  "coarse_condition_limit": 10000000000.0,
+  "rank_threshold": 1e-12,
+  "residual_refresh": 1000,
+  "stopping": "same independent original relative residual and outer KKT limits; AmgX native absolute target is amgx_factor*rtol*||b||; CG triggers fresh verification at rtol",
+  "amgx_configuration": {
+    "config_version": 2,
+    "determinism_flag": 1,
+    "solver": {
+      "scope": "main",
+      "solver": "PCG",
+      "preconditioner": {
+        "scope": "amg",
+        "solver": "AMG",
+        "algorithm": "CLASSICAL",
+        "selector": "PMIS",
+        "interpolator": "D2",
+        "smoother": {
+          "solver": "MULTICOLOR_GS",
+          "relaxation_factor": 1.0,
+          "symmetric_GS": 1
+        },
+        "presweeps": 1,
+        "postsweeps": 1,
+        "cycle": "V",
+        "max_iters": 1,
+        "max_levels": 25,
+        "coarse_solver": "DENSE_LU_SOLVER"
+      },
+      "tolerance": 1.0000000000000001e-11,
+      "max_iters": 10000,
+      "norm": "L2",
+      "convergence": "ABSOLUTE",
+      "monitor_residual": 1,
+      "obtain_timings": 1,
+      "print_solve_stats": 0
+    }
+  },
+  "resources": "AmgX base Config/Resources persist per sequence; each inner solve rebuilds matrix, vectors, solver and hierarchy",
+  "warm_starts": "outer_inner passes the previous accepted target's active set and state; every accepted inner solve updates the full state; cold gives empty active sets and zero inner guesses; each repetition starts without history",
+  "timing": "fresh process for every method/repetition/start policy; one complete sequence includes assembly, reference or resource setup, all targets and PDAS inner solves, transfers, recycling updates, verification and cleanup; all-method small warmup and process initialization are separate",
+  "memory": "10 ms default sampled host RSS and NVML allocation of the same process; all libraries and allocator caches included; fresh worker process per sequence; sampling interval and maximum gap reported",
+  "failures": "retain every declared sequence and target, inner cap, outer cap, cycle, exception, timeout and memory error; clear warm-start and recycling history after a failed target; report accepted timings separately"
+}

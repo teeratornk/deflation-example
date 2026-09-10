@@ -1,0 +1,659 @@
+{
+  "protocol": "full-reference-cht-study-v1",
+  "controls": {
+    "phase": "final",
+    "device": "cuda",
+    "problem": "steady",
+    "n": 64,
+    "slabs": 8,
+    "horizon": 0.1,
+    "solid_capacity": 2.0,
+    "fluid_capacity": 1.0,
+    "initial_temperature": 0.0,
+    "reference_construction": "mode_dependent",
+    "reference_capacity": 1.0,
+    "targets": 16,
+    "rank": 100,
+    "recycle_rank": 100,
+    "window": 100,
+    "repeats": 5,
+    "methods": [
+      "jacobi",
+      "reference",
+      "recycling",
+      "amgx"
+    ],
+    "warm_starts": [
+      "outer_inner"
+    ],
+    "rtol": 1e-10,
+    "cg_factor": 0.1,
+    "amgx_factor": 0.1,
+    "outer_tolerance": 1e-08,
+    "inner_cap": 10000,
+    "residual_refresh": 10000,
+    "cache_operator_product": true,
+    "outer_cap": 100,
+    "initial_active": "all",
+    "threads": 4,
+    "bound": 0.00019498904452558432,
+    "calibration_grid": 8,
+    "calibration_steps": 8,
+    "calibration_activity": 0.2,
+    "host_memory_budget_bytes": null,
+    "gpu_memory_budget_bytes": null,
+    "memory_interval": 0.01,
+    "sequence_timeout": 7200.0
+  },
+  "calibration_input": {
+    "source_record_sha256": "d8af842adf7b0c86461d5759e4cb36f800378c69cfd4d1c617ce56d1f416df2d",
+    "source_protocol_sha256": "04f1f6cc398eddcac4a5a30037eb57ebf62ca132ef0401e84329c518b5072ef2",
+    "source_git_head": "706dde9f5a01e1255282014e2a19dafc4d023ea4",
+    "calibration_seconds": 215.65024310257286,
+    "bound": 0.00019498904452558432,
+    "spatial_grid": 24,
+    "time_slabs": 1,
+    "scope": "measured once in the supplied calibration record; charged once in preparation-inclusive sequence totals"
+  },
+  "physics": {
+    "alpha": 0.001,
+    "conductivity_ratio": 100.0,
+    "transport_amplitude": 50.0
+  },
+  "targets": [
+    {
+      "index": 0,
+      "angle": 0.0,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.3,
+          0.3,
+          0.265
+        ],
+        [
+          0.3,
+          0.7,
+          0.265
+        ],
+        [
+          0.7,
+          0.3,
+          0.6649999999999999
+        ],
+        [
+          0.7,
+          0.7,
+          0.6649999999999999
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.8,
+        0.65,
+        0.45
+      ],
+      "theta": 0.0
+    },
+    {
+      "index": 1,
+      "angle": 0.08,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.3166225975333106,
+          0.28465671994564157,
+          0.26966666666666667
+        ],
+        [
+          0.28465671994564157,
+          0.6833774024666893,
+          0.26966666666666667
+        ],
+        [
+          0.7153432800543584,
+          0.3166225975333106,
+          0.6696666666666666
+        ],
+        [
+          0.6833774024666893,
+          0.7153432800543584,
+          0.6696666666666666
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.81,
+        0.65,
+        0.45
+      ],
+      "theta": 0.06666666666666667
+    },
+    {
+      "index": 2,
+      "angle": 0.16,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.33441818464772377,
+          0.2706909020020254,
+          0.2743333333333333
+        ],
+        [
+          0.2706909020020254,
+          0.6655818153522761,
+          0.2743333333333333
+        ],
+        [
+          0.7293090979979745,
+          0.33441818464772377,
+          0.6743333333333332
+        ],
+        [
+          0.6655818153522761,
+          0.7293090979979745,
+          0.6743333333333332
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.8200000000000001,
+        0.65,
+        0.45
+      ],
+      "theta": 0.13333333333333333
+    },
+    {
+      "index": 3,
+      "angle": 0.24,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.35327293031502094,
+          0.25819187974416713,
+          0.27899999999999997
+        ],
+        [
+          0.25819187974416713,
+          0.646727069684979,
+          0.27899999999999997
+        ],
+        [
+          0.7418081202558328,
+          0.35327293031502094,
+          0.6789999999999999
+        ],
+        [
+          0.646727069684979,
+          0.7418081202558328,
+          0.6789999999999999
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.8300000000000001,
+        0.65,
+        0.45
+      ],
+      "theta": 0.2
+    },
+    {
+      "index": 4,
+      "angle": 0.32,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.37306622850673543,
+          0.2472396042602883,
+          0.2836666666666667
+        ],
+        [
+          0.2472396042602883,
+          0.6269337714932646,
+          0.2836666666666667
+        ],
+        [
+          0.7527603957397117,
+          0.3730662285067354,
+          0.6836666666666666
+        ],
+        [
+          0.6269337714932646,
+          0.7527603957397117,
+          0.6836666666666666
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.8400000000000001,
+        0.65,
+        0.45
+      ],
+      "theta": 0.26666666666666666
+    },
+    {
+      "index": 5,
+      "angle": 0.39999999999999997,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.3936714696611531,
+          0.23790413273769284,
+          0.28833333333333333
+        ],
+        [
+          0.2379041327376929,
+          0.6063285303388468,
+          0.28833333333333333
+        ],
+        [
+          0.762095867262307,
+          0.3936714696611531,
+          0.6883333333333332
+        ],
+        [
+          0.6063285303388469,
+          0.762095867262307,
+          0.6883333333333332
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.8500000000000001,
+        0.65,
+        0.45
+      ],
+      "theta": 0.3333333333333333
+    },
+    {
+      "index": 6,
+      "angle": 0.48,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.41495685055243975,
+          0.23024518033584657,
+          0.293
+        ],
+        [
+          0.23024518033584662,
+          0.5850431494475602,
+          0.293
+        ],
+        [
+          0.7697548196641534,
+          0.4149568505524397,
+          0.693
+        ],
+        [
+          0.5850431494475602,
+          0.7697548196641534,
+          0.693
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.8600000000000001,
+        0.65,
+        0.45
+      ],
+      "theta": 0.4
+    },
+    {
+      "index": 7,
+      "angle": 0.5599999999999999,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.4367862173814935,
+          0.2243117382131401,
+          0.29766666666666663
+        ],
+        [
+          0.2243117382131401,
+          0.5632137826185065,
+          0.29766666666666663
+        ],
+        [
+          0.7756882617868599,
+          0.4367862173814934,
+          0.6976666666666667
+        ],
+        [
+          0.5632137826185065,
+          0.7756882617868599,
+          0.6976666666666667
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.87,
+        0.65,
+        0.45
+      ],
+      "theta": 0.4666666666666667
+    },
+    {
+      "index": 8,
+      "angle": 0.64,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.4590199366956199,
+          0.22014176015066306,
+          0.30233333333333334
+        ],
+        [
+          0.22014176015066306,
+          0.5409800633043801,
+          0.30233333333333334
+        ],
+        [
+          0.779858239849337,
+          0.45901993669561986,
+          0.7023333333333333
+        ],
+        [
+          0.5409800633043801,
+          0.7798582398493369,
+          0.7023333333333333
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.88,
+        0.65,
+        0.45
+      ],
+      "theta": 0.5333333333333333
+    },
+    {
+      "index": 9,
+      "angle": 0.72,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.4815157885661156,
+          0.21776191977752635,
+          0.307
+        ],
+        [
+          0.2177619197775264,
+          0.5184842114338843,
+          0.307
+        ],
+        [
+          0.7822380802224735,
+          0.4815157885661156,
+          0.707
+        ],
+        [
+          0.5184842114338843,
+          0.7822380802224735,
+          0.707
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.89,
+        0.65,
+        0.45
+      ],
+      "theta": 0.6
+    },
+    {
+      "index": 10,
+      "angle": 0.7999999999999999,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.5041298763104715,
+          0.21718743995066236,
+          0.31166666666666665
+        ],
+        [
+          0.21718743995066236,
+          0.49587012368952854,
+          0.31166666666666665
+        ],
+        [
+          0.7828125600493376,
+          0.5041298763104713,
+          0.7116666666666667
+        ],
+        [
+          0.49587012368952854,
+          0.7828125600493376,
+          0.7116666666666667
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.9,
+        0.65,
+        0.45
+      ],
+      "theta": 0.6666666666666666
+    },
+    {
+      "index": 11,
+      "angle": 0.8799999999999999,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.5267175469400778,
+          0.21842199538049006,
+          0.3163333333333333
+        ],
+        [
+          0.21842199538049012,
+          0.47328245305992217,
+          0.3163333333333333
+        ],
+        [
+          0.7815780046195099,
+          0.5267175469400778,
+          0.7163333333333333
+        ],
+        [
+          0.4732824530599222,
+          0.7815780046195098,
+          0.7163333333333333
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.91,
+        0.65,
+        0.45
+      ],
+      "theta": 0.7333333333333333
+    },
+    {
+      "index": 12,
+      "angle": 0.96,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.5491343164457083,
+          0.221457689125309,
+          0.321
+        ],
+        [
+          0.22145768912530905,
+          0.4508656835542917,
+          0.321
+        ],
+        [
+          0.778542310874691,
+          0.5491343164457083,
+          0.721
+        ],
+        [
+          0.4508656835542917,
+          0.778542310874691,
+          0.721
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.92,
+        0.65,
+        0.45
+      ],
+      "theta": 0.8
+    },
+    {
+      "index": 13,
+      "angle": 1.04,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.571236794002112,
+          0.2262751031047766,
+          0.32566666666666666
+        ],
+        [
+          0.22627510310477666,
+          0.428763205997888,
+          0.32566666666666666
+        ],
+        [
+          0.7737248968952233,
+          0.5712367940021119,
+          0.7256666666666667
+        ],
+        [
+          0.428763205997888,
+          0.7737248968952233,
+          0.7256666666666667
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.93,
+        0.65,
+        0.45
+      ],
+      "theta": 0.8666666666666667
+    },
+    {
+      "index": 14,
+      "angle": 1.1199999999999999,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.5928835991799586,
+          0.2328434223093565,
+          0.3303333333333333
+        ],
+        [
+          0.23284342230935662,
+          0.4071164008200414,
+          0.3303333333333333
+        ],
+        [
+          0.7671565776906435,
+          0.5928835991799585,
+          0.7303333333333333
+        ],
+        [
+          0.40711640082004147,
+          0.7671565776906434,
+          0.7303333333333333
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.9400000000000001,
+        0.65,
+        0.45
+      ],
+      "theta": 0.9333333333333333
+    },
+    {
+      "index": 15,
+      "angle": 1.2,
+      "sigma": 0.12,
+      "centers": [
+        [
+          0.6139362662981105,
+          0.24112063191122002,
+          0.33499999999999996
+        ],
+        [
+          0.24112063191122007,
+          0.38606373370188946,
+          0.33499999999999996
+        ],
+        [
+          0.75887936808878,
+          0.6139362662981105,
+          0.735
+        ],
+        [
+          0.3860637337018895,
+          0.75887936808878,
+          0.735
+        ]
+      ],
+      "weights": [
+        1.0,
+        0.9500000000000001,
+        0.65,
+        0.45
+      ],
+      "theta": 1.0
+    }
+  ],
+  "reference_policy": "one full-domain analytical Laplacian space per sequence; restrict at every inner solve",
+  "transient_convention": "one complete trajectory per query; backward Euler with capacity=solid_capacity below x3=1/2 and fluid_capacity above; right-endpoint time weights in both objective terms; common cell-volume times mean-step factor removed from reduced equations; initial temperature prescribed; bound imposed at all positive time levels",
+  "space_time_reference": "mode_dependent uses the temporal eigensystem for each spatial Laplacian eigenvalue; tensor uses one pure-time eigensystem; order candidate products by reference eigenvalue or Rayleigh value and retain the declared total rank; store spatial and temporal factors before restriction",
+  "temporal_target": "existing unequal Gaussian weights and query-dependent centers, plus rotation 0.8*t/T, vertical motion 0.05*sin(2*pi*t/T), and amplitude 0.15+0.85*sin(pi*t/T)^2",
+  "recycling_policy": "empty initial history; retain deployed coarse vectors and the last window new directions from each accepted CG solve; normalize columns in Jacobi coordinates; QR/small-factor SVD rank threshold 1e-12; retain the lowest scaled Ritz vectors; transfer by zero extension; coarse space fixed during a solve and residual restarts; clear history after a failed target",
+  "coarse_condition_limit": 10000000000.0,
+  "cached_products": "reference and recycling CG optionally retain BZ for projected preconditioning; construction and storage are charged; Jacobi rank zero has no coarse-space operator product",
+  "rank_threshold": 1e-12,
+  "residual_refresh": 10000,
+  "stopping": "same independent original relative residual and outer KKT limits; AmgX native absolute target is amgx_factor*rtol*||b||; CG triggers fresh verification at cg_factor*rtol; solver-specific internal margins are declared before each comparison",
+  "amgx_configuration": {
+    "config_version": 2,
+    "determinism_flag": 1,
+    "solver": {
+      "scope": "main",
+      "solver": "PCG",
+      "preconditioner": {
+        "scope": "amg",
+        "solver": "AMG",
+        "algorithm": "CLASSICAL",
+        "selector": "PMIS",
+        "interpolator": "D2",
+        "smoother": {
+          "solver": "MULTICOLOR_GS",
+          "relaxation_factor": 1.0,
+          "symmetric_GS": 1
+        },
+        "presweeps": 1,
+        "postsweeps": 1,
+        "cycle": "V",
+        "max_iters": 1,
+        "max_levels": 25,
+        "coarse_solver": "DENSE_LU_SOLVER"
+      },
+      "tolerance": 1.0000000000000001e-11,
+      "max_iters": 10000,
+      "norm": "L2",
+      "convergence": "ABSOLUTE",
+      "monitor_residual": 1,
+      "obtain_timings": 1,
+      "print_solve_stats": 0
+    }
+  },
+  "resources": "AmgX base Config/Resources persist per sequence; each inner solve rebuilds matrix, vectors, solver and hierarchy",
+  "warm_starts": "outer_inner passes the previous accepted target's active set and state; every accepted inner solve updates the full state; without accepted outer history use the declared initial_active policy; cold uses that same initial active set and zero inner guesses for each query; each repetition starts without history",
+  "timing": "fresh process for every method/repetition/start policy; one complete sequence includes assembly, reference or resource setup, all targets and PDAS inner solves, transfers, recycling updates, verification and cleanup; all-method small warmup and process initialization are separate",
+  "memory": "10 ms default sampled host RSS and NVML allocation of the same solver process; independent monitor process avoids delays from native calls holding the solver interpreter lock; all solver libraries and allocator caches included; monitor memory excluded; fresh worker process per sequence; sampling interval and maximum gap reported",
+  "memory_budget": "optional common host/GPU sampled-peak budgets are feasibility screens, not hard allocator caps; numerically completed sequences exceeding a declared budget retain their results and are excluded from budget-feasible accepted timings",
+  "failures": "retain every declared sequence and target, inner cap, outer cap, cycle, exception, timeout and memory error; clear warm-start and recycling history after a failed target; report accepted timings separately",
+  "mask_encoding": "zlib: followed by base64 of zlib-compressed, little-endian packed Boolean bits"
+}
