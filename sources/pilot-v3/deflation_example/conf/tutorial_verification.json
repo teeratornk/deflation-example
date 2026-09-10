@@ -1,0 +1,12 @@
+{
+  "tutorial": "verification",
+  "version": 1,
+  "threads": 1,
+  "examples": ["active-set release", "objective agreement and stationarity", "original and recurrence residuals", "corrected initial guess for projected solves", "three CHT stopping protocols"],
+  "linear_tolerance": 1e-10,
+  "pdas_tolerance": 1e-9,
+  "illustrative_recurrence_dtype": "float32",
+  "production_dtype": "float64",
+  "cht_protocols": [1, 2, 3],
+  "timing_scope": "summaries of accepted sequences; all failed attempts remain separately labeled"
+}

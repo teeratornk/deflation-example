@@ -1,0 +1,21 @@
+defaults:
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+  - _self_
+
+grids: [64, 128]
+rank: 100
+repeats: 5
+threads: 4
+include_cpu: true
+output: runs/gpu-benchmark-${now:%Y%m%d-%H%M%S-%f}
+
+hydra:
+  run:
+    dir: .
+  sweep:
+    dir: .
+    subdir: .
+  output_subdir: null
+  job:
+    chdir: false

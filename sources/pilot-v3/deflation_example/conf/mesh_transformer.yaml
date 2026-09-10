@@ -1,0 +1,10 @@
+defaults:
+  - mesh_study
+  - _self_
+
+geometry: transformer_2d
+alpha: 1.0e-12
+bound: 0.8
+spatial_reference: scaled_schur
+inner_cap: 50000
+targets: 3

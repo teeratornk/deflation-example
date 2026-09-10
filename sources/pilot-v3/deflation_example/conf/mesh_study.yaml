@@ -1,0 +1,46 @@
+defaults:
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+  - _self_
+
+geometry: engine_3d
+level: 0
+transient: false
+slabs: 4
+horizon: 0.1
+alpha: 0.000001
+bound: 0.2
+initial_temperature: 0.0
+targets: 3
+rank: 20
+construction: mode_dependent
+spatial_reference: diffusion
+temporal_metric: euclidean
+methods: [jacobi, reference, recycling]
+device: cpu
+repeats: 1
+warm_start: outer_inner
+phase: pilot
+threads: 4
+inner_cap: 10000
+residual_refresh: 10000
+outer_cap: 100
+rtol: 1.0e-10
+kkt_tolerance: 1.0e-8
+cg_factor: 0.1
+amgx_factor: 0.1
+matrix_free_inner: false
+monitor_memory: false
+save_fields: true
+timeout_seconds: 7200.0
+output: runs/mesh-${geometry}-${now:%Y%m%d-%H%M%S-%f}
+
+hydra:
+  run:
+    dir: .
+  sweep:
+    dir: .
+    subdir: .
+  output_subdir: null
+  job:
+    chdir: false

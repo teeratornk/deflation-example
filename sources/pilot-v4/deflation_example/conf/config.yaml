@@ -1,0 +1,24 @@
+defaults:
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+  - _self_
+
+problem: diffusion
+grid: null
+rank: 20
+alpha: 0.001
+device: cpu
+plot: false
+threads: 1
+maxiter: 20000
+output: runs/${problem}-${now:%Y%m%d-%H%M%S-%f}
+
+hydra:
+  run:
+    dir: .
+  sweep:
+    dir: .
+    subdir: .
+  output_subdir: null
+  job:
+    chdir: false

@@ -1,0 +1,46 @@
+{
+  "schema": "mesh-cht-input-v1",
+  "geometry": "transformer_2d",
+  "source_files": {
+    "fattuesday_2d_physics_g1.npz": "428e60e9e45258dcfaf412961cceb428405b06299d32efd5eb2e4c51b0bdcf61",
+    "fattuesday_2d_stokes_field.npz": "69f23f9a0c432fa21f435176202022dce1e7bbbfed6d645be4685ac3fd74a4b9"
+  },
+  "source_revision": "35161d0afc0c0115d7ef03d8474d451885d3b75d",
+  "coordinates": "axisymmetric (r,z), metres",
+  "materials": {
+    "0": "oil",
+    "1": "winding",
+    "2": "baffle"
+  },
+  "physical": {
+    "reference_temperature_K": 323.15,
+    "inlet_temperature_K": 341.3,
+    "inlet_velocity_m_s": 0.027,
+    "oil_conductivity_W_m_K": 0.130897,
+    "winding_conductivity_rz_W_m_K": [
+      0.5238601948105099,
+      1.1709267456804227
+    ],
+    "baffle_conductivity_W_m_K": 0.2,
+    "capacity_J_m3_K": [
+      1621197.71,
+      3080000.0,
+      1800000.0
+    ],
+    "temperature_scale_K": 20.0,
+    "length_scale_m": 1.0,
+    "time_scale_s": 12385293.09304262,
+    "control_units": "source density divided by oil_conductivity*temperature_scale/length_scale^2",
+    "property_policy": "Material properties are frozen at reference_temperature_K.",
+    "flow_policy": "Prescribed axisymmetric P2 Stokes velocity, frozen for all queries and time slabs."
+  },
+  "flow_verification": {
+    "inlet_outlet_relative_imbalance": 9.1315598990123e-07,
+    "inlet_outlet_flux_m3_s": [
+      0.013573376723540843,
+      0.013573389118151102
+    ],
+    "coordinate_match_max_m": 4.577566798522237e-16
+  },
+  "scope": "Self-built geometry with prescribed flow; thermal optimization uses a separate P1 discretization."
+}

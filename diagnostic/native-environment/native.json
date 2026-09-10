@@ -1,0 +1,11 @@
+{
+  "schema": "mesh-cht-native-environment-v1",
+  "scope": "Native installation shared by the body-fitted complete-sequence studies",
+  "amgx_version": "2.5.0",
+  "amgx_source_commit": "cc1cebdbb32b14d33762d4ddabcb2e23c1669f47",
+  "amgx_api": "1.0",
+  "pyamgx": "0.1",
+  "pyamgx_source_commit": "6229ff008ee5a264cfc1799eeb2f83d96da0aadc",
+  "pyamgx_binary_sha256": "492fd5b7fb6376d0ea5f5061a63dc367dfd747bb0ed5fa95a5d6b9eeef984594",
+  "amgx_library_sha256": "18a639e019df4e28a9480bd5a39ba92432a2c758c7de334067de373f6653d0b9"
+}
