@@ -145,8 +145,8 @@ def run(root, output=None):
     support(
         root / "diagnostic/independent-validation/validation.json",
         {
-            "Engine steady": root / "diagnostic/engine-steady-transfer/transfer.json",
-            "Engine transient": root / "diagnostic/engine-transient-transfer/transfer.json",
+            "Bore steady": root / "diagnostic/engine-steady-transfer/transfer.json",
+            "Bore transient": root / "diagnostic/engine-transient-transfer/transfer.json",
             "Transformer transient": root
             / "diagnostic/transformer-transient-transfer/transfer.json",
         },

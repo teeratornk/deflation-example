@@ -87,7 +87,9 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
             colorbar = fig.colorbar(
                 im, ax=geometry, orientation="horizontal", ticks=[0, 1, 2], pad=0.12
             )
-            colorbar.ax.set_xticklabels(["Oil", "Winding", "Baffle"], fontsize=9)
+            colorbar.ax.set_xticklabels(
+                ["Oil", "Winding", "Baffle"], fontsize=9, rotation=45, ha="right"
+            )
         for col, query in enumerate(queries, 1):
             if query not in range(c["targets"]):
                 raise ValueError("A requested target lies outside the recorded sequence")
