@@ -48,6 +48,8 @@ def _gpu_deflated_cg(
     timer,
     torch,
     acceptance_rtol,
+    direction_callback,
+    completion_callback,
 ):
     """Return (LinearResult, timing/memory metrics), verified with the CPU matrix.
 
@@ -137,7 +139,7 @@ def _gpu_deflated_cg(
         return np.isfinite(value) and value <= rtol
 
     status, iterations = "breakdown" if coarse_failed else "maxiter", 0
-    if not coarse_failed:
+    if rank and not coarse_failed:
         x += Q(rhs - apply(x))
     r = rhs - apply(x)
     timer.mark("initialization")
@@ -160,6 +162,8 @@ def _gpu_deflated_cg(
                 ):
                     status = "breakdown"
                     break
+                if direction_callback is not None:
+                    direction_callback(p)
                 step = rz / curvature
                 x += step * p
                 r -= step * Ap
@@ -170,11 +174,12 @@ def _gpu_deflated_cg(
                     if small_residual(r):
                         status = "converged"
                         break
-                    x += Q(r)
-                    r = rhs - apply(x)
-                    if small_residual(r):
-                        status = "converged"
-                        break
+                    if rank:
+                        x += Q(r)
+                        r = rhs - apply(x)
+                        if small_residual(r):
+                            status = "converged"
+                            break
                 z = precondition(r)
                 new_rz = torch.dot(r, z)
                 p = z.clone() if restart else z + (new_rz / rz) * p
@@ -191,6 +196,11 @@ def _gpu_deflated_cg(
     elif status == "converged":
         status = "residual_failed"
     timer.mark("verification")
+    completion_metrics = None
+    if completion_callback is not None:
+        completion_metrics = completion_callback(H, diag, V, status)
+        timer.mark("basis_processing")
+        timer.synchronize(torch.cuda.synchronize)
     total = time.perf_counter() - start
     return LinearResult(x_cpu, iterations, residual, status, rank, condition, fallback), {
         "setup_seconds": setup,
@@ -204,6 +214,7 @@ def _gpu_deflated_cg(
         "basis_backend": basis_backend,
         "iteration_rtol": rtol,
         "acceptance_rtol": acceptance_rtol,
+        "completion": completion_metrics,
     }
 
 
@@ -220,6 +231,8 @@ def gpu_deflated_cg(
     *,
     basis_backend="cpu_svd",
     acceptance_rtol=None,
+    direction_callback=None,
+    completion_callback=None,
 ):
     """Verified CUDA solve, including conversion, transfers and temporary cleanup.
 
@@ -227,9 +240,18 @@ def gpu_deflated_cg(
     the complete call after runtime availability is checked. Explicit barriers
     are separate from asynchronous stage times. PyTorch's allocator remains
     cached; cleanup releases this solve's tensors, not the shared runtime.
+
+    Optional callbacks support bounded recycling. The direction callback receives
+    a read-only view of each executed search direction and must copy directions
+    it retains. After independent verification, the completion callback receives
+    the GPU matrix, diagonal, deployed coarse basis and final status. Its work
+    belongs to basis_processing and total time; it must preserve solver inputs.
     """
     if basis_backend not in {"cpu_svd", "gpu_qr"}:
         raise ValueError("Basis backend must be cpu_svd or gpu_qr")
+    for callback in (direction_callback, completion_callback):
+        if callback is not None and not callable(callback):
+            raise ValueError("Solver callbacks must be callable")
     acceptance_rtol = (
         rtol if acceptance_rtol is None else positive_real(acceptance_rtol, "Acceptance tolerance")
     )
@@ -251,6 +273,8 @@ def gpu_deflated_cg(
         timer=timer,
         torch=torch,
         acceptance_rtol=acceptance_rtol,
+        direction_callback=direction_callback,
+        completion_callback=completion_callback,
     )
     # Returning from the helper releases its temporary GPU tensors. The
     # returned solution owns CPU storage only. No empty_cache() is charged.

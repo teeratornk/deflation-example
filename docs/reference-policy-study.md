@@ -1,0 +1,124 @@
+# Reference-space reuse study
+
+This study tests a fixed full-domain reference policy in complete steady and
+transient state-constrained conjugate heat-transfer (CHT) optimization. Transient
+performance and comparisons with the expanded recycling control are open
+experimental questions. Existing benchmark records retain their original scope.
+
+## Claims and measurements
+
+| Claim | Comparison or verification | Required quantities |
+|---|---|---|
+| Full-domain storage supplies reference values at released constraints | Replay identical optimization traces with direct restriction and sequential zero-extension transfer | Newly active and newly inactive nodes, actual rank, transferred-space difference, coarse energy-error reduction, accepted iterations and total kernel cost |
+| One reference supports complete constrained optimization | Complete sequences with Jacobi-CG, reference deflation, scaled recycling and persistent-resource AmgX | Original residuals, all KKT components, accepted targets and sequences, complete costs and all failures |
+| A space–time construction retains temporal coupling | Independent small trajectory optimization and mode-dependent versus tensor-product references | State/adjoint identities, initial and final blocks, objective weights, recovered control, total rank and restricted storage |
+| Reuse has a useful time–memory range | Spatial, temporal and rank studies with matched starts and declared budgets | Complete time, cumulative cost, reference/candidate storage, comparable sampled process memory, caps and memory limits |
+| Conditional analysis describes the measured coarse correction | Small CHT trace systems and a controlled parameter study | Remaining deflated spectrum, initial energy-error reduction, positive separation and certified conditioning improvement when available |
+
+Residual recomputation, KKT verification, Cholesky factorization and GPU execution
+support these tests. They are implementation and verification choices. The
+algorithmic policy defines correction information over the full domain before
+optimization and restricts it at every inactive-set update. The transfer ablation
+compares two specified transfers; conclusions about recycling concern the
+implemented comparator.
+
+## Execution and decision gates
+
+1. Implement complete-sequence Jacobi-CG and recycling that retains existing
+   coarse vectors with new search directions. Use Jacobi-scaled Ritz selection,
+   report effective ranks, and include capture, selection and transfer costs.
+2. Implement complete backward-Euler CHT optimization. Verify the full trajectory
+   against an independent small constrained optimizer before timing. Compare two
+   space–time reference constructions in a pilot and then freeze one policy.
+3. Replay steady and transient optimization traces for the matched transfer
+   ablation. Keep matrices, right-hand sides, starting vectors and tolerances
+   identical. Separate activation from release counts.
+4. Freeze final configurations after pilots. Run independently repeated complete
+   sequences, spatial and temporal refinements, and a small rank sweep. Preserve
+   every declared attempt and report accepted timings separately from failures.
+5. Inspect spectral diagnostics and decide whether the longer conditional bounds
+   belong in the SI. Rewrite the paper from the supported claims and numerical
+   records; write the abstract last.
+
+The primary start policy carries accepted active sets across queries and uses
+the last full state as the next inner initial guess. Cold starts are a supporting
+control. Recycling begins with empty history and updates between PDAS inner
+solves. Reference construction is charged from the first target. Requested and
+effective ranks, retained vectors, candidate pools, reference factors, restricted
+bases and cached operator products are recorded separately.
+
+The proposed steady progression is 24, 32 and 48 interior nodes per axis, with
+64 conditional on the pilot's time and memory requirements. Transient studies
+refine space at fixed time discretization and time at fixed physical horizon.
+A change in horizon forms a separate comparison. The pilot determines feasible
+transient sizes and rank budgets before the final configuration is frozen.
+
+## Physical and temporal conventions
+
+The solid–fluid geometry, conductivity interface, prescribed transport and
+distributed source control follow the existing CHT preset. The temperature bound
+is a fixed physical scalar within each declared refinement comparison. Scenario
+indices identify optimization queries; time levels identify states within one
+trajectory. Targets move and pulse in physical time and vary across queries.
+
+For thermal-capacity matrix C and steady state matrix A, backward Euler uses
+`C (y_n - y_(n-1))/dt + A y_n = u_n`. The initial temperature is prescribed.
+The objective uses right-endpoint time quadrature for both temperature tracking
+and the L2 control penalty, with the same spatial cell-volume factor. The pilot
+will record capacity values, time steps, horizon, initial data and target
+parameters explicitly. Full block coupling enters the operator, transpose,
+reduced Hessian, control recovery and KKT checks.
+
+## Reproducibility
+
+Pilots and final studies have separate output directories and protocol identifiers.
+Final protocols record source identifiers, environment, order, warmup, numerical
+thresholds, budgets and failure rules before timed execution. Complete sequence
+costs include assembly, construction, every active-set update and inner solve,
+transfers, verification and cleanup. Process initialization and warmup are
+reported separately and included in preparation-inclusive totals. Memory
+measurements use the same boundary and sampling method for all competitors.
+
+The main manuscript will use the working title *Reference-Space Reuse for Steady
+and Transient State-Constrained Conjugate Heat Transfer*. Its organization will
+follow the formulation, reference construction, transfer mechanism, complete
+optimization comparisons, scaling and one limitations subsection. Auxiliary
+benchmark branches remain available in the SI or reproducible repository.
+
+## Pilot reproduction
+
+The small CPU pilot runs three complete trajectory optimizers and needs the
+optional process-memory dependencies:
+
+```bash
+uv run --locked --extra study python -m deflation_example.benchmark_cht device=cpu 'methods=[jacobi,reference,recycling]' problem=transient n=4 calibration_grid=4 slabs=4 targets=3 rank=12 window=12 output=runs/transient-cpu-pilot
+```
+
+The default configuration is a pilot, with four methods and a small steady grid.
+After installing the GPU, study and plotting extras, install AmgX and its binding
+as described in [the GPU guide](gpu-benchmark.md). The new study uses PyAMGX source
+commit `6229ff008ee5a264cfc1799eeb2f83d96da0aadc`; its source identifier and binary
+hash enter each GPU worker's record. Use `--no-sync` after this native installation.
+Every GPU worker initializes and warms both numerical libraries, including when
+running one method for a construction comparison.
+
+```bash
+uv run --no-sync python -m deflation_example.benchmark_cht --cfg job
+uv run --no-sync python -m deflation_example.benchmark_cht output=runs/steady-gpu-pilot
+uv run --no-sync python -m deflation_example.benchmark_cht problem=transient n=6 calibration_grid=6 slabs=4 rank=24 window=24 output=runs/transient-gpu-pilot
+```
+
+`declared_protocol.json` precedes calibration. `protocol.json` additionally fixes
+the calibrated physical bound before comparison. Each sequence runs in a fresh
+process and has a separate JSON record; `results.json` contains their hashes and
+acceptance flags. Compressed masks retain the inactive systems for replay. The
+complete sequence and preparation-inclusive process times are separate fields.
+These pilot commands establish correctness and feasibility; final performance
+claims require the frozen final configurations and repeated measurements.
+
+The transient verification tests include nonzero initial temperature, unequal time
+steps, independent forward and transpose actions, the final adjoint block,
+objective quadrature and a bounded-variable least-squares reference. Mode-dependent
+reference vectors satisfy the homogeneous space–time eigenproblem. The tensor
+alternative uses shared temporal vectors and reports their reference Rayleigh
+values. Both constructions specify the total space–time rank.

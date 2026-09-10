@@ -1,0 +1,43 @@
+defaults:
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+  - _self_
+
+phase: pilot
+device: cuda
+problem: steady
+n: 8
+slabs: 8
+horizon: 0.1
+solid_capacity: 2.0
+fluid_capacity: 1.0
+initial_temperature: 0.0
+reference_construction: mode_dependent
+reference_capacity: 1.0
+targets: 4
+rank: 12
+recycle_rank: null
+window: 12
+repeats: 1
+methods: [jacobi, reference, recycling, amgx]
+warm_starts: [outer_inner]
+rtol: 1.0e-10
+amgx_factor: 0.1
+outer_tolerance: 1.0e-8
+inner_cap: 10000
+outer_cap: 100
+threads: 4
+bound: null
+calibration_grid: 8
+calibration_steps: 8
+calibration_activity: 0.2
+memory_interval: 0.01
+sequence_timeout: 7200
+output: runs/cht-study-${now:%Y%m%d-%H%M%S-%f}
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job:
+    chdir: false

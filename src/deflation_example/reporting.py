@@ -55,10 +55,24 @@ def environment():
         from . import __version__
 
         package_version = __version__
+    cpu_model = None
+    if platform.system() == "Linux":
+        try:
+            cpu_model = next(
+                (
+                    line.split(":", 1)[1].strip()[:160]
+                    for line in Path("/proc/cpuinfo").read_text().splitlines()
+                    if line.startswith("model name") and ":" in line
+                ),
+                None,
+            )
+        except OSError:
+            pass
     return {
         "python": platform.python_version(),
         "system": platform.system(),
         "machine": platform.machine(),
+        "cpu_model": cpu_model,
         "numpy": np.__version__,
         "scipy": scipy.__version__,
         "package": package_version,

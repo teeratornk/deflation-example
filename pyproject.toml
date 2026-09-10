@@ -16,6 +16,7 @@ dependencies = ["numpy>=1.26,<3", "scipy>=1.13,<2", "threadpoolctl>=3.5,<4", "hy
 [project.optional-dependencies]
 plot = ["matplotlib>=3.8,<4"]
 gpu = ["torch==2.10.0"]
+study = ["psutil>=6,<8", "nvidia-ml-py>=12,<14"]
 
 [dependency-groups]
 dev = ["pytest>=8,<10", "build>=1.2,<2", "ruff>=0.11,<1"]
