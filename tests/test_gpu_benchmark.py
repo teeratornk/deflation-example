@@ -110,6 +110,28 @@ def test_cleanup_on_setup_failure():
     assert created == destroyed
 
 
+def test_error_equation_changes_solver_controls_and_keeps_amgx_resources():
+    api, created, destroyed, _ = fake_amgx()
+    session = AmgxSession(api, 1e-11, 50, True).open()
+    result, metrics = amgx_cg(
+        sparse.eye(3),
+        np.ones(3),
+        api=api,
+        synchronize=lambda: None,
+        session=session,
+        rtol=0.01,
+        acceptance_rtol=0.1,
+        maxiter=20,
+        rhs_relative=True,
+        session_solver_override=True,
+    )
+    assert result.status == "converged" and metrics["resources_reused"]
+    assert metrics["native_absolute_tolerance"] == pytest.approx(0.01 * np.sqrt(3))
+    assert session.rtol == 1e-11 and session.maxiter == 50
+    session.close()
+    assert created == destroyed and created["Resources"] == 1
+
+
 def test_cleanup_attempts_all_objects():
     calls = []
 

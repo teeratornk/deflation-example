@@ -43,6 +43,10 @@ def verified_refinement(solve, A, b, initial, tolerance, maxiter, max_correction
                 "rank": result.rank,
                 "coarse_condition": result.coarse_condition,
                 "termination_test": timing.get("termination_test"),
+                "iteration_rtol": timing.get("iteration_rtol"),
+                "native_absolute_tolerance": timing.get("native_absolute_tolerance"),
+                "components_seconds": timing["components_seconds"],
+                "kernel_seconds": timing["total_seconds"],
             }
         )
         improved = np.isfinite(residual) and residual < previous_residual
