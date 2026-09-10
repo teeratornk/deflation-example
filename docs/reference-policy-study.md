@@ -122,3 +122,52 @@ objective quadrature and a bounded-variable least-squares reference. Mode-depend
 reference vectors satisfy the homogeneous space–time eigenproblem. The tensor
 alternative uses shared temporal vectors and reports their reference Rayleigh
 values. Both constructions specify the total space–time rank.
+
+## Transfer and conditioning diagnostics
+
+Replay an accepted source sequence with direct full-reference restriction and
+sequential zero-extension transfer:
+
+```bash
+uv run --locked python -m deflation_example.benchmark_transfer --records-root runs/transient-cpu-pilot --output runs/transfer --repeats 3
+uv run --locked python -m deflation_example.benchmark_cht_conditioning --output runs/cht-conditioning
+uv run --locked python -m deflation_example.benchmark_cht_report --records-roots runs/transient-cpu-pilot --output runs/trajectory-summary
+```
+
+Replay reconstructs each inactive matrix and right-hand side and checks the
+source hashes. Both transfers start from zero and receive the same original
+reference on their first solve. The sequential control subsequently carries only
+its surviving entries. It receives no replacement directions. The report records
+newly inactive and newly active nodes, numerical rank, fallback, coarse energy
+removal and independently verified residuals. Small systems also include the
+remaining nonzero spectrum in Jacobi coordinates. Reconstruction, independent
+direct solutions and spectral diagnostics are separate from kernel timings.
+
+The controlled CHT example uses an exact eigenvector of the full Jacobi-scaled
+heterogeneous operator. Its prescribed restrictions progress from certified
+conditioning improvement to an uninformative bound. This reference construction
+differs from the analytical spaces in the timing study. The regression checks
+evaluate the stated formula, including the numerical reference residual, and
+compare its condition-number bound with the measured deflated spectrum.
+
+The sequence summary verifies timing sums, ranks, numerical thresholds, masks,
+trajectory recovery and KKT acceptance before generating JSON and CSV tables.
+It reports failed attempts separately from accepted sequence timings. Component
+medians describe their own distributions; their sum can differ from the median
+complete time.
+
+## Timing and initialization pilots
+
+The configuration exposes the initial active set (`initial_active=empty` or
+`all`) and residual-refresh interval. Every method receives the same declared
+active-set initialization. Accepted histories take precedence under the matched
+warm-start policy. These settings support documented stopping and initialization
+pilots; they remain fixed within every final comparison.
+
+Final memory measurements use a separate monitoring process. This avoids gaps
+caused by native solver calls holding the Python interpreter lock. The monitor
+samples the solver process's complete host RSS and GPU allocation, including
+all numerical libraries and allocator caches. Its own storage is excluded.
+The recorded maximum sampling gap quantifies the resolution of the sampled
+peak. Monitor initialization and finalization lie outside the complete solve
+interval and enter the preparation-inclusive process time.

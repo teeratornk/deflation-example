@@ -25,8 +25,8 @@ jobs:
         with:
           version: '0.9.30'
           python-version: ${{ matrix.python }}
-      - run: uv sync --locked --extra plot --python '${{ matrix.python }}'
-      - run: uv run --locked --extra plot pytest -m 'not gpu'
+      - run: uv sync --locked --extra plot --extra study --python '${{ matrix.python }}'
+      - run: uv run --locked --extra plot --extra study pytest -m 'not gpu'
       - run: uv run --locked ruff check . && uv run --locked ruff format --check .
       - run: uv build
       - run: uv run --locked python tools/check_release.py --source . --history dist/*.whl dist/*.tar.gz
@@ -35,7 +35,7 @@ jobs:
         run: |
           example_env=$(mktemp -d)
           uv venv "$example_env/venv" --python '${{ matrix.python }}'
-          uv export --locked --no-dev --extra plot --no-emit-project --format requirements-txt --output-file "$example_env/requirements.txt"
+          uv export --locked --no-dev --extra plot --extra study --no-emit-project --format requirements-txt --output-file "$example_env/requirements.txt"
           uv pip install --python "$example_env/venv/bin/python" --require-hashes -r "$example_env/requirements.txt"
           uv pip install --python "$example_env/venv/bin/python" --no-deps dist/*.whl
           cd "$example_env"
@@ -45,6 +45,10 @@ jobs:
           for tutorial in spectral verification costs; do
             "$example_env/venv/bin/python" -m deflation_example.tutorials "$tutorial" --records "$GITHUB_WORKSPACE/examples/benchmarks" --output "tutorial-$tutorial"
           done
+          "$example_env/venv/bin/python" -m deflation_example.benchmark_cht device=cpu 'methods=[jacobi,reference,recycling]' problem=transient n=3 slabs=3 targets=3 rank=5 window=8 bound=0.0001 repeats=1 output=trajectory
+          "$example_env/venv/bin/python" -m deflation_example.benchmark_cht_report --records-roots trajectory --output trajectory-summary
+          "$example_env/venv/bin/python" -m deflation_example.benchmark_transfer --records-root trajectory --output transfer --repeats 1
+          "$example_env/venv/bin/python" -m deflation_example.benchmark_cht_conditioning --output conditioning
   release:
     if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
     needs: cpu

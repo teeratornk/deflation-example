@@ -30,6 +30,49 @@ def test_query_parameter_is_separate_from_physical_time():
     assert protocol["controls"]["horizon"] == 0.1
 
 
+@pytest.mark.parametrize("method", ["jacobi", "reference", "recycling"])
+def test_all_active_initialization_releases_constraints(monkeypatch, method):
+    monkeypatch.setattr(
+        benchmark_cht,
+        "ProcessMemory",
+        lambda *args: ProcessMemory(interval=60, query=lambda: (100, 0)),
+    )
+    config = small_config("transient")
+    config.initial_active = "all"
+    protocol = benchmark_cht.specification(config)
+    record = benchmark_cht.complete_sequence(protocol, method, "outer_inner")
+    assert record["success"]
+    assert record["cases"][0]["initial_active_count"] == 81
+    assert record["cases"][0]["final_active_count"] < 81
+
+
+def test_summary_checks_semantic_acceptance_and_timing(monkeypatch):
+    from copy import deepcopy
+    from deflation_example.benchmark_cht_report import validate_sequence, summarize
+
+    monkeypatch.setattr(
+        benchmark_cht,
+        "ProcessMemory",
+        lambda *args: ProcessMemory(interval=60, query=lambda: (100, 0)),
+    )
+    protocol = benchmark_cht.specification(small_config("transient"))
+    record = benchmark_cht.complete_sequence(protocol, "reference", "outer_inner")
+    validate_sequence(record, protocol)
+    assert summarize(protocol, [record])[1]["accepted_sequences"] == 1
+    bad = deepcopy(record)
+    bad["cases"][0]["inner"][0]["acceptance_rtol"] *= 10
+    with pytest.raises(ValueError, match="Final residual target"):
+        validate_sequence(bad, protocol)
+    bad = deepcopy(record)
+    bad["total_seconds"] += 1
+    with pytest.raises(ValueError, match="timing sum"):
+        validate_sequence(bad, protocol)
+    bad = deepcopy(record)
+    bad["cases"][0]["kkt"]["primal"] = 1
+    with pytest.raises(ValueError, match="KKT"):
+        validate_sequence(bad, protocol)
+
+
 @pytest.mark.parametrize("size", [0, 1, 31, 10000])
 def test_mask_encoding_round_trip_and_dimension_check(size):
     mask = np.random.default_rng(12).random(size) > 0.2
@@ -85,6 +128,22 @@ def test_failed_capped_sequences_are_retained(monkeypatch):
     assert len(record["cases"]) == 3
     assert all(case["status"] == "inner_maxiter" for case in record["cases"])
     assert all(case["initial_active_count"] == 0 for case in record["cases"])
+
+
+def test_cleanup_failure_preserves_numerical_outcomes_and_closes_sampler(monkeypatch):
+    sampler = ProcessMemory(interval=60, query=lambda: (100, 0))
+    monkeypatch.setattr(benchmark_cht, "ProcessMemory", lambda *args: sampler)
+
+    def failed_close(self):
+        raise RuntimeError("Cleanup failure")
+
+    monkeypatch.setattr(benchmark_cht.StudySolver, "close", failed_close)
+    record = benchmark_cht.complete_sequence(
+        benchmark_cht.specification(small_config()), "jacobi", "outer_inner"
+    )
+    assert not record["success"] and record["error_type"] == "RuntimeError"
+    assert len(record["cases"]) == 3 and sampler.closed
+    assert all(case["status"] == "converged" for case in record["cases"])
 
 
 def test_run_records_worker_timeout_and_preserves_all_declared_attempts(tmp_path, monkeypatch):

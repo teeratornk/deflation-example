@@ -25,7 +25,9 @@ rtol: 1.0e-10
 amgx_factor: 0.1
 outer_tolerance: 1.0e-8
 inner_cap: 10000
+residual_refresh: 1000
 outer_cap: 100
+initial_active: empty
 threads: 4
 bound: null
 calibration_grid: 8

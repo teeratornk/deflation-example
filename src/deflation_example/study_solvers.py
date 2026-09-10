@@ -48,6 +48,7 @@ class StudySolver:
         rtol=1e-10,
         amgx_factor=0.1,
         maxiter=10000,
+        refresh=1000,
         torch=None,
         api=None,
     ):
@@ -61,6 +62,7 @@ class StudySolver:
         self.window = integer(window, "Direction window", 1)
         self.rtol = positive_real(rtol, "Final relative tolerance")
         self.maxiter = integer(maxiter, "Iteration cap", 1)
+        self.refresh = integer(refresh, "Residual refresh interval", 1)
         self.amgx_factor = positive_real(amgx_factor, "AmgX stopping factor")
         if self.amgx_factor > 1:
             raise ValueError("AmgX stopping factor must not exceed one")
@@ -125,6 +127,7 @@ class StudySolver:
                 acceptance_rtol=self.rtol,
                 maxiter=self.maxiter,
                 basis_backend="gpu_qr",
+                refresh=self.refresh,
                 direction_callback=None if self.history is None else self.history.capture,
                 completion_callback=None if self.history is None else self.history.finish,
             )
@@ -138,6 +141,7 @@ class StudySolver:
                 x0=initial,
                 rtol=self.rtol,
                 maxiter=self.maxiter,
+                refresh=self.refresh,
                 direction_callback=None if self.history is None else self.history.capture,
             )
             kernel_seconds = time.perf_counter() - tick

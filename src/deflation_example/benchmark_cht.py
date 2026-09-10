@@ -56,7 +56,9 @@ class StudyConfig:
     amgx_factor: float = 0.1
     outer_tolerance: float = 1e-8
     inner_cap: int = 10000
+    residual_refresh: int = 1000
     outer_cap: int = 100
+    initial_active: str = "empty"
     threads: int = 4
     bound: float | None = None
     calibration_grid: int = 8
@@ -85,13 +87,23 @@ def specification(config):
         raise ValueError("Problem must be steady or transient CHT")
     if values["reference_construction"] not in {"mode_dependent", "tensor"}:
         raise ValueError("Unknown space-time construction")
+    if values["initial_active"] not in {"empty", "all"}:
+        raise ValueError("Initial active set must be empty or all")
     integer(values["slabs"], "Time slabs", 1)
     for key in ("horizon", "solid_capacity", "fluid_capacity", "reference_capacity"):
         positive_real(values[key], key)
     finite_real(values["initial_temperature"], "Initial temperature")
     for key in ("n", "calibration_grid", "targets"):
         integer(values[key], key, 2)
-    for key in ("window", "repeats", "inner_cap", "outer_cap", "threads", "calibration_steps"):
+    for key in (
+        "window",
+        "repeats",
+        "inner_cap",
+        "residual_refresh",
+        "outer_cap",
+        "threads",
+        "calibration_steps",
+    ):
         integer(values[key], key, 1)
     integer(values["rank"], "Reference rank")
     if values["recycle_rank"] is None:
@@ -124,15 +136,15 @@ def specification(config):
         "recycling_policy": "empty initial history; retain deployed coarse vectors and the last window new directions from each accepted CG solve; normalize columns in Jacobi coordinates; QR/small-factor SVD rank threshold 1e-12; retain the lowest scaled Ritz vectors; transfer by zero extension; coarse space fixed during a solve and residual restarts; clear history after a failed target",
         "coarse_condition_limit": 1e10,
         "rank_threshold": 1e-12,
-        "residual_refresh": 1000,
+        "residual_refresh": values["residual_refresh"],
         "stopping": "same independent original relative residual and outer KKT limits; AmgX native absolute target is amgx_factor*rtol*||b||; CG triggers fresh verification at rtol",
         "amgx_configuration": amgx_configuration(
             values["rtol"] * values["amgx_factor"], values["inner_cap"], True
         ),
         "resources": "AmgX base Config/Resources persist per sequence; each inner solve rebuilds matrix, vectors, solver and hierarchy",
-        "warm_starts": "outer_inner passes the previous accepted target's active set and state; every accepted inner solve updates the full state; cold gives empty active sets and zero inner guesses; each repetition starts without history",
+        "warm_starts": "outer_inner passes the previous accepted target's active set and state; every accepted inner solve updates the full state; without accepted outer history use the declared initial_active policy; cold uses that same initial active set and zero inner guesses for each query; each repetition starts without history",
         "timing": "fresh process for every method/repetition/start policy; one complete sequence includes assembly, reference or resource setup, all targets and PDAS inner solves, transfers, recycling updates, verification and cleanup; all-method small warmup and process initialization are separate",
-        "memory": "10 ms default sampled host RSS and NVML allocation of the same process; all libraries and allocator caches included; fresh worker process per sequence; sampling interval and maximum gap reported",
+        "memory": "10 ms default sampled host RSS and NVML allocation of the same solver process; independent monitor process avoids delays from native calls holding the solver interpreter lock; all solver libraries and allocator caches included; monitor memory excluded; fresh worker process per sequence; sampling interval and maximum gap reported",
         "failures": "retain every declared sequence and target, inner cap, outer cap, cycle, exception, timeout and memory error; clear warm-start and recycling history after a failed target; report accepted timings separately",
         "mask_encoding": "zlib: followed by base64 of zlib-compressed, little-endian packed Boolean bits",
     }
@@ -182,6 +194,18 @@ def desired_and_load(model, parameters):
     return desired, desired
 
 
+def build_reference(model, controls):
+    if isinstance(model, ThermalTrajectory):
+        return build_space_time_reference(
+            model,
+            controls["rank"],
+            controls["reference_construction"],
+            controls["reference_capacity"],
+        )
+    basis, modes = analytical_reference(controls["n"], 3, controls["rank"])
+    return ArrayReference(basis, {"construction": "analytical", "mode_indices": modes})
+
+
 def complete_sequence(protocol, method, warm, torch=None, api=None):
     c = protocol["controls"]
     barrier = (lambda: None) if torch is None else torch.cuda.synchronize
@@ -189,7 +213,7 @@ def complete_sequence(protocol, method, warm, torch=None, api=None):
     barrier()
     start = tick = time.perf_counter()
     cases, parts, previous = [], {}, None
-    problem = adapter = reference = basis = result = state = desired = initial_active = None
+    problem = adapter = reference = result = state = desired = initial_active = None
     error = None
     storage = {}
     try:
@@ -212,15 +236,7 @@ def complete_sequence(protocol, method, warm, torch=None, api=None):
         matrices = None
         tick = time.perf_counter()
         if method == "reference":
-            if isinstance(problem, ThermalTrajectory):
-                reference = build_space_time_reference(
-                    problem, c["rank"], c["reference_construction"], c["reference_capacity"]
-                )
-            else:
-                basis, modes = analytical_reference(c["n"], 3, c["rank"])
-                reference = ArrayReference(
-                    basis, {"construction": "analytical", "mode_indices": modes}
-                )
+            reference = build_reference(problem, c)
             storage.update(reference.storage())
             storage["reference_description"] = reference.description
         parts["reference_construction"] = time.perf_counter() - tick
@@ -234,6 +250,7 @@ def complete_sequence(protocol, method, warm, torch=None, api=None):
             rtol=c["rtol"],
             amgx_factor=c["amgx_factor"],
             maxiter=c["inner_cap"],
+            refresh=c["residual_refresh"],
             torch=torch,
             api=api,
         )
@@ -241,7 +258,13 @@ def complete_sequence(protocol, method, warm, torch=None, api=None):
         for parameters in protocol["targets"]:
             tick = time.perf_counter()
             desired, load = desired_and_load(problem, parameters)
-            initial_active = previous["active"] if previous is not None and warm != "cold" else None
+            initial_active = (
+                previous["active"]
+                if previous is not None and warm != "cold"
+                else np.ones(len(desired), dtype=bool)
+                if c["initial_active"] == "all"
+                else None
+            )
             state = (
                 previous["y"].copy()
                 if previous is not None and warm != "cold"
@@ -355,13 +378,20 @@ def complete_sequence(protocol, method, warm, torch=None, api=None):
         error = type(exception).__name__
     finally:
         tick = time.perf_counter()
-        if adapter is not None:
-            adapter.close()
-        adapter = reference = basis = problem = previous = result = state = desired = (
-            initial_active
-        ) = None
-        load = matrices = masks = None
-        barrier()
+        try:
+            if adapter is not None:
+                adapter.close()
+        except Exception as exception:
+            error = error or type(exception).__name__
+        finally:
+            adapter = reference = problem = previous = result = state = desired = initial_active = (
+                None
+            )
+            load = matrices = masks = None
+        try:
+            barrier()
+        except Exception as exception:
+            error = error or type(exception).__name__
         parts["cleanup"] = time.perf_counter() - tick
     total = time.perf_counter() - start
     memory = sampler.finish()
@@ -474,6 +504,8 @@ def worker(protocol_path, output, method, warm):
         finalization_seconds=finalization,
         environment=observed_environment,
     )
+    # Preserve the numerical outcome even if optional native metadata fails.
+    write_report(output, result)
     if initialized:
         result["environment"].update(
             torch=torch.__version__, cuda=torch.version.cuda, gpu=torch.cuda.get_device_name()
@@ -563,8 +595,12 @@ def run(config):
                     check=False,
                 )
                 process_seconds = time.perf_counter() - tick
-                if child.returncode == 0 and (output / name).is_file():
+                if (output / name).is_file():
                     sequence = json.loads((output / name).read_text())
+                    if child.returncode != 0:
+                        sequence.update(
+                            success=False, status="worker_failed", returncode=child.returncode
+                        )
                 else:
                     sequence = {
                         "success": False,
