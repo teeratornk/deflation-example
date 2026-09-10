@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 from scipy import sparse
+from deflation_example.problems import build_problem, laplacian, sine_modes
 from deflation_example.solvers import (
     LinearResult,
     deflated_cg,
@@ -11,6 +12,30 @@ from deflation_example.solvers import (
     pdas,
     restricted_normal_operator,
 )
+
+
+@pytest.mark.parametrize("problem", ["diffusion", "thermal", "cht"])
+@pytest.mark.parametrize(
+    "angle", [0.1j, 0.3 + 0j, True, "0.3", [0.3], np.array([0.3]), np.nan, np.inf]
+)
+def test_target_rejects_nonreal_or_nonscalar_angles(problem, angle):
+    with pytest.raises(ValueError, match="finite real scalar"):
+        build_problem(problem, 4).target(angle)
+
+
+@pytest.mark.parametrize("angle", [0, -0.3, np.float32(0.3), np.float64(0.3)])
+def test_target_accepts_finite_real_scalars(angle):
+    target = build_problem("cht", 4).target(angle)
+    assert target.shape == (64,)
+    assert target.dtype == np.float64 and np.isfinite(target).all()
+
+
+@pytest.mark.parametrize("dim", [True, 2.0, 2.5, "2", np.array([2]), 1, 4])
+def test_cartesian_dimension_contract(dim):
+    with pytest.raises(ValueError):
+        laplacian(4, dim)
+    with pytest.raises(ValueError):
+        sine_modes(4, dim, 2)
 
 
 @pytest.mark.parametrize("bound", [1, [1, 1], np.array([1, 1], dtype=np.int32)])

@@ -9,12 +9,13 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import eigsh
-from .validation import integer, positive_real
+from .validation import finite_real, integer, positive_real
 
 
 def laplacian(n, dim=2):
     """Positive Dirichlet Laplacian on the unit square/cube."""
     n = integer(n, "Grid size", 2)
+    dim = integer(dim, "Dimension", 2)
     if dim not in (2, 3):
         raise ValueError("Use at least two interior nodes per axis and dimension 2 or 3")
     T = sparse.diags([-np.ones(n - 1), 2 * np.ones(n), -np.ones(n - 1)], [-1, 0, 1])
@@ -91,8 +92,7 @@ class Problem:
     reference: sparse.csr_matrix
 
     def target(self, theta):
-        if not np.isfinite(theta):
-            raise ValueError("Target angle must be finite")
+        theta = finite_real(theta, "Target angle")
         if self.dim == 2:
             angles = 5 * np.pi / 4 + np.arange(4) * np.pi / 2 + theta
             centers = 0.5 + np.sqrt(0.08) * np.column_stack([np.cos(angles), np.sin(angles)])
@@ -135,6 +135,7 @@ def build_problem(name="diffusion", n=None, alpha=1e-3):
 def sine_modes(n, dim, rank):
     """Low tensor sine modes; stable sorting fixes a choice inside repeated clusters."""
     n = integer(n, "Grid size", 2)
+    dim = integer(dim, "Dimension", 2)
     if dim not in (2, 3):
         raise ValueError("Dimension must be 2 or 3")
     rank = integer(rank, "Reference rank")

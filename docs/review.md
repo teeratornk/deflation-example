@@ -11,6 +11,9 @@ small constrained optimization solution, exact coarse corrections, rank loss,
 zero loads, coarse-conditioning fallback and explicit nonconvergence. Small
 deterministic operator/target fixtures check the three presets against the
 manuscript implementation. End-to-end tests check all three problem classes.
+They also repeat each default preset, compare the saved fields within numerical
+tolerances, and recompute the equations and KKT components from those fields.
+Repeatability checks exclude elapsed times and permit floating-point differences.
 
 For each completed example, inspect `success` in `results.json`, then the KKT
 components, objective difference and independently recomputed kernel residuals.
@@ -51,9 +54,14 @@ uv run --locked --extra gpu pytest -m gpu
 uv run --locked --extra gpu deflation-example device=cuda problem=cht output=runs/gpu-check
 ```
 
-CPU CI runs on Python 3.11 and 3.12, builds the distributions, and executes a wheel
-from outside the source tree. CUDA tests are marked separately because ordinary
-hosted CI has no GPU. Passing CPU CI does not imply that CUDA was exercised.
+CPU CI runs on Python 3.11 and 3.12 and builds both distributions. It installs the
+wheel into a separate environment with dependencies exported from `uv.lock`,
+then runs all three default presets with plots and all three diagnostic tutorials
+from outside the source tree. Tutorials receive the benchmark-record directory
+explicitly. CUDA tests cover the complete demo adapter, both basis-processing
+variants, matrix-free kernels and AmgX warm starts. They are marked separately
+because ordinary hosted CI has no GPU. Review skipped tests: a missing CUDA device
+or native AmgX binding leaves that implementation unchecked.
 
 ## Current benchmark coverage
 

@@ -31,7 +31,19 @@ def cpu_kernel(matrix, rhs, basis, diagonal, *, rtol, maxiter):
 def cuda_kernel(matrix, rhs, basis, diagonal, *, rtol, maxiter):
     from .gpu import gpu_deflated_cg
 
-    return gpu_deflated_cg(matrix, rhs, basis, diagonal, rtol=rtol, maxiter=maxiter)
+    result, metrics = gpu_deflated_cg(matrix, rhs, basis, diagonal, rtol=rtol, maxiter=maxiter)
+    # The demo kernel contract accepts scalar timing and memory measurements.
+    # Detailed benchmark metadata and nested phase timings remain available
+    # from gpu_deflated_cg and the dedicated benchmark commands.
+    fields = (
+        "total_seconds",
+        "setup_seconds",
+        "solve_seconds",
+        "return_and_verify_seconds",
+        "peak_torch_bytes",
+        "baseline_torch_bytes",
+    )
+    return result, {key: metrics[key] for key in fields}
 
 
 def default_kernels(device) -> dict[str, LinearKernel]:

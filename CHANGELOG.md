@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased robustness checks
+
+- Fix the CUDA demo adapter to accept the GPU solver's detailed timing record.
+- Accept array-like reference bases consistently in CPU and GPU solvers.
+- Reject complex or nonscalar target angles and noninteger spatial dimensions.
+- Repeat every default CPU preset and check the saved fields against the equations.
+- Install wheels with locked dependencies in CI and exercise all presets and tutorials outside the checkout.
+- Preserve the published releases and original numerical benchmark records.
+
 ## Diagnostic tutorials, version 1
 
 - Add runnable spectral, accuracy/stopping and cost tutorials with fixed protocols.

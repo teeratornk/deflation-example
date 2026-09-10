@@ -258,7 +258,7 @@ def test_gpu_qr_parity_and_timing():
     A = sparse.csr_matrix(K.T @ K + np.eye(30))
     b = rng.normal(size=30)
     Z = np.linalg.eigh(A.toarray())[1][:, :5]
-    for basis in (Z, np.column_stack([Z, Z]), np.zeros((30, 5))):
+    for basis in (Z, Z.tolist(), np.column_stack([Z, Z]), np.zeros((30, 5))):
         for backend in ("gpu_qr", "cpu_svd"):
             result, timing = gpu_deflated_cg(A, b, basis, A.diagonal(), basis_backend=backend)
             assert result.status == "converged" and result.residual <= 1e-10
@@ -266,4 +266,4 @@ def test_gpu_qr_parity_and_timing():
             assert sum(timing["components_seconds"].values()) == pytest.approx(
                 timing["total_seconds"]
             )
-            assert timing["orthogonalized_rank"] == (0 if not basis.any() else 5)
+            assert timing["orthogonalized_rank"] == (0 if not np.any(basis) else 5)

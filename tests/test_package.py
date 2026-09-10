@@ -169,6 +169,23 @@ def test_sweep_mode_cannot_write_machine_metadata(tmp_path, flag):
 
 
 @pytest.mark.gpu
+def test_cuda_complete_demo(tmp_path):
+    torch = pytest.importorskip("torch")
+    if not torch.cuda.is_available():
+        pytest.skip("No CUDA device")
+    report = run_demo(tmp_path / "cuda", grid=8, rank=5, device="cuda")
+    assert report["success"]
+    for case in report["cases"]:
+        assert set(case["kernels"]) == {
+            "jacobi_cpu",
+            "deflated_cpu",
+            "jacobi_cuda",
+            "deflated_cuda",
+        }
+        assert all(row["residual"] <= 1e-10 for row in case["kernels"].values())
+
+
+@pytest.mark.gpu
 def test_cuda_core_parity():
     torch = pytest.importorskip("torch")
     if not torch.cuda.is_available():

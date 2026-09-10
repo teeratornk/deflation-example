@@ -34,6 +34,12 @@ def positive_real(value, name):
     return float(value)
 
 
+def finite_real(value, name):
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, Real) or not np.isfinite(value):
+        raise ValueError(f"{name} must be a finite real scalar")
+    return float(value)
+
+
 def matrix(value):
     if not sparse.issparse(value) and not isinstance(value, LinearOperator):
         value = real_array(value, "Matrix")

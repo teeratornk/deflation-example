@@ -5,7 +5,7 @@ import numpy as np
 from scipy import sparse
 from scipy.linalg import norm
 from .solvers import LinearResult, independent_residual, orthonormalize, validate_linear_inputs
-from .validation import matrix, positive_real
+from .validation import matrix, positive_real, real_array
 from .timing import PhaseTimer
 
 
@@ -61,6 +61,7 @@ def _gpu_deflated_cg(
     b, initial, d = validate_linear_inputs(
         A, b, basis, diagonal, x0, rtol, maxiter, refresh, condition_limit
     )
+    basis = None if basis is None else real_array(basis, "Basis")
     torch.cuda.reset_peak_memory_stats()
     start = timer.start
     baseline = torch.cuda.memory_allocated()

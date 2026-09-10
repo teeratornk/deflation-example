@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from scipy.sparse.linalg import spsolve
 from deflation_example import reporting
-from deflation_example.backends import cpu_kernel
+from deflation_example.backends import cpu_kernel, cuda_kernel
 from deflation_example.problems import build_problem, reference_modes
 from deflation_example.runner import run_demo
 from deflation_example.solvers import LinearResult
@@ -44,6 +44,30 @@ def test_cpu_adapter_preserves_all_inputs():
     assert result.status == "converged" and timing["total_seconds"] >= 0
     for a, copy in zip(inputs, before):
         np.testing.assert_array_equal(a, copy)
+
+
+def test_cuda_adapter_accepts_detailed_backend_metadata(tmp_path):
+    def solve(matrix, rhs, basis, diagonal, *, rtol, maxiter):
+        result, _ = cpu_kernel(matrix, rhs, basis, diagonal, rtol=rtol, maxiter=maxiter)
+        return result, {
+            "total_seconds": 0.03,
+            "setup_seconds": 0.01,
+            "solve_seconds": 0.01,
+            "return_and_verify_seconds": 0.01,
+            "peak_torch_bytes": 1024,
+            "baseline_torch_bytes": 0,
+            "basis_backend": "cpu_svd",
+            "components_seconds": {"iteration": 0.01, "host_bookkeeping": 0.02},
+        }
+
+    with patch("deflation_example.gpu.gpu_deflated_cg", side_effect=solve):
+        report = run_demo(tmp_path / "run", grid=6, rank=3, kernels={"cuda": cuda_kernel})
+    assert report["success"]
+    for case in report["cases"]:
+        for row in case["kernels"].values():
+            assert row["total_seconds"] == 0.03
+            assert row["peak_torch_bytes"] == 1024
+            assert "components_seconds" not in row
 
 
 def test_atomic_reports_preserve_previous_record_on_failure(tmp_path):
