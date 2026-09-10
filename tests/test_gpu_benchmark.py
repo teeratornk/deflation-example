@@ -267,3 +267,27 @@ def test_gpu_qr_parity_and_timing():
                 timing["total_seconds"]
             )
             assert timing["orthogonalized_rank"] == (0 if not np.any(basis) else 5)
+
+
+@pytest.mark.gpu
+def test_diagnostics_preserve_gpu_recurrence_and_report_fresh_residual():
+    torch = pytest.importorskip("torch")
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is unavailable")
+    from deflation_example.gpu import gpu_deflated_cg
+
+    rng = np.random.default_rng(35)
+    K = rng.normal(size=(40, 40))
+    A = sparse.csr_matrix(K.T @ K + np.eye(40))
+    b = rng.normal(size=40)
+    basis = np.linalg.eigh(A.toarray())[1][:, :4]
+    ordinary, _ = gpu_deflated_cg(A, b, basis, basis_backend="gpu_qr")
+    observed, metrics = gpu_deflated_cg(A, b, basis, basis_backend="gpu_qr", diagnostics=True)
+    np.testing.assert_array_equal(ordinary.x, observed.x)
+    assert ordinary.iterations == observed.iterations
+    assert ordinary.status == observed.status == "converged"
+    terminal = metrics["diagnostics"][-1]
+    assert terminal["event"] == "termination"
+    assert terminal["fresh_cpu_residual"] == observed.residual
+    assert terminal["rank"] == 4
+    assert terminal["coarse_correction_orthogonality"] < 1e-12

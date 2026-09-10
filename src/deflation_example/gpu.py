@@ -52,6 +52,7 @@ def _gpu_deflated_cg(
     completion_callback,
     cache_operator_product,
     device_basis=None,
+    diagnostics=False,
 ):
     """Return (LinearResult, timing/memory metrics), verified with the CPU matrix.
 
@@ -169,6 +170,49 @@ def _gpu_deflated_cg(
         return np.isfinite(value) and value <= rtol
 
     status, iterations = "breakdown" if coarse_failed else "maxiter", 0
+    termination_test = "coarse_cholesky" if coarse_failed else None
+    diagnostic_records = []
+
+    def diagnose(event, residual, direction=None, scalar=None, curvature=None):
+        if not diagnostics:
+            return
+        fresh = rhs - apply(x)
+        tiny = torch.finfo(torch.float64).tiny
+        rnorm = torch.linalg.vector_norm(residual)
+        item = {
+            "event": event,
+            "iteration": iterations,
+            "recurrence_residual": float(torch.linalg.vector_norm(residual / rhs_scale)) / rhs_norm,
+            "fresh_gpu_residual": float(torch.linalg.vector_norm(fresh / rhs_scale)) / rhs_norm,
+            "fresh_cpu_residual": independent_residual(A, x.cpu().numpy(), b),
+            "residual_gap": float(torch.linalg.vector_norm((fresh - residual) / rhs_scale))
+            / rhs_norm,
+            "rz": None if scalar is None else float(scalar),
+            "curvature": None if curvature is None else float(curvature),
+            "rank": rank,
+            "coarse_condition": condition,
+        }
+        if rank and not coarse_failed:
+            item["coarse_residual_fraction"] = float(
+                torch.linalg.vector_norm(V.T @ residual) / torch.clamp(rnorm, min=tiny)
+            )
+            corrected = fresh - apply(Q(fresh))
+            item["coarse_correction_orthogonality"] = float(
+                torch.linalg.vector_norm(V.T @ corrected)
+                / torch.clamp(torch.linalg.vector_norm(fresh), min=tiny)
+            )
+            left = residual - apply(Q(residual))
+            item["balanced_rz"] = float(
+                torch.dot(left, left / diag) + torch.dot(residual, Q(residual))
+            )
+            if direction is not None:
+                product = apply(direction)
+                item["direction_coarse_fraction"] = float(
+                    torch.linalg.vector_norm(V.T @ product)
+                    / torch.clamp(torch.linalg.vector_norm(product), min=tiny)
+                )
+        diagnostic_records.append(item)
+
     if rank and not coarse_failed:
         x += Q(rhs - apply(x))
     r = rhs - apply(x)
@@ -191,6 +235,14 @@ def _gpu_deflated_cg(
                     or not bool(torch.isfinite(curvature + rz))
                 ):
                     status = "breakdown"
+                    termination_test = (
+                        "nonfinite_scalar"
+                        if not bool(torch.isfinite(curvature + rz))
+                        else "nonpositive_curvature"
+                        if float(curvature) <= 0
+                        else "nonpositive_rz"
+                    )
+                    diagnose(termination_test, r, p, rz, curvature)
                     break
                 if direction_callback is not None:
                     direction_callback(p)
@@ -200,6 +252,7 @@ def _gpu_deflated_cg(
                 iterations = k + 1
                 restart = iterations % refresh == 0 or small_residual(r)
                 if restart:
+                    diagnose("residual_refresh", r, p, rz, curvature)
                     r = rhs - apply(x)
                     if small_residual(r):
                         status = "converged"
@@ -221,6 +274,7 @@ def _gpu_deflated_cg(
     timer.mark("download")
     timer.synchronize(torch.cuda.synchronize)
     residual = independent_residual(A, x_cpu, b)
+    diagnose("termination", r)
     if residual <= acceptance_rtol and not coarse_failed:
         status = "converged"
     elif status == "converged":
@@ -247,6 +301,8 @@ def _gpu_deflated_cg(
         "completion": completion_metrics,
         "operator_product_cached": AV is not None,
         "cached_operator_product_bytes": 0 if AV is None else AV.numel() * AV.element_size(),
+        "termination_test": termination_test,
+        "diagnostics": diagnostic_records if diagnostics else None,
     }
 
 
@@ -267,6 +323,7 @@ def gpu_deflated_cg(
     completion_callback=None,
     cache_operator_product=False,
     device_basis=None,
+    diagnostics=False,
 ):
     """Verified CUDA solve, including conversion, transfers and temporary cleanup.
 
@@ -285,6 +342,8 @@ def gpu_deflated_cg(
         raise ValueError("Basis backend must be cpu_svd or gpu_qr")
     if not isinstance(cache_operator_product, bool):
         raise ValueError("Operator-product caching must be Boolean")
+    if not isinstance(diagnostics, bool):
+        raise ValueError("Diagnostics must be Boolean")
     for callback in (direction_callback, completion_callback):
         if callback is not None and not callable(callback):
             raise ValueError("Solver callbacks must be callable")
@@ -313,6 +372,7 @@ def gpu_deflated_cg(
         completion_callback=completion_callback,
         cache_operator_product=cache_operator_product,
         device_basis=device_basis,
+        diagnostics=diagnostics,
     )
     # Returning from the helper releases its temporary GPU tensors. The
     # returned solution owns CPU storage only. No empty_cache() is charged.

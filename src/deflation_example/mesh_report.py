@@ -103,7 +103,7 @@ def load_study(directory):
 
 def _label(report):
     c = report["controls"]
-    name = "Transformer" if c["geometry"] == "transformer_2d" else "Engine"
+    name = "Transformer" if c["geometry"] == "transformer_2d" else "Bore-in-block"
     form = f"{c['slabs']} slabs" if c["transient"] else "steady"
     return f"{name}, level {c['level']}, {form}, rank {c['rank']}"
 
@@ -124,7 +124,7 @@ def generate(directories, output, plots=True):
     main_rows, detail_rows, accuracy_rows, component_rows, preparation_rows = [], [], [], [], []
     for report, records in loaded:
         c = report["controls"]
-        name = "Transformer" if c["geometry"] == "transformer_2d" else f"Engine {c['level']}"
+        name = "Transformer" if c["geometry"] == "transformer_2d" else f"Bore {c['level']}"
         if c["rank"] != 100:
             name += f", $r={c['rank']}$"
         kind = f"{c['slabs']} slabs" if c["transient"] else "Steady"
@@ -218,6 +218,32 @@ def generate(directories, output, plots=True):
     if plots:
         plot_sequences(loaded, output / "complete_sequences.pdf")
         plot_components(loaded, output / "complete_components.pdf")
+    largest, records = max(loaded, key=lambda pair: pair[0]["problem_size"] or 0)
+    decision_rows = []
+    for method, data in records.items():
+        if len(data) != largest["controls"]["repeats"]:
+            continue
+        ordered = sorted(data, key=lambda record: record["seconds"])
+        record = ordered[len(ordered) // 2]
+        parts = components(record)
+        item = next(m for m in largest["methods"] if m["method"] == method)
+        gpu = f"{max(item['peak_gpu_bytes']) / 2**30:.3f}" if item["peak_gpu_bytes"] else "---"
+        remaining = parts["Transfers"] + parts["Verification"] + parts["Other"]
+        decision_rows.append(
+            " & ".join(
+                [
+                    NAMES[method],
+                    f"{parts['Construction and setup']:.3f}",
+                    f"{parts['Iteration']:.3f}",
+                    f"{remaining:.3f}",
+                    f"{record['seconds']:.3f} [{ordered[0]['seconds']:.3f}, {ordered[-1]['seconds']:.3f}]",
+                    gpu,
+                ]
+            )
+            + r" \\"
+        )
+    with atomic_output(output / "largest_cost_rows.tex") as stream:
+        stream.write("\n".join(decision_rows) + "\n")
     return reports
 
 
@@ -249,13 +275,19 @@ def plot_sequences(loaded, output):
                     linewidth=1.7,
                     label=f"{NAMES[method]} ({len(data)}/{report['controls']['repeats']})",
                 )
-        ref, amg = records.get("reference"), records.get("amgx")
-        if ref and amg and len(ref) == len(amg) == report["controls"]["repeats"]:
-            ratio = np.median([r["seconds"] for r in amg]) / np.median([r["seconds"] for r in ref])
+        ref = records.get("reference")
+        alternatives = [
+            (float(np.median([r["seconds"] for r in data])), method)
+            for method, data in records.items()
+            if method != "reference" and len(data) == report["controls"]["repeats"]
+        ]
+        if ref and len(ref) == report["controls"]["repeats"] and alternatives:
+            fastest, method = min(alternatives)
+            ratio = fastest / np.median([r["seconds"] for r in ref])
             ax.text(
                 0.03,
                 0.96,
-                f"AmgX / reference: {ratio:.2f}×",
+                f"Fastest alternative: {NAMES[method]}\nAlternative / reference: {ratio:.2f}×",
                 va="top",
                 transform=ax.transAxes,
                 fontsize=8,

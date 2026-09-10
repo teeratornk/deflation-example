@@ -26,8 +26,8 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
 
     if not queries or len(set(queries)) != len(queries):
         raise ValueError("Choose distinct target indices")
-    fig = plt.figure(figsize=(3 * (len(queries) + 1), 5.6), constrained_layout=True)
-    grid = fig.add_gridspec(2, len(queries) + 1)
+    fig = plt.figure(figsize=(3 * (len(queries) + 1), 9.0), constrained_layout=True)
+    grid = fig.add_gridspec(4, len(queries) + 1, width_ratios=[1.35] + [1] * len(queries))
     materials_cmap = ListedColormap(["#66c2a5", "#c5c5c5", "#8da0cb"])
     for row, directory in enumerate((transformer, engine)):
         directory = Path(directory)
@@ -41,7 +41,7 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
             raise ValueError("Figure reconstruction requires the recorded mesh input bundle")
         mesh = showcase.assembly.mesh
         nodes, cells, free, materials = mesh.nodes, mesh.cells, mesh.free, mesh.materials
-        geometry = fig.add_subplot(grid[row, 0], projection="3d" if row else None)
+        geometry = fig.add_subplot(grid[2 * row : 2 * row + 2, 0], projection="3d" if row else None)
         if row:
             coarse = ThermalMesh.load(Path(__file__).parent / "data" / expected / "mesh.npz")
             gas = coarse.cells[coarse.materials == 0]
@@ -66,7 +66,7 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
                 xlabel="$x_1/L$",
                 ylabel="$x_2/L$",
                 zlabel="$x_3/L$",
-                title="Gas bore inside metal block",
+                title="Bore-in-block model",
                 box_aspect=(1, 1, 1),
             )
             for spatial_axis in (geometry.xaxis, geometry.yaxis, geometry.zaxis):
@@ -102,17 +102,20 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
             active = unpack_mask(record["cases"][query]["active_mask_bits"], model.size)
             for k, field in enumerate((desired, active)):
                 values[free, k] = field.reshape(-1, len(free))[selected_slab]
-            axis = fig.add_subplot(grid[row, col])
+            axis = fig.add_subplot(grid[2 * row, col])
+            active_axis = fig.add_subplot(grid[2 * row + 1, col])
             if row:
                 xy, triangles, sampled, owners = tetrahedral_slice(
                     nodes, cells, values, coordinate=0.5, axis=2
                 )
                 tri = mtri.Triangulation(xy[:, 0], xy[:, 1], triangles)
                 axis.set(xlabel="$x_1/L$", ylabel="$x_2/L$", aspect="equal")
+                active_axis.set(xlabel="$x_1/L$", ylabel="$x_2/L$", aspect="equal")
             else:
                 tri = mtri.Triangulation(nodes[:, 1], nodes[:, 0], cells[:, [0, 2, 1]])
                 sampled = values
                 axis.set(xlabel="$z$ (m)", ylabel="$r$ (m)")
+                active_axis.set(xlabel="$z$ (m)", ylabel="$r$ (m)")
             artist = axis.tripcolor(
                 tri,
                 sampled[:, 0],
@@ -122,14 +125,13 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
                 vmax=1.25,
                 rasterized=True,
             )
-            if sampled[:, 1].min() < 0.5 < sampled[:, 1].max():
-                axis.tricontour(
-                    tri,
-                    sampled[:, 1],
-                    levels=[0.5],
-                    colors="white",
-                    linewidths=0.25 if not row else 0.8,
-                )
+            active_artist = active_axis.tricontourf(
+                tri,
+                sampled[:, 1],
+                levels=[-0.01, 0.5, 1.01],
+                colors=["#f2f2f2", "#0072b2"],
+            )
+            active_axis.set_title(f"Active set, target {query + 1}", fontsize=9)
             title = f"Target {query + 1}"
             if c["transient"]:
                 time = (selected_slab + 1) * c["horizon"] / c["slabs"]
@@ -140,7 +142,9 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
                 )
             axis.set_title(title, fontsize=9)
             if col == len(queries):
-                fig.colorbar(artist, ax=axis, label="Desired temperature", shrink=0.8)
+                fig.colorbar(artist, ax=axis, label="Normalized desired temperature", shrink=0.8)
+                bar = fig.colorbar(active_artist, ax=active_axis, ticks=[0.25, 0.75], shrink=0.8)
+                bar.ax.set_yticklabels(["Inactive", "Active"], fontsize=8)
     metadata = (
         {"CreationDate": None, "ModDate": None} if Path(output).suffix.lower() == ".pdf" else None
     )
