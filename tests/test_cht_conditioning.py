@@ -5,6 +5,7 @@ import pytest
 from threadpoolctl import threadpool_limits
 
 from deflation_example.benchmark_cht_conditioning import controlled_cht
+from deflation_example.benchmark_cht_support import verify_conditioning
 
 
 def test_controlled_cht_formula_and_transition():
@@ -29,3 +30,7 @@ def test_controlled_cht_formula_and_transition():
         assert row["measured_effective_condition"] <= row["deflated_condition_upper_bound"]
         assert np.isfinite(row["deflated_condition_upper_bound"])
         assert row["restriction_identity_error"] < 1e-12
+    verify_conditioning(result)
+    result["rows"][0]["deflated_condition_upper_bound"] *= 1.01
+    with pytest.raises(ValueError, match="deflated_condition_upper_bound"):
+        verify_conditioning(result)

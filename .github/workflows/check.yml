@@ -45,11 +45,14 @@ jobs:
           for tutorial in spectral verification costs; do
             "$example_env/venv/bin/python" -m deflation_example.tutorials "$tutorial" --records "$GITHUB_WORKSPACE/examples/benchmarks" --output "tutorial-$tutorial"
           done
-          "$example_env/venv/bin/python" -m deflation_example.benchmark_cht device=cpu 'methods=[jacobi,reference,recycling]' problem=transient n=3 slabs=3 targets=3 rank=5 window=8 bound=0.0001 repeats=1 output=trajectory
+          "$example_env/venv/bin/python" -m deflation_example.benchmark_cht phase=final device=cpu 'methods=[jacobi,reference,recycling]' problem=transient n=3 slabs=3 targets=3 rank=5 window=8 bound=0.0001 repeats=1 output=trajectory
           "$example_env/venv/bin/python" -m deflation_example.benchmark_cht_report --records-roots trajectory --output trajectory-summary
           "$example_env/venv/bin/python" -m deflation_example.benchmark_transfer --records-root trajectory --output transfer --repeats 1
+          "$example_env/venv/bin/python" -m deflation_example.benchmark_cht_presentation --records-roots trajectory --main-studies trajectory --physical-studies trajectory --output trajectory-figures
+          "$example_env/venv/bin/python" -m deflation_example.benchmark_transfer_report --records-roots transfer --figure-studies transfer --output transfer-summary
           "$example_env/venv/bin/python" -m deflation_example.benchmark_cht_conditioning --output conditioning
           "$example_env/venv/bin/python" -m deflation_example.benchmark_cht_validation --output independent-validation
+          "$example_env/venv/bin/python" -m deflation_example.benchmark_cht_support --validation-root independent-validation --conditioning-root conditioning --pilot-roots trajectory --output supporting-tables
   release:
     if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
     needs: cpu

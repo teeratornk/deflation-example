@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0
+
+- Add complete coupled steady and transient CHT optimization with independent trajectory verification.
+- Compare rank-zero Jacobi-CG, fixed-reference deflation, Jacobi-scaled recycling that retains existing coarse vectors, and persistent-resource AmgX.
+- Construct compact mode-dependent space–time references and retain the tensor-product construction control.
+- Replay identical optimization traces to compare full-reference restriction with sequential zero-extension transfer.
+- Measure coarse energy removal, small deflated spectra, complete sequence costs and comparable sampled process memory.
+- Freeze spatial, temporal, rank and cold-start populations with every declared outcome retained.
+- Reconstruct the controlled CHT condition-number bound before generating its table.
+- Generate figures and tables from checked raw records and version the complete study data separately from the installable package.
+
 ## Unreleased robustness checks
 
 - Fix the CUDA demo adapter to accept the GPU solver's detailed timing record.

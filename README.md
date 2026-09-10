@@ -1,7 +1,8 @@
 # Deflation example
 
-A small companion to **Online Spectral Deflation for State Constrained Optimal
-Control Problems**, by Kadeethum et al. Solve a constrained temperature-tracking
+A companion to **Reference-Space Reuse for Steady and Transient
+State-Constrained Conjugate Heat Transfer**, by Kadeethum et al.
+Solve a constrained temperature-tracking
 problem, reuse a full-domain reference space, and inspect the resulting states,
 optimality checks and linear iterations.
 
@@ -93,14 +94,30 @@ Timings include GPU setup and transfers; reference construction is reported
 separately. Small problems can be faster on the CPU. Iteration reduction is not
 a wall-time speedup, and these examples make no general GPU performance claim.
 
-For the manuscript timing comparison, use the separate
+For the earlier kernel and complete-sequence protocols, use the separate
 [GPU benchmark](docs/gpu-benchmark.md). It includes GPU QR, AmgX with fresh
 and persistent resources, all repetitions, itemized timing and plot generation.
 It also supplies sixteen-target CHT PDAS sequences at two grids, matched warm
 starts, scaled-Ritz and history controls, and ranks 0, 20 and 200 through
 `128^3`. Checked-in raw records retain all repetitions and failed attempts.
-The CPU quickstart and installed wheel remain small; full evidence records
-are included in the repository and source distribution.
+The CPU quickstart and installed wheel remain small. Records for these earlier
+protocols are included in the repository and source distribution.
+
+## Complete steady and transient optimization
+
+The [reference-policy study](docs/reference-policy-study.md) extends the companion
+to complete steady and transient CHT optimization. It provides an efficient
+Jacobi-CG control, reference deflation, recycling with retained coarse vectors
+and Jacobi-scaled selection, and persistent-resource AmgX. The transient solver
+optimizes a complete backward-Euler trajectory with constraints at every time
+level. An independent bounded least-squares reference verifies small problems.
+Matched trace replay measures the information retained at released constraints.
+The study guide gives pilot commands and the frozen repeated-comparison campaign.
+The complete study data have their own
+[versioned checkout](https://github.com/teeratornk/deflation-example/tree/reference-policy-data-v1),
+which keeps the installable package independent of the larger record collection.
+The data include every final sequence, construction and stopping pilots,
+matched replays, and independent verification records.
 
 ## Diagnostic tutorials
 
@@ -126,8 +143,8 @@ See [the short Python example](examples/basic.py) and
 module responsibilities and the tested kernel extension point. To run the CPU tests and style checks:
 
 ```bash
-uv sync --locked --extra plot
-uv run --locked pytest -m "not gpu"
+uv sync --locked --extra plot --extra study
+uv run --locked --extra plot --extra study pytest -m "not gpu"
 uv run --locked ruff check .
 ```
 

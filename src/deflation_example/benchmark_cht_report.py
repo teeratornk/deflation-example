@@ -4,6 +4,7 @@ import argparse
 from collections import Counter
 import csv
 from pathlib import Path
+import re
 
 import numpy as np
 
@@ -134,6 +135,41 @@ def validate_sequence(sequence, protocol):
         close(measured, sequence["process_seconds"], "process timing sum")
 
 
+def validate_final_sources(manifest, sequences):
+    source = manifest.get("environment", {})
+    head = source.get("git_head")
+    hashes = source.get("source_sha256", {})
+    identified_wheel = (
+        head is None
+        and source.get("source_tree_clean") is None
+        and isinstance(hashes, dict)
+        and bool(hashes)
+        and all(
+            isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)
+            for value in hashes.values()
+        )
+        and bool(source.get("package"))
+    )
+    identified_checkout = (
+        source.get("source_tree_clean") is True
+        and isinstance(head, str)
+        and re.fullmatch(r"[0-9a-f]{40}", head) is not None
+    )
+    if not (identified_checkout or identified_wheel):
+        raise ValueError("Final study requires a clean, identified source revision")
+    for sequence in sequences:
+        if "total_seconds" not in sequence:
+            continue
+        observed = sequence.get("environment", {})
+        if (
+            observed.get("source_tree_clean") != source.get("source_tree_clean")
+            or observed.get("git_head") != head
+            or observed.get("source_sha256", {}) != hashes
+            or (identified_wheel and observed.get("package") != source["package"])
+        ):
+            raise ValueError("Final sequence source differs from the clean study revision")
+
+
 def load_study(root):
     records = Records(root)
     manifest, protocol = records.load("results.json"), records.load("protocol.json")
@@ -176,9 +212,7 @@ def load_study(root):
     if c["phase"] == "final":
         if not manifest.get("complete") or seen != expected:
             raise ValueError("Final study is missing declared attempts")
-        for sequence in sequences:
-            if "environment" in sequence and not sequence["environment"]["source_tree_clean"]:
-                raise ValueError("Final measurement source is dirty")
+        validate_final_sources(manifest, sequences)
     return protocol, sequences, records.manifest
 
 

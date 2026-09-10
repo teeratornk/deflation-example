@@ -153,6 +153,7 @@ def specification(config):
         if values["bound"] is not None and values["bound"] != bound:
             raise ValueError("Declared physical bound differs from its calibration record")
         values["bound"] = bound
+        upstream = previous["specification"].get("calibration_input") or {}
         calibration_input = {
             "source_record_sha256": hashlib.sha256(raw).hexdigest(),
             "source_protocol_sha256": previous["protocol_sha256"],
@@ -161,10 +162,17 @@ def specification(config):
                 previous["calibration_seconds"], "Recorded calibration cost"
             ),
             "bound": bound,
-            "spatial_grid": source["calibration_grid"],
-            "time_slabs": source["slabs"] if source["problem"] == "transient" else 1,
+            "spatial_grid": upstream.get("spatial_grid", source["calibration_grid"]),
+            "time_slabs": upstream.get(
+                "time_slabs", source["slabs"] if source["problem"] == "transient" else 1
+            ),
             "scope": "measured once in the supplied calibration record; charged once in preparation-inclusive sequence totals",
         }
+        if upstream:
+            calibration_input["origin"] = upstream.get("origin") or {
+                key: upstream[key]
+                for key in ("source_record_sha256", "source_protocol_sha256", "source_git_head")
+            }
     for key, allowed in (("methods", METHODS), ("warm_starts", ("cold", "outer_inner"))):
         requested = values[key]
         if not requested or len(set(requested)) != len(requested) or set(requested) - set(allowed):
@@ -746,4 +754,13 @@ if __name__ == "__main__":
         parser.add_argument("--warm", required=True, choices=["cold", "outer_inner"])
         worker(**vars(parser.parse_args(sys.argv[2:])))
     else:
+        if any(
+            arg == "-m" or (arg.startswith("--") and len(arg) > 2 and "--multirun".startswith(arg))
+            for arg in sys.argv[1:]
+        ):
+            print(
+                "Use separate study invocations or the declared campaign for configuration sweeps.",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
         main()

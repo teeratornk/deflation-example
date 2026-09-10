@@ -1,9 +1,9 @@
 # Reference-space reuse study
 
 This study tests a fixed full-domain reference policy in complete steady and
-transient state-constrained conjugate heat-transfer (CHT) optimization. Transient
-performance and comparisons with the expanded recycling control are open
-experimental questions. Existing benchmark records retain their original scope.
+transient state-constrained conjugate heat-transfer (CHT) optimization.
+It compares four complete solvers and isolates reference transfer on matched
+optimization traces. Earlier benchmark records retain their original scope.
 
 ## Claims and measurements
 
@@ -22,7 +22,7 @@ optimization and restricts it at every inactive-set update. The transfer ablatio
 compares two specified transfers; conclusions about recycling concern the
 implemented comparator.
 
-## Execution and decision gates
+## Study components
 
 1. Implement complete-sequence Jacobi-CG and recycling that retains existing
    coarse vectors with new search directions. Use Jacobi-scaled Ritz selection,
@@ -47,10 +47,10 @@ solves. Reference construction is charged from the first target. Requested and
 effective ranks, retained vectors, candidate pools, reference factors, restricted
 bases and cached operator products are recorded separately.
 
-The proposed steady progression is 24, 32 and 48 interior nodes per axis, with
-64 conditional on the pilot's time and memory requirements. Transient studies
+The frozen steady progression is 24, 32, 48 and 64 interior nodes per axis.
+Transient studies
 refine space at fixed time discretization and time at fixed physical horizon.
-A change in horizon forms a separate comparison. The pilot determines feasible
+A change in horizon forms a separate comparison. Pilots determine feasible
 transient sizes and rank budgets before the final configuration is frozen.
 
 ## Physical and temporal conventions
@@ -64,9 +64,9 @@ trajectory. Targets move and pulse in physical time and vary across queries.
 For thermal-capacity matrix C and steady state matrix A, backward Euler uses
 `C (y_n - y_(n-1))/dt + A y_n = u_n`. The initial temperature is prescribed.
 The objective uses right-endpoint time quadrature for both temperature tracking
-and the L2 control penalty, with the same spatial cell-volume factor. The pilot
-will record capacity values, time steps, horizon, initial data and target
-parameters explicitly. Full block coupling enters the operator, transpose,
+and the L2 control penalty, with the same spatial cell-volume factor.
+The records specify capacity values, time steps, horizon, initial data and target
+parameters. Full block coupling enters the operator, transpose,
 reduced Hessian, control recovery and KKT checks.
 
 ## Reproducibility
@@ -79,11 +79,11 @@ transfers, verification and cleanup. Process initialization and warmup are
 reported separately and included in preparation-inclusive totals. Memory
 measurements use the same boundary and sampling method for all competitors.
 
-The main manuscript will use the working title *Reference-Space Reuse for Steady
-and Transient State-Constrained Conjugate Heat Transfer*. Its organization will
-follow the formulation, reference construction, transfer mechanism, complete
-optimization comparisons, scaling and one limitations subsection. Auxiliary
-benchmark branches remain available in the SI or reproducible repository.
+The manuscript is titled *Reference-Space Reuse for Steady and Transient
+State-Constrained Conjugate Heat Transfer*. It presents the formulation,
+reference construction, transfer mechanism, complete optimization comparisons,
+scaling and one limitations subsection. Auxiliary benchmark branches remain
+available in the reproducible repository.
 
 ## Pilot reproduction
 
@@ -237,7 +237,23 @@ feasible rank choices under each common screen. Those comparisons account for
 the full process allocation, including numerical-library caches. Sampling can
 miss shorter peaks, so these screens do not certify a hard allocation limit.
 
-After reproducing the calibration pilots, run any subset from a clean checkout:
+The versioned data provide the original calibration reports. To regenerate
+the physical bounds, run the following CPU commands. Calibration uses a
+separate direct-PDAS solve at query 0.5 and is independent of the two
+subsequent comparison targets:
+
+```bash
+uv run --locked --extra study python -m deflation_example.benchmark_cht device=cpu 'methods=[reference]' problem=steady n=24 calibration_grid=24 targets=2 rank=100 window=100 threads=4 output=runs/steady-calibration
+uv run --locked --extra study python -m deflation_example.benchmark_cht device=cpu 'methods=[reference]' problem=transient n=12 calibration_grid=12 slabs=8 targets=2 rank=100 window=100 threads=4 output=runs/transient-calibration
+```
+
+The recorded bounds are `0.00019498904452558432` for steady problems and
+`0.00026847890969378894` for trajectories. Calibration time varies with the
+deployment. Supplied recorded calibration times reproduce the published
+preparation-inclusive accounting; newly measured calibration times describe
+the new deployment.
+
+After obtaining the calibration reports, run any subset from a clean checkout:
 
 ```bash
 uv run --no-sync python -m deflation_example.benchmark_cht_campaign --selected steady24 steady32 --steady-calibration runs/steady-calibration/results.json --transient-calibration runs/transient-calibration/results.json --output runs/final-steady-small
@@ -248,3 +264,39 @@ disjoint populations concurrently on separate GPUs. Each output directory retain
 the complete campaign declaration, source identifier, calibrated protocols and
 every sequence outcome. A failed solve does not prevent the remaining declared
 comparisons from running.
+
+## Regenerate the submitted figures and tables
+
+The original numerical workers used clean source commit
+`cc611292f66025f4d0f96a406c6aeb67799b7d34`. Version 0.4.0 adds the checked
+publication summaries and preserves the numerical protocol. The frozen evidence
+is a separate data-only tag in this repository. It keeps the installed package
+small and retains all final populations, pilot attempts and diagnostic records.
+
+```bash
+git clone --branch v0.4.0 --depth 1 https://github.com/teeratornk/deflation-example.git deflation-code
+git clone --branch reference-policy-data-v1 --depth 1 https://github.com/teeratornk/deflation-example.git deflation-evidence
+cd deflation-code
+uv sync --locked --extra plot --extra study
+uv run --locked --extra plot --extra study python -m deflation_example.benchmark_evidence --records ../deflation-evidence --output runs/submission
+```
+
+This CPU command verifies every file against the data manifest, checks the
+complete optimization records, reconstructs the controlled CHT matrices, and
+generates the submission tables and figures. It requires no GPU and performs no
+new timing comparison. Omitting the output option performs byte-hash verification
+alone. Each generated report records its input hashes and generator version.
+
+The data categories are `final`, `pilot`, `diagnostic` and `summary`. The final
+category contains every frozen campaign population. The pilot category includes
+stopping and construction comparisons, calibration records and larger feasibility
+tests. The diagnostic category contains independent optimization checks,
+conditioning examples, source traces and matched transfer replays. The summary
+category freezes the publication reports. GPU reruns use the campaign command
+above and the calibration records in the data checkout. Source identifiers,
+configuration, numerical acceptance, hardware, library versions and each timed
+repetition remain in the individual JSON records.
+
+The manuscript importer consumes the generated `presentation`, `transfer` and
+`support` directories. PDF metadata can differ between builds; the input hashes,
+numerical summaries and plotted values provide the reproducibility checks.

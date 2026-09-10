@@ -59,6 +59,7 @@ def source_trace(tmp_path, monkeypatch):
     record = benchmark_cht.complete_sequence(protocol, "reference", "outer_inner")
     assert record["success"]
     record["protocol_sha256"] = checksum
+    record["repetition"] = 0
     write_report(root / "sequence.json", record)
     write_report(
         root / "results.json",
@@ -104,4 +105,18 @@ def test_source_trace_tampering_is_rejected(tmp_path, monkeypatch):
     record["success"] = False
     write_report(root / "sequence.json", record)
     with pytest.raises(ValueError, match="hash"):
+        benchmark_transfer.load_trace(root, "reference", 0, "outer_inner")
+
+
+def test_source_trace_acceptance_is_rechecked_after_hash_verification(tmp_path, monkeypatch):
+    root = source_trace(tmp_path, monkeypatch)
+    record = json.loads((root / "sequence.json").read_text())
+    record["cases"][0]["kkt"]["stationarity"] = 1.0
+    write_report(root / "sequence.json", record)
+    manifest = json.loads((root / "results.json").read_text())
+    manifest["sequences"][0]["sha256"] = hashlib.sha256(
+        (root / "sequence.json").read_bytes()
+    ).hexdigest()
+    write_report(root / "results.json", manifest)
+    with pytest.raises(ValueError, match="KKT"):
         benchmark_transfer.load_trace(root, "reference", 0, "outer_inner")

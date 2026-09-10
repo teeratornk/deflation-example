@@ -73,6 +73,57 @@ def test_summary_checks_semantic_acceptance_and_timing(monkeypatch):
         validate_sequence(bad, protocol)
 
 
+def test_final_source_checks_require_matching_clean_identifiers():
+    from deflation_example.benchmark_cht_report import validate_final_sources
+
+    environment = {"git_head": "a" * 40, "source_tree_clean": True}
+    manifest = {"environment": environment}
+    valid = {"total_seconds": 1, "environment": environment}
+    validate_final_sources(manifest, [valid, {"status": "walltime_cap"}])
+    for changed in (
+        {},
+        {"git_head": "b" * 40, "source_tree_clean": True},
+        {"git_head": "a" * 40, "source_tree_clean": False},
+    ):
+        with pytest.raises(ValueError, match="source"):
+            validate_final_sources(manifest, [{"total_seconds": 1, "environment": changed}])
+    with pytest.raises(ValueError, match="identified"):
+        validate_final_sources({}, [])
+    wheel = {
+        "git_head": None,
+        "source_tree_clean": None,
+        "package": "0.4.0",
+        "source_sha256": {"solver.py": "a" * 64},
+    }
+    validate_final_sources({"environment": wheel}, [{"total_seconds": 1, "environment": wheel}])
+    with pytest.raises(ValueError, match="source"):
+        validate_final_sources(
+            {"environment": wheel},
+            [
+                {
+                    "total_seconds": 1,
+                    "environment": {**wheel, "source_sha256": {"solver.py": "b" * 64}},
+                }
+            ],
+        )
+
+
+def test_cht_cli_rejects_multirun_before_writing_configuration(tmp_path):
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-m", "deflation_example.benchmark_cht", "--multirun", "n=3,4"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "separate study invocations" in result.stderr
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_memory_budget_failure_preserves_numerical_completion(monkeypatch):
     monkeypatch.setattr(
         benchmark_cht,
@@ -103,11 +154,21 @@ def test_calibration_input_is_hashed_and_does_not_export_its_path(tmp_path):
     benchmark_cht.write_report(path, record)
     config.calibration_report = str(path)
     config.slabs = 6
+    config.calibration_grid = 9
     protocol = benchmark_cht.specification(config)
     assert str(path) not in json.dumps(protocol)
     assert protocol["calibration_input"]["calibration_seconds"] == 12.5
     assert protocol["calibration_input"]["time_slabs"] == 3
     assert len(protocol["calibration_input"]["source_record_sha256"]) == 64
+    record["specification"] = protocol
+    benchmark_cht.write_report(path, record)
+    config.slabs = 12
+    chained = benchmark_cht.specification(config)["calibration_input"]
+    assert chained["spatial_grid"] == 3 and chained["time_slabs"] == 3
+    assert (
+        chained["origin"]["source_record_sha256"]
+        == protocol["calibration_input"]["source_record_sha256"]
+    )
     config.horizon *= 2
     with pytest.raises(ValueError, match="horizon"):
         benchmark_cht.specification(config)

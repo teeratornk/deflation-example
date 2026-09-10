@@ -11,6 +11,7 @@ from scipy.sparse.linalg import spsolve
 from threadpoolctl import threadpool_limits
 
 from .benchmark_cht import build_model, build_reference, desired_and_load, unpack_mask
+from .benchmark_cht_report import validate_sequence
 from .benchmark_extended import digest
 from .recycling import transfer_basis
 from .reporting import environment, write_report
@@ -99,6 +100,13 @@ def load_trace(root, method, repetition, warm):
         raise ValueError("Source sequence hash does not match its manifest")
     if not sequence["success"] or not entry["success"]:
         raise ValueError("Primary transfer replay requires an accepted complete source sequence")
+    if (sequence["method"], sequence["repetition"], sequence["warm_start"]) != (
+        method,
+        repetition,
+        warm,
+    ):
+        raise ValueError("Source sequence labels differ from the requested trace")
+    validate_sequence(sequence, protocol)
     return protocol, sequence, records.manifest
 
 
@@ -147,6 +155,7 @@ def run(
         "environment": environment(),
         "rows": [],
         "success": False,
+        "complete": False,
     }
     write_report(output / "results.json", result)
     torch = None
@@ -324,6 +333,7 @@ def run(
                 result["rows"].append(row)
                 previous, carried = I, transferred
                 write_report(output / "results.json", result)
+        result["complete"] = True
         result["success"] = bool(result["rows"]) and all(
             group["all_repetitions_accepted"]
             for row in result["rows"]
