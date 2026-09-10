@@ -208,6 +208,10 @@ after rechecking its equations at the recorded intermediate viscosity.
 Resumed initialization still has to reach the declared physical viscosity.
 Its record separates additional elapsed time from previously recorded
 initialization time; missing earlier timing remains explicit.
+For a steady Newton attempt initialized by a saved pseudo-time field, use
+`baseline_continuation=false baseline_guess_directory=PATH`. This option checks
+the field checksum, physical inputs and discretization settings. It records the
+initial physical steady residual and applies the unchanged final steady test.
 
 Each accepted coupled step satisfies independently recomputed momentum,
 continuity and thermal residuals of at most 10⁻⁸, a relative boundary mass
@@ -227,3 +231,23 @@ complete. Forward timings remain separate from the optimization comparisons.
 The main manuscript will receive an assessment subsection after the matched
 calculations and resolution studies establish the accuracy and scope of the
 results.
+
+## Inspect spatial discretization changes
+
+The following diagnostic applies a saved steady source to nested meshes while
+retaining the original prescribed P2 velocity field:
+
+```bash
+uv run --locked python examples/coupled_assessment/diagnose_thermal.py \
+  --controls-directory runs/assessment-controls/steady --role nominal \
+  --levels 2 --output runs/thermal-refinement-nominal.json
+```
+
+It checks the projected residual identity and separates diffusion, transport,
+streamline stabilization, source loading and background loading. It also reports
+the unchanged physical source range, source-integral differences, fresh thermal
+residuals and temperature changes. Conservation of the source integral leaves
+room for changes in its discrete loading vector. The component norms describe
+the residual decomposition; their values alone do not determine the temperature
+error. Temperatures outside the published oil range remain visible as diagnostic
+outputs with unresolved physical applicability.

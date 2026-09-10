@@ -26,6 +26,7 @@ baseline_continuation: true
 baseline_strategy: viscosity
 baseline_directory: null
 baseline_restart_directory: null
+baseline_guess_directory: null
 hydra:
   run:
     dir: .

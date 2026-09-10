@@ -151,3 +151,61 @@ def test_continuation_restart_rechecks_equations_and_restores_viscosity(tmp_path
         with pytest.raises(ValueError, match="declared steady equations"):
             checked_restart(*args)
     assert flow.viscosity == 0.1
+
+
+@pytest.mark.parametrize("alteration", [None, "field_hash", "convection", "grad_div", "stage"])
+def test_checkpoint_guess_keeps_physical_steady_acceptance_separate(tmp_path, alteration):
+    import hashlib
+    from deflation_example.assess_transformer import checked_initial_guess
+    from deflation_example.axisymmetric_flow import AxisymmetricFlow
+    from deflation_example.reporting import write_fields, write_report
+    from test_axisymmetric_flow import annular_rectangle
+
+    flow = AxisymmetricFlow(annular_rectangle(3), 0.1)
+    fixed = flow.boundary[flow.points[flow.boundary, 1] < 1 - 1e-12]
+    values = np.zeros((len(fixed), 2))
+    field = tmp_path / "stage.npz"
+    write_fields(
+        field,
+        velocity=np.zeros((flow.nv, 2)),
+        pressure=flow.mesh.nodes[flow.vertices, 1],
+    )
+    metadata = {
+        "stage": {"status": "converged", "pseudo_time_step_s": 0.1},
+        "momentum_properties": {"viscosity": 0.1},
+        "input_sha256": {"mesh": "example"},
+        "level": 0,
+        "file": field.name,
+        "field_sha256": hashlib.sha256(field.read_bytes()).hexdigest(),
+    }
+    record = {"configuration": {"convection_form": "advective"}, "grad_div_coefficient_m2_s": 0.0}
+    if alteration == "field_hash":
+        metadata["field_sha256"] = "different"
+    elif alteration == "convection":
+        record["configuration"]["convection_form"] = "skew"
+    elif alteration == "grad_div":
+        record["grad_div_coefficient_m2_s"] = 1.0
+    elif alteration == "stage":
+        metadata["stage"]["status"] = "iteration_cap"
+    write_report(tmp_path / "baseline-checkpoint.json", metadata)
+    write_report(tmp_path / "record.json", record)
+    args = (tmp_path, flow, fixed, values, {"viscosity": 0.1}, {"mesh": "example"}, 0)
+    if alteration is None:
+        guess, origin = checked_initial_guess(*args)
+        assert guess.status == "initial"
+        assert (
+            origin["initialization_physical_steady_residuals"]["momentum_relative_residual"] > 1e-9
+        )
+        solution = flow.solve(
+            np.zeros_like(flow.quadrature_points), fixed, values, initial=guess, method="newton"
+        )
+        assert solution.status == "converged"
+        assert (
+            max(
+                flow.verify(solution, np.zeros_like(flow.quadrature_points), fixed, values).values()
+            )
+            <= 1e-9
+        )
+    else:
+        with pytest.raises(ValueError):
+            checked_initial_guess(*args)

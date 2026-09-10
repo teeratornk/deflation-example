@@ -138,6 +138,45 @@ def checked_restart(directory, flow, fixed, values, properties, input_hashes, le
     )
 
 
+def checked_initial_guess(directory, flow, fixed, values, properties, input_hashes, level):
+    """Authenticate an initialization field and measure its physical steady residual.
+
+    A converged pseudo-time step supplies an initial iterate. The subsequent
+    steady solve must satisfy its own independently evaluated stopping test.
+    """
+    directory = Path(directory)
+    raw = (directory / "baseline-checkpoint.json").read_bytes()
+    metadata = json.loads(raw)
+    record = json.loads((directory / "record.json").read_text())
+    if (
+        metadata["momentum_properties"] != properties
+        or metadata["input_sha256"] != input_hashes
+        or metadata["level"] != level
+        or metadata["stage"]["status"] != "converged"
+        or record["configuration"].get("convection_form", "advective") != flow.convection_form
+        or record.get("grad_div_coefficient_m2_s", 0.0) != flow.grad_div
+    ):
+        raise ValueError("Initialization checkpoint settings differ")
+    field = directory / metadata["file"]
+    if field.parent.resolve() != directory.resolve():
+        raise ValueError("Checkpoint fields must lie inside their record directory")
+    digest = hashlib.sha256(field.read_bytes()).hexdigest()
+    if digest != metadata["field_sha256"]:
+        raise ValueError("Initialization checkpoint checksum differs")
+    with np.load(field, allow_pickle=False) as data:
+        result = FlowResult(data["velocity"].copy(), data["pressure"].copy(), "initial", [])
+    metrics = flow.verify(result, np.zeros_like(flow.quadrature_points), fixed, values)
+    if not np.isfinite(list(metrics.values())).all():
+        raise ValueError("Initialization checkpoint has nonfinite physical residuals")
+    return result, {
+        "initialization_checkpoint_sha256": hashlib.sha256(raw).hexdigest(),
+        "initialization_field_sha256": digest,
+        "initialization_stage": metadata["stage"],
+        "initialization_physical_steady_residuals": metrics,
+        "preceding_initialization_seconds": metadata.get("elapsed_seconds"),
+    }
+
+
 def load_controls(directory, role, level):
     """Authenticate frozen source bundles before any spatial transfer."""
     directory = Path(directory)
@@ -298,6 +337,12 @@ def run(config):
         or c["baseline_strategy"] != "viscosity"
     ):
         raise ValueError("Restart requires viscosity continuation and no completed baseline input")
+    if c["baseline_guess_directory"] is not None and (
+        c["baseline_directory"] is not None
+        or c["baseline_restart_directory"] is not None
+        or c["baseline_continuation"]
+    ):
+        raise ValueError("A checkpoint initial guess requires a direct steady baseline solve")
     output = Path(c["output"])
     output.mkdir(parents=True, exist_ok=False)
     try:
@@ -353,6 +398,7 @@ def _execute(c, output):
                 "controls_directory",
                 "baseline_directory",
                 "baseline_restart_directory",
+                "baseline_guess_directory",
             }
         },
         "selection": inputs.selection,
@@ -432,6 +478,18 @@ def _execute(c, output):
             )
             solver_options["initial_factor"] = initial_factor
             report.update(restart_metadata)
+            write_report(output / "record.json", report)
+        if c["baseline_guess_directory"] is not None:
+            initial_flow, guess_metadata = checked_initial_guess(
+                c["baseline_guess_directory"],
+                flow,
+                fixed,
+                values,
+                published,
+                inputs.manifest["input_sha256"],
+                c["level"],
+            )
+            report.update(guess_metadata)
             write_report(output / "record.json", report)
         if c["baseline_directory"] is None:
             initial_flow = baseline_solver(
