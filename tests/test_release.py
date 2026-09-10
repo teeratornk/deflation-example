@@ -82,6 +82,26 @@ def test_version_numbers_are_not_network_endpoints():
     assert not guard.inspect_content("uv.lock", b'version = "10.3.9.90"')
 
 
+def test_only_numeric_reviewed_mesh_bundles_are_allowed():
+    import io
+    import numpy as np
+    data = {
+        "nodes": np.zeros((4, 3)), "cells": np.array([[0, 1, 2, 3]]),
+        "materials": np.array([0]), "dirichlet": np.array([0]), "axisymmetric": np.array(False),
+    }
+    stream = io.BytesIO()
+    np.savez_compressed(stream, **data)
+    name = "src/deflation_example/data/engine_3d/mesh.npz"
+    assert not guard.inspect_content(name, stream.getvalue())
+    assert guard.inspect_content("arbitrary.npz", stream.getvalue())
+    stream = io.BytesIO()
+    np.savez_compressed(stream, **{**data, "nodes": np.array(["hidden text"])})
+    assert "nonnumeric mesh array" in guard.inspect_content(name, stream.getvalue())
+    stream = io.BytesIO()
+    np.savez_compressed(stream, **{**data, "extra": np.array([1])})
+    assert "unexpected mesh arrays" in guard.inspect_content(name, stream.getvalue())
+
+
 def test_history_finds_a_removed_credential(tmp_path):
     def git(*args):
         return subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)

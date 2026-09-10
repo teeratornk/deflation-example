@@ -51,6 +51,7 @@ def _gpu_deflated_cg(
     direction_callback,
     completion_callback,
     cache_operator_product,
+    device_basis=None,
 ):
     """Return (LinearResult, timing/memory metrics), verified with the CPU matrix.
 
@@ -65,6 +66,12 @@ def _gpu_deflated_cg(
         A, b, basis, diagonal, x0, rtol, maxiter, refresh, condition_limit
     )
     basis = None if basis is None else real_array(basis, "Basis")
+    if device_basis is not None:
+        if (basis is not None or basis_backend != "gpu_qr" or not torch.is_tensor(device_basis)
+            or device_basis.device != torch.device("cuda", torch.cuda.current_device())
+            or device_basis.dtype != torch.float64 or device_basis.ndim != 2
+            or device_basis.shape[0] != len(b) or not bool(torch.isfinite(device_basis).all())):
+            raise ValueError("Device basis must be finite float64 on the current CUDA device, with GPU QR and no CPU basis")
     torch.cuda.reset_peak_memory_stats()
     start = timer.start
     baseline = torch.cuda.memory_allocated()
@@ -81,7 +88,11 @@ def _gpu_deflated_cg(
     x = torch.tensor(initial, device="cuda", dtype=torch.float64)
     timer.mark("upload")
     timer.synchronize(torch.cuda.synchronize)
-    if basis is None:
+    if device_basis is not None:
+        V = orthonormalize_gpu(device_basis, torch)
+        timer.mark("basis_processing")
+        timer.synchronize(torch.cuda.synchronize)
+    elif basis is None:
         V = None
     elif basis_backend == "cpu_svd":
         Z = orthonormalize(basis)
@@ -97,7 +108,7 @@ def _gpu_deflated_cg(
         timer.mark("basis_processing")
         timer.synchronize(torch.cuda.synchronize)
     rank = 0 if V is None else V.shape[1]
-    requested_rank = 0 if basis is None else basis.shape[1]
+    requested_rank = device_basis.shape[1] if device_basis is not None else (0 if basis is None else basis.shape[1])
     orthogonalized_rank = rank
     condition, fallback, coarse_failed = 1.0, None, False
 
@@ -243,6 +254,7 @@ def gpu_deflated_cg(
     direction_callback=None,
     completion_callback=None,
     cache_operator_product=False,
+    device_basis=None,
 ):
     """Verified CUDA solve, including conversion, transfers and temporary cleanup.
 
@@ -288,6 +300,7 @@ def gpu_deflated_cg(
         direction_callback=direction_callback,
         completion_callback=completion_callback,
         cache_operator_product=cache_operator_product,
+        device_basis=device_basis,
     )
     # Returning from the helper releases its temporary GPU tensors. The
     # returned solution owns CPU storage only. No empty_cache() is charged.

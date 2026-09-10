@@ -53,6 +53,7 @@ class StudySolver:
         cache_operator_product=True,
         torch=None,
         api=None,
+        resident_recycling=False,
     ):
         if method not in METHODS or device not in {"cpu", "cuda"}:
             raise ValueError("Unknown study solver or device")
@@ -74,7 +75,7 @@ class StudySolver:
             raise ValueError("Internal stopping factors must not exceed one")
         self.method, self.device = method, device
         self.reference, self.torch, self.api = reference, torch, api
-        self.history = RecycleSpace(rank, window, device) if method == "recycling" else None
+        self.history = RecycleSpace(rank, window, device, resident=resident_recycling) if method == "recycling" else None
         self.session = None
         self.previous = None
         if method == "amgx":
@@ -98,14 +99,21 @@ class StudySolver:
         else:
             newly_inactive = len(np.setdiff1d(indices, self.previous, assume_unique=True))
             newly_active = len(np.setdiff1d(self.previous, indices, assume_unique=True))
+        device_reference = (self.method == "reference" and self.device == "cuda"
+                            and callable(getattr(self.reference, "restrict_device", None)))
+        device_basis = device_reference or (self.history is not None and self.history.resident)
         basis = (
-            self.reference.restrict(indices)
+            self.reference.restrict_device(indices)
+            if device_reference
+            else self.reference.restrict(indices)
             if self.method == "reference"
             else self.history.begin(indices)
             if self.history is not None
             else None
         )
         diagonal = B.diagonal()
+        if device_basis:
+            self.torch.cuda.synchronize()
         preparation = time.perf_counter() - start
         if self.method == "amgx":
             result, metrics = amgx_cg(
@@ -126,7 +134,7 @@ class StudySolver:
             result, metrics = gpu_deflated_cg(
                 B,
                 b,
-                basis,
+                None if device_basis else basis,
                 diagonal,
                 x0=initial,
                 rtol=self.rtol * self.cg_factor,
@@ -137,6 +145,7 @@ class StudySolver:
                 cache_operator_product=self.cache_operator_product,
                 direction_callback=None if self.history is None else self.history.capture,
                 completion_callback=None if self.history is None else self.history.finish,
+                device_basis=basis if device_basis else None,
             )
         else:
             tick = time.perf_counter()
@@ -184,6 +193,9 @@ class StudySolver:
             "newly_inactive": newly_inactive,
             "newly_active": newly_active,
             "input_basis_columns": 0 if basis is None else basis.shape[1],
-            "restricted_basis_bytes": 0 if basis is None else basis.nbytes,
+            "restricted_basis_bytes": 0 if basis is None else (
+                basis.numel()*basis.element_size() if device_basis else basis.nbytes),
+            "reference_restriction_device": "cuda" if device_reference else "cpu",
+            "basis_transfer_device": "cuda" if device_basis else "cpu",
             "callback_seconds": time.perf_counter() - start,
         }

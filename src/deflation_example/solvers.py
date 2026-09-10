@@ -220,11 +220,21 @@ def pdas(H, f, bound, initial_active=None, tolerance=1e-9, maxiter=100, linear_s
             "host_bookkeeping",
         )
     )
-    H = sparse.csr_matrix(matrix(H), dtype=float)
+    H = matrix(H)
+    matrix_free = isinstance(H, LinearOperator)
+    if matrix_free:
+        if not callable(getattr(H, "restrict", None)) or not callable(getattr(H, "diagonal", None)):
+            raise ValueError("Matrix-free PDAS needs restriction and diagonal operations")
+        if linear_solver is None:
+            raise ValueError("Matrix-free PDAS requires an explicit inner solver")
+    else:
+        H = sparse.csr_matrix(H, dtype=float)
     f = real_array(f, "PDAS load")
     if f.ndim != 1 or f.size == 0 or not np.all(np.isfinite(f)) or H.shape != (f.size, f.size):
         raise ValueError("PDAS needs a nonempty finite load and a compatible matrix")
-    if not np.all(np.isfinite(H.data)) or np.any(H.diagonal() <= 0):
+    if (not matrix_free and not np.all(np.isfinite(H.data))) or (
+        not np.all(np.isfinite(H.diagonal())) or np.any(H.diagonal() <= 0)
+    ):
         raise ValueError("PDAS requires a finite SPD matrix")
     positive_real(tolerance, "PDAS tolerance")
     integer(maxiter, "PDAS iteration cap", 1)
@@ -258,8 +268,14 @@ def pdas(H, f, bound, initial_active=None, tolerance=1e-9, maxiter=100, linear_s
         y[J] = bound[J]
         inner_residual, inner_iterations, inner_status = 0.0, 0, "converged"
         if len(I):
-            HII = H[I][:, I].tocsr()
-            rhs = f[I] - H[I][:, J] @ bound[J]
+            if matrix_free:
+                HII = H.restrict(I)
+                boundary_state = np.zeros(len(f))
+                boundary_state[J] = bound[J]
+                rhs = f[I] - (H @ boundary_state)[I]
+            else:
+                HII = H[I][:, I].tocsr()
+                rhs = f[I] - H[I][:, J] @ bound[J]
             timer.mark("restriction")
             if linear_solver is None:
                 y[I] = spsolve(HII, rhs)

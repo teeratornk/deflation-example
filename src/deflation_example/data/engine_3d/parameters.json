@@ -1,0 +1,50 @@
+{
+  "schema": "mesh-cht-input-v1",
+  "geometry": "engine_3d",
+  "generator": "deflation_example.generate_engine_mesh",
+  "gmsh": "4.15.2",
+  "mesh_size": 0.12,
+  "mesher_threads": 1,
+  "coordinates": "(x1,x2,x3) divided by block length",
+  "geometry_parameters": {
+    "block": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "bore_center": [
+      0.5,
+      0.5
+    ],
+    "bore_radius": 0.3,
+    "floor": 0.12,
+    "deck": 0.78
+  },
+  "materials": {
+    "0": "gas",
+    "1": "metal"
+  },
+  "physical": {
+    "conductivity_ratio": 1000.0,
+    "metal_conductivity_W_m_K": 55.0,
+    "inward_interface_flux_W_m2": 500000.0,
+    "length_scale_m": 0.1,
+    "coolant_temperature_K": 360.0,
+    "temperature_scale_K": 909.0909090909091,
+    "dimensionless_interface_flux": 1000.0,
+    "dimensionless_capacity": [
+      1.0,
+      1.0
+    ],
+    "capacity_policy": "Unit capacity in both materials, matching the documented dimensionless energy equation.",
+    "flow_policy": "Prescribed smooth azimuthal circulation in the bore; zero velocity in metal.",
+    "velocity_max": 50.0,
+    "time_units": "fluid diffusion time L^2/thermal_diffusivity",
+    "control_units": "dimensionless distributed thermal source"
+  },
+  "source": {
+    "manuscript_section": "03c_engine.tex",
+    "repository": "https://github.com/teeratornk/gnn_solver_manuscript",
+    "scope": "Geometry, conductivity, interface flux and cooling boundary follow the documented case. The optimization prescribes circulation independently of temperature."
+  }
+}

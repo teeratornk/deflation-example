@@ -123,13 +123,16 @@ class RecycleSpace:
     A failed solve clears history. Returned metrics contain no basis arrays.
     """
 
-    def __init__(self, rank, window, device="cpu", tolerance=1e-12):
+    def __init__(self, rank, window, device="cpu", tolerance=1e-12, resident=False):
         self.rank = integer(rank, "Retained rank")
         self.window = integer(window, "Direction window", 1)
         self.tolerance = positive_real(tolerance, "Numerical rank tolerance")
         if device not in {"cpu", "cuda"}:
             raise ValueError("Recycle device must be cpu or cuda")
         self.device = device
+        if not isinstance(resident, bool) or (resident and device != "cuda"):
+            raise ValueError("Resident recycling requires CUDA execution")
+        self.resident = resident
         self.clear()
 
     def clear(self):
@@ -143,7 +146,17 @@ class RecycleSpace:
         self.current = inactive_indices(indices)
         self.directions.clear()
         self.observed = 0
-        return transfer_basis(self.basis, self.indices, self.current)
+        if not self.resident:
+            return transfer_basis(self.basis, self.indices, self.current)
+        from .gpu import require_cuda
+        torch = require_cuda()
+        transferred = torch.zeros((len(self.current), self.basis.shape[1]),
+                                  dtype=torch.float64, device="cuda")
+        if self.basis.shape[1]:
+            _, old, new = np.intersect1d(self.indices, self.current, assume_unique=True,
+                                         return_indices=True)
+            transferred[torch.tensor(new, device="cuda")] = self.basis[torch.tensor(old, device="cuda")]
+        return transferred
 
     def capture(self, direction):
         if self.current is None or direction.shape != (len(self.current),):
@@ -195,7 +208,8 @@ class RecycleSpace:
             torch.cuda.synchronize()
             selection_seconds = time.perf_counter() - start
             download_start = time.perf_counter()
-            selected = selected.cpu().numpy()
+            if not self.resident:
+                selected = selected.cpu().numpy()
             torch.cuda.synchronize()
             download_seconds = time.perf_counter() - download_start
             candidate_bytes = candidates.numel() * candidates.element_size()
@@ -211,4 +225,5 @@ class RecycleSpace:
             "history_bytes_after": self.basis.nbytes,
             "selection_seconds": selection_seconds,
             "selection_download_seconds": download_seconds,
+            "history_location": "cuda" if self.resident else "cpu",
         }
