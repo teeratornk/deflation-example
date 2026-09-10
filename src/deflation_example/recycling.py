@@ -149,13 +149,18 @@ class RecycleSpace:
         if not self.resident:
             return transfer_basis(self.basis, self.indices, self.current)
         from .gpu import require_cuda
+
         torch = require_cuda()
-        transferred = torch.zeros((len(self.current), self.basis.shape[1]),
-                                  dtype=torch.float64, device="cuda")
+        transferred = torch.zeros(
+            (len(self.current), self.basis.shape[1]), dtype=torch.float64, device="cuda"
+        )
         if self.basis.shape[1]:
-            _, old, new = np.intersect1d(self.indices, self.current, assume_unique=True,
-                                         return_indices=True)
-            transferred[torch.tensor(new, device="cuda")] = self.basis[torch.tensor(old, device="cuda")]
+            _, old, new = np.intersect1d(
+                self.indices, self.current, assume_unique=True, return_indices=True
+            )
+            transferred[torch.tensor(new, device="cuda")] = self.basis[
+                torch.tensor(old, device="cuda")
+            ]
         return transferred
 
     def capture(self, direction):

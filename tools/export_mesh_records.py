@@ -25,9 +25,19 @@ def run(selections, sources, output):
             raise ValueError("A pilot source must contain its mesh benchmark implementation")
         for path in sorted(root.rglob("*")):
             relative = path.relative_to(root)
-            if "__pycache__" in relative.parts or path.suffix not in {".py", ".yaml", ".json", ".npz", ".md"}:
+            if "__pycache__" in relative.parts or path.suffix not in {
+                ".py",
+                ".yaml",
+                ".json",
+                ".npz",
+                ".md",
+            }:
                 continue
-            if path.is_symlink() or not path.is_file() or any((root/p).is_symlink() for p in relative.parents):
+            if (
+                path.is_symlink()
+                or not path.is_file()
+                or any((root / p).is_symlink() for p in relative.parents)
+            ):
                 raise ValueError("Pilot sources cannot contain symbolic links")
             target = (PurePosixPath("sources") / name / relative.as_posix()).as_posix()
             content = path.read_bytes()
@@ -40,7 +50,8 @@ def run(selections, sources, output):
     license_content = license_path.read_bytes()
     shutil.copyfile(license_path, output / "LICENSE")
     manifest["files"]["LICENSE"] = {
-        "sha256": hashlib.sha256(license_content).hexdigest(), "bytes": len(license_content)
+        "sha256": hashlib.sha256(license_content).hexdigest(),
+        "bytes": len(license_content),
     }
     for target, (source, content) in prepared.items():
         destination = output / target
@@ -48,7 +59,10 @@ def run(selections, sources, output):
         shutil.copyfile(source, destination)
         if destination.read_bytes() != content:
             raise ValueError("A pilot source changed during export")
-        manifest["files"][target] = {"sha256": hashlib.sha256(content).hexdigest(), "bytes": len(content)}
+        manifest["files"][target] = {
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "bytes": len(content),
+        }
     manifest.update(format="mesh-cht-evidence-v1", numerical_pilot_sources=sorted(source_names))
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     return manifest

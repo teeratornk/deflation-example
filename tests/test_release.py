@@ -85,9 +85,13 @@ def test_version_numbers_are_not_network_endpoints():
 def test_only_numeric_reviewed_mesh_bundles_are_allowed():
     import io
     import numpy as np
+
     data = {
-        "nodes": np.zeros((4, 3)), "cells": np.array([[0, 1, 2, 3]]),
-        "materials": np.array([0]), "dirichlet": np.array([0]), "axisymmetric": np.array(False),
+        "nodes": np.zeros((4, 3)),
+        "cells": np.array([[0, 1, 2, 3]]),
+        "materials": np.array([0]),
+        "dirichlet": np.array([0]),
+        "axisymmetric": np.array(False),
     }
     stream = io.BytesIO()
     np.savez_compressed(stream, **data)

@@ -34,14 +34,17 @@ class DeviceMeshReference:
             return self.spatial[rows]
         time_rows = rows // self.spatial.shape[0]
         space_rows = rows % self.spatial.shape[0]
-        return (self.spatial[space_rows[:, None], self.columns[None, :]]
-                * self.temporal[time_rows])
+        return self.spatial[space_rows[:, None], self.columns[None, :]] * self.temporal[time_rows]
 
     def storage(self):
-        tensors = [self.spatial] if self.temporal is None else [self.spatial, self.temporal, self.columns]
-        return {**self.host.storage(),
-                "persistent_device_reference_bytes": sum(t.numel()*t.element_size() for t in tensors),
-                "reference_restriction_device": "cuda"}
+        tensors = (
+            [self.spatial] if self.temporal is None else [self.spatial, self.temporal, self.columns]
+        )
+        return {
+            **self.host.storage(),
+            "persistent_device_reference_bytes": sum(t.numel() * t.element_size() for t in tensors),
+            "reference_restriction_device": "cuda",
+        }
 
 
 def spatial_reference(assembly, rank, *, alpha=None):
@@ -53,25 +56,42 @@ def spatial_reference(assembly, rank, *, alpha=None):
     m = assembly.mass[I]
     if alpha is not None:
         from .mesh_control import build_mesh_control
+
         H = build_mesh_control(assembly, alpha=alpha).H
         K, m = H.assembled(), H.diagonal()
     if len(I) < 256 or rank > len(I) // 3:
         values, vectors = linalg.eigh(K.toarray(), np.diag(m), subset_by_index=[0, rank - 1])
     else:
-        values, vectors = eigsh(K, k=rank, M=sparse.diags(m), sigma=0, which="LM",
-                                v0=np.random.default_rng(701).normal(size=len(I)), tol=1e-10)
+        values, vectors = eigsh(
+            K,
+            k=rank,
+            M=sparse.diags(m),
+            sigma=0,
+            which="LM",
+            v0=np.random.default_rng(701).normal(size=len(I)),
+            tol=1e-10,
+        )
         order = np.argsort(values)
         values, vectors = values[order], vectors[:, order]
     residual = K @ vectors - m[:, None] * vectors * values
     denominator = np.linalg.norm(K @ vectors, axis=0)
     error = np.linalg.norm(residual, axis=0) / np.maximum(denominator, np.finfo(float).tiny)
     if not np.isfinite(error).all() or error.max() > 1e-7:
-        raise RuntimeError("Reference eigensolve failed its independently recomputed residual check")
+        raise RuntimeError(
+            "Reference eigensolve failed its independently recomputed residual check"
+        )
     return values, vectors, error
 
 
-def build_mesh_reference(problem, coarse_assembly, prolongation, rank, construction="mode_dependent",
-                         spatial_policy="diffusion", temporal_metric="euclidean"):
+def build_mesh_reference(
+    problem,
+    coarse_assembly,
+    prolongation,
+    rank,
+    construction="mode_dependent",
+    spatial_policy="diffusion",
+    temporal_metric="euclidean",
+):
     """Build one full-domain reference before optimization, including all time levels."""
     rank = integer(rank, "Total reference rank", 1)
     if construction not in {"mode_dependent", "tensor"}:
@@ -81,8 +101,11 @@ def build_mesh_reference(problem, coarse_assembly, prolongation, rank, construct
     if temporal_metric not in {"euclidean", "jacobi"}:
         raise ValueError("Choose euclidean or jacobi temporal selection coordinates")
     spatial_rank = min(rank, len(coarse_assembly.mesh.free) - 1)
-    values, phi, residuals = spatial_reference(coarse_assembly, spatial_rank,
-                                              alpha=problem.alpha if spatial_policy == "scaled_schur" else None)
+    values, phi, residuals = spatial_reference(
+        coarse_assembly,
+        spatial_rank,
+        alpha=problem.alpha if spatial_policy == "scaled_schur" else None,
+    )
     phi = np.asarray(prolongation @ phi)
     # Candidate scores must be invariant to arbitrary eigenvector normalization.
     norms = np.linalg.norm(phi, axis=0)
@@ -119,14 +142,13 @@ def build_mesh_reference(problem, coarse_assembly, prolongation, rank, construct
         aa = float(AP[:, j] @ (w * AP[:, j]))
         ac = float(AP[:, j] @ (w * CP[:, j]))
         cc = float(CP[:, j] @ (w * CP[:, j]))
-        H = mass * Wt + problem.alpha * (aa * Wt + ac * (Wt @ T + T.T @ Wt)
-                                        + cc * T.T @ Wt @ T)
-        metric = diagonal @ phi[:, j]**2 if temporal_metric == "jacobi" else np.ones(n)
+        H = mass * Wt + problem.alpha * (aa * Wt + ac * (Wt @ T + T.T @ Wt) + cc * T.T @ Wt @ T)
+        metric = diagonal @ phi[:, j] ** 2 if temporal_metric == "jacobi" else np.ones(n)
         if construction == "mode_dependent":
             score, vectors = linalg.eigh(H, np.diag(metric))
         else:
             vectors = common
-            score = np.diag(vectors.T @ H @ vectors) / np.sum(metric[:, None]*vectors**2, axis=0)
+            score = np.diag(vectors.T @ H @ vectors) / np.sum(metric[:, None] * vectors**2, axis=0)
         factors.append(vectors)
         candidates.extend((float(s), j, k) for k, s in enumerate(score))
     selected = sorted(candidates)[:rank]
@@ -134,10 +156,15 @@ def build_mesh_reference(problem, coarse_assembly, prolongation, rank, construct
         raise ValueError("The coarse space-time pool cannot support the requested rank")
     used = sorted({j for _, j, _ in selected})
     remap = {j: i for i, j in enumerate(used)}
-    return SpaceTimeReference(phi[:, used],
-                              np.column_stack([factors[j][:, k] for _, j, k in selected]),
-                              [remap[j] for _, j, _ in selected],
-                              {**description, "temporal_construction": construction,
-                               "temporal_selection_metric": temporal_metric,
-                               "selection": selected,
-                               "temporal_operator": "one-spatial-mode compression of the weighted trajectory Hessian"})
+    return SpaceTimeReference(
+        phi[:, used],
+        np.column_stack([factors[j][:, k] for _, j, k in selected]),
+        [remap[j] for _, j, _ in selected],
+        {
+            **description,
+            "temporal_construction": construction,
+            "temporal_selection_metric": temporal_metric,
+            "selection": selected,
+            "temporal_operator": "one-spatial-mode compression of the weighted trajectory Hessian",
+        },
+    )

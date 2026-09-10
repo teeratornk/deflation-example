@@ -55,8 +55,12 @@ def inspect_mesh_bundle(name, content):
     """Allow only the three reviewed numeric mesh bundles, without loading arrays."""
     suffix = str(PurePosixPath(name))
     expected = None
-    if suffix.endswith(("deflation_example/data/engine_3d/mesh.npz",
-                        "deflation_example/data/transformer_2d/mesh.npz")):
+    if suffix.endswith(
+        (
+            "deflation_example/data/engine_3d/mesh.npz",
+            "deflation_example/data/transformer_2d/mesh.npz",
+        )
+    ):
         expected = {"nodes", "cells", "materials", "dirichlet", "axisymmetric"}
     elif suffix.endswith("deflation_example/data/transformer_2d/inputs.npz"):
         expected = {"velocity_P2_m_s", "source_W_m3", "boundary_outlet", "boundary_wall"}
@@ -65,7 +69,9 @@ def inspect_mesh_bundle(name, content):
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as bundle:
             infos = bundle.infolist()
-            if len(infos) != len(expected) or {i.filename for i in infos} != {k+".npy" for k in expected}:
+            if len(infos) != len(expected) or {i.filename for i in infos} != {
+                k + ".npy" for k in expected
+            }:
                 return ["unexpected mesh arrays"]
             for info in infos:
                 if info.file_size > MAX_FILE_BYTES:
@@ -74,15 +80,19 @@ def inspect_mesh_bundle(name, content):
                 if array[:6] != b"\x93NUMPY" or array[6:8] not in {b"\x01\x00", b"\x02\x00"}:
                     return ["invalid numeric mesh array"]
                 width = 2 if array[6] == 1 else 4
-                length = int.from_bytes(array[8:8+width], "little")
+                length = int.from_bytes(array[8 : 8 + width], "little")
                 start = 8 + width
-                header = ast.literal_eval(array[start:start+length].decode("ascii"))
+                header = ast.literal_eval(array[start : start + length].decode("ascii"))
                 if set(header) != {"descr", "fortran_order", "shape"}:
                     return ["invalid numeric mesh header"]
                 dtype, shape = header["descr"], header["shape"]
                 if not isinstance(dtype, str) or not re.fullmatch(r"[<>=|][biuf][1248]", dtype):
                     return ["nonnumeric mesh array"]
-                if not isinstance(shape, tuple) or len(shape) > 4 or any(type(n) is not int or n < 0 for n in shape):
+                if (
+                    not isinstance(shape, tuple)
+                    or len(shape) > 4
+                    or any(type(n) is not int or n < 0 for n in shape)
+                ):
                     return ["invalid mesh array dimensions"]
                 expected_size = math.prod(shape) * int(dtype[-1])
                 if len(array) - start - length != expected_size:

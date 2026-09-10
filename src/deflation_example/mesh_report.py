@@ -17,9 +17,13 @@ COLORS = {"jacobi": "#777777", "reference": "#0072b2", "recycling": "#cc79a7", "
 
 def components(record):
     """Partition the complete interval using nonoverlapping nested timers."""
-    result = dict.fromkeys(("Construction and setup", "Iteration", "Transfers", "Verification", "Other"), 0.)
-    result["Construction and setup"] = sum(record["components_seconds"][k]
-                                           for k in ("assembly", "reference_construction", "solver_resources"))
+    result = dict.fromkeys(
+        ("Construction and setup", "Iteration", "Transfers", "Verification", "Other"), 0.0
+    )
+    result["Construction and setup"] = sum(
+        record["components_seconds"][k]
+        for k in ("assembly", "reference_construction", "solver_resources")
+    )
     for case in record["cases"]:
         outer = case["outer_timing"]["components_seconds"]
         result["Construction and setup"] += outer["restriction"]
@@ -29,7 +33,15 @@ def components(record):
             if not np.isclose(sum(p.values()), inner["total_seconds"], rtol=1e-12):
                 raise ValueError("Inner timing components do not sum to their interval")
             result["Construction and setup"] += inner["restriction_and_transfer_seconds"] + sum(
-                p[k] for k in ("basis_processing", "coarse_or_hierarchy_setup", "initialization", "handle_creation", "resource_creation"))
+                p[k]
+                for k in (
+                    "basis_processing",
+                    "coarse_or_hierarchy_setup",
+                    "initialization",
+                    "handle_creation",
+                    "resource_creation",
+                )
+            )
             result["Iteration"] += p["iteration"]
             result["Transfers"] += sum(p[k] for k in ("conversion", "upload", "download"))
             result["Verification"] += p["verification"]
@@ -48,7 +60,9 @@ def load_study(directory):
     sources = {}
     for path in sorted(directory.glob("*/record.json")):
         r = json.loads(path.read_text())
-        sources[path.relative_to(directory).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+        sources[path.relative_to(directory).as_posix()] = hashlib.sha256(
+            path.read_bytes()
+        ).hexdigest()
         if r["success"] and (r["method"], r["repetition"]) in completed:
             records[r["method"]].append(r)
     report["input_record_sha256"] = sources
@@ -59,13 +73,28 @@ def load_study(directory):
         method["components_seconds"] = [components(r) for r in accepted]
         method["startup_seconds"] = [r["startup_after_import_seconds"] for r in accepted]
         method["finalization_seconds"] = [r["finalization_seconds"] for r in accepted]
-        method["library_preparation_inclusive_seconds"] = [r["seconds"] + r["startup_after_import_seconds"] + r["finalization_seconds"] for r in accepted]
-        method["whole_worker_process_seconds"] = [completed[(r["method"], r["repetition"])]["process_wall_seconds"] for r in accepted]
-        method["max_original_residual"] = max((i["original_residual"] for r in accepted for c in r["cases"] for i in c["inner"]), default=None)
-        method["max_kkt"] = max((max(c["kkt"].values()) for r in accepted for c in r["cases"]), default=None)
+        method["library_preparation_inclusive_seconds"] = [
+            r["seconds"] + r["startup_after_import_seconds"] + r["finalization_seconds"]
+            for r in accepted
+        ]
+        method["whole_worker_process_seconds"] = [
+            completed[(r["method"], r["repetition"])]["process_wall_seconds"] for r in accepted
+        ]
+        method["max_original_residual"] = max(
+            (i["original_residual"] for r in accepted for c in r["cases"] for i in c["inner"]),
+            default=None,
+        )
+        method["max_kkt"] = max(
+            (max(c["kkt"].values()) for r in accepted for c in r["cases"]), default=None
+        )
         ranks = [i["deployed_rank"] for r in accepted for c in r["cases"] for i in c["inner"]]
         method["deployed_rank_range"] = [min(ranks), max(ranks)] if ranks else None
-        method["fallback_count"] = sum(i["fallback_reason"] is not None for r in accepted for c in r["cases"] for i in c["inner"])
+        method["fallback_count"] = sum(
+            i["fallback_reason"] is not None
+            for r in accepted
+            for c in r["cases"]
+            for i in c["inner"]
+        )
     sample = next((r for group in records.values() for r in group), None)
     report["mesh"] = sample["mesh"] if sample else None
     report["problem_size"] = sample["problem_size"] if sample else None
@@ -84,12 +113,18 @@ def generate(directories, output, plots=True):
     output.mkdir(parents=True, exist_ok=False)
     loaded = [load_study(d) for d in directories]
     reports = [r for r, _ in loaded]
-    write_report(output / "summary.json", {"protocol": "mesh-comparison-report-v1",
-                                           "generator_environment": environment(), "studies": reports})
+    write_report(
+        output / "summary.json",
+        {
+            "protocol": "mesh-comparison-report-v1",
+            "generator_environment": environment(),
+            "studies": reports,
+        },
+    )
     main_rows, detail_rows, accuracy_rows, component_rows, preparation_rows = [], [], [], [], []
     for report, records in loaded:
         c = report["controls"]
-        name = ("Transformer" if c["geometry"] == "transformer_2d" else f"Engine {c['level']}")
+        name = "Transformer" if c["geometry"] == "transformer_2d" else f"Engine {c['level']}"
         if c["rank"] != 100:
             name += f", $r={c['rank']}$"
         kind = f"{c['slabs']} slabs" if c["transient"] else "Steady"
@@ -106,26 +141,78 @@ def generate(directories, output, plots=True):
             times = m["complete_seconds"]
             if times:
                 timing = f"{np.median(times):.3f} [{min(times):.3f}, {max(times):.3f}]"
-                inner, outer = (f"{np.median(m[k]):.0f}" for k in ("inner_iterations", "outer_iterations"))
-                host = f"{max(m['peak_host_bytes'])/2**30:.3f}" if m["peak_host_bytes"] else "---"
-                gpu = f"{max(m['peak_gpu_bytes'])/2**30:.3f}" if m["peak_gpu_bytes"] else "---"
-                accuracy_rows.append(" & ".join([name, kind, NAMES[m["method"]],
-                    f"{m['max_original_residual']:.2e}", f"{m['max_kkt']:.2e}",
-                    "--".join(map(str, m["deployed_rank_range"])), str(m["fallback_count"])]) + r" \\")
-                representative = sorted(records[m["method"]], key=lambda r: r["seconds"])[len(times)//2]
+                inner, outer = (
+                    f"{np.median(m[k]):.0f}" for k in ("inner_iterations", "outer_iterations")
+                )
+                host = f"{max(m['peak_host_bytes']) / 2**30:.3f}" if m["peak_host_bytes"] else "---"
+                gpu = f"{max(m['peak_gpu_bytes']) / 2**30:.3f}" if m["peak_gpu_bytes"] else "---"
+                accuracy_rows.append(
+                    " & ".join(
+                        [
+                            name,
+                            kind,
+                            NAMES[m["method"]],
+                            f"{m['max_original_residual']:.2e}",
+                            f"{m['max_kkt']:.2e}",
+                            "--".join(map(str, m["deployed_rank_range"])),
+                            str(m["fallback_count"]),
+                        ]
+                    )
+                    + r" \\"
+                )
+                representative = sorted(records[m["method"]], key=lambda r: r["seconds"])[
+                    len(times) // 2
+                ]
                 parts = components(representative)
-                component_rows.append(" & ".join([name, kind, NAMES[m["method"]]]
-                    + [f"{v:.3f}" for v in parts.values()] + [f"{representative['seconds']:.3f}"]) + r" \\")
-                preparation_rows.append(" & ".join([name, kind, NAMES[m["method"]]] + [
-                    f"{np.median(m[k]):.3f}" for k in ("complete_seconds", "startup_seconds",
-                    "finalization_seconds", "library_preparation_inclusive_seconds", "whole_worker_process_seconds")]) + r" \\")
+                component_rows.append(
+                    " & ".join(
+                        [name, kind, NAMES[m["method"]]]
+                        + [f"{v:.3f}" for v in parts.values()]
+                        + [f"{representative['seconds']:.3f}"]
+                    )
+                    + r" \\"
+                )
+                preparation_rows.append(
+                    " & ".join(
+                        [name, kind, NAMES[m["method"]]]
+                        + [
+                            f"{np.median(m[k]):.3f}"
+                            for k in (
+                                "complete_seconds",
+                                "startup_seconds",
+                                "finalization_seconds",
+                                "library_preparation_inclusive_seconds",
+                                "whole_worker_process_seconds",
+                            )
+                        ]
+                    )
+                    + r" \\"
+                )
             else:
-                timing, inner, outer, host, gpu = ("---",)*5
-            detail_rows.append(" & ".join([name, kind, NAMES[m["method"]],
-                f"{m['accepted']}/{m['requested']}", timing, outer, inner, host, gpu]) + r" \\")
-    for name, rows in (("complete_rows.tex", main_rows), ("detail_rows.tex", detail_rows),
-                       ("accuracy_rows.tex", accuracy_rows), ("component_rows.tex", component_rows),
-                       ("preparation_rows.tex", preparation_rows)):
+                timing, inner, outer, host, gpu = ("---",) * 5
+            detail_rows.append(
+                " & ".join(
+                    [
+                        name,
+                        kind,
+                        NAMES[m["method"]],
+                        f"{m['accepted']}/{m['requested']}",
+                        timing,
+                        outer,
+                        inner,
+                        host,
+                        gpu,
+                    ]
+                )
+                + r" \\"
+            )
+    for name, rows in (
+        ("complete_rows.tex", main_rows),
+        ("detail_rows.tex", detail_rows),
+        ("accuracy_rows.tex", accuracy_rows),
+        ("component_rows.tex", component_rows),
+        ("preparation_rows.tex", preparation_rows),
+    ):
         with atomic_output(output / name) as stream:
             stream.write("\n".join(rows) + "\n")
     if plots:
@@ -136,10 +223,14 @@ def generate(directories, output, plots=True):
 
 def plot_sequences(loaded, output):
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    rows = (len(loaded)+1)//2
-    fig, axes = plt.subplots(rows, 2, figsize=(10, 2.7*rows), squeeze=False, constrained_layout=True)
+
+    rows = (len(loaded) + 1) // 2
+    fig, axes = plt.subplots(
+        rows, 2, figsize=(10, 2.7 * rows), squeeze=False, constrained_layout=True
+    )
     for ax, (report, records) in zip(axes.flat, loaded):
         for method, data in records.items():
             curves = []
@@ -149,19 +240,36 @@ def plot_sequences(loaded, output):
                 y = [r["initial_setup_seconds"]] + [c["cumulative_seconds"] for c in r["cases"]]
                 y[-1] = r["seconds"]
                 curves.append(y)
-                ax.plot(range(len(y)), y, color=COLORS[method], alpha=.23, linewidth=.8)
+                ax.plot(range(len(y)), y, color=COLORS[method], alpha=0.23, linewidth=0.8)
             if curves:
-                ax.plot(range(len(curves[0])), np.median(curves, axis=0), color=COLORS[method],
-                        linewidth=1.7, label=f"{NAMES[method]} ({len(data)}/{report['controls']['repeats']})")
+                ax.plot(
+                    range(len(curves[0])),
+                    np.median(curves, axis=0),
+                    color=COLORS[method],
+                    linewidth=1.7,
+                    label=f"{NAMES[method]} ({len(data)}/{report['controls']['repeats']})",
+                )
         ref, amg = records.get("reference"), records.get("amgx")
         if ref and amg and len(ref) == len(amg) == report["controls"]["repeats"]:
-            ratio = np.median([r["seconds"] for r in amg])/np.median([r["seconds"] for r in ref])
-            ax.text(.03, .96, f"AmgX / reference: {ratio:.2f}×", va="top", transform=ax.transAxes, fontsize=8)
-        ax.set(title=_label(report), xlabel="Accepted target index", ylabel="Complete elapsed time (s)",
-               xlim=(0, report["controls"]["targets"]), ylim=(0, None))
-        ax.grid(alpha=.2)
+            ratio = np.median([r["seconds"] for r in amg]) / np.median([r["seconds"] for r in ref])
+            ax.text(
+                0.03,
+                0.96,
+                f"AmgX / reference: {ratio:.2f}×",
+                va="top",
+                transform=ax.transAxes,
+                fontsize=8,
+            )
+        ax.set(
+            title=_label(report),
+            xlabel="Accepted target index",
+            ylabel="Complete elapsed time (s)",
+            xlim=(0, report["controls"]["targets"]),
+            ylim=(0, None),
+        )
+        ax.grid(alpha=0.2)
         ax.legend(fontsize=7, loc="lower right")
-    for ax in list(axes.flat)[len(loaded):]:
+    for ax in list(axes.flat)[len(loaded) :]:
         ax.set_visible(False)
     fig.savefig(output, metadata={"CreationDate": None, "ModDate": None})
     plt.close(fig)
@@ -169,10 +277,17 @@ def plot_sequences(loaded, output):
 
 def plot_components(loaded, output):
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    fig, axes = plt.subplots((len(loaded)+1)//2, 2, figsize=(10, 2.6*((len(loaded)+1)//2)),
-                              squeeze=False, constrained_layout=True)
+
+    fig, axes = plt.subplots(
+        (len(loaded) + 1) // 2,
+        2,
+        figsize=(10, 2.6 * ((len(loaded) + 1) // 2)),
+        squeeze=False,
+        constrained_layout=True,
+    )
     colors = ["#56b4e9", "#0072b2", "#e69f00", "#009e73", "#aaaaaa"]
     for ax, (report, records) in zip(axes.flat, loaded):
         for position, (method, data) in enumerate(records.items()):
@@ -180,15 +295,25 @@ def plot_components(loaded, output):
                 ax.text(position, 0, "No accepted sequence", rotation=90, fontsize=7)
                 continue
             ordered = sorted(data, key=lambda r: r["seconds"])
-            representative = ordered[len(ordered)//2]
+            representative = ordered[len(ordered) // 2]
             base = 0
             for (name, seconds), color in zip(components(representative).items(), colors):
-                ax.bar(position, seconds, bottom=base, color=color, label=name if position == 0 else None)
+                ax.bar(
+                    position,
+                    seconds,
+                    bottom=base,
+                    color=color,
+                    label=name if position == 0 else None,
+                )
                 base += seconds
-        ax.set(title=_label(report), ylabel="Complete elapsed time (s)",
-               xticks=range(len(records)), xticklabels=[NAMES[m] for m in records])
+        ax.set(
+            title=_label(report),
+            ylabel="Complete elapsed time (s)",
+            xticks=range(len(records)),
+            xticklabels=[NAMES[m] for m in records],
+        )
         ax.legend(fontsize=6, loc="upper left")
-    for ax in list(axes.flat)[len(loaded):]:
+    for ax in list(axes.flat)[len(loaded) :]:
         ax.set_visible(False)
     fig.savefig(output, metadata={"CreationDate": None, "ModDate": None})
     plt.close(fig)

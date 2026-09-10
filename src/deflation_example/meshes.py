@@ -64,16 +64,18 @@ class ThermalMesh:
         if np.any(counts > 2):
             raise ValueError("A conforming mesh facet has at most two incident cells")
         graph = sparse.coo_matrix(
-            (np.ones(len(cells) * d),
-             (np.repeat(cells[:, 0], d), cells[:, 1:].ravel())),
+            (np.ones(len(cells) * d), (np.repeat(cells[:, 0], d), cells[:, 1:].ravel())),
             shape=(len(nodes), len(nodes)),
         ).tocsr()
         _, labels = sparse.csgraph.connected_components(graph, directed=False)
         if len(np.unique(labels[pins])) != len(np.unique(labels)):
             raise ValueError("Every connected component needs a Dirichlet boundary")
-        for key, array in (("nodes", nodes), ("cells", cells),
-                           ("materials", material.astype(np.int64, copy=True)),
-                           ("dirichlet", np.unique(pins).astype(np.int64))):
+        for key, array in (
+            ("nodes", nodes),
+            ("cells", cells),
+            ("materials", material.astype(np.int64, copy=True)),
+            ("dirichlet", np.unique(pins).astype(np.int64)),
+        ):
             array.flags.writeable = False
             object.__setattr__(self, key, array)
 
@@ -97,15 +99,22 @@ class ThermalMesh:
     def save(self, path):
         """Create a portable numeric-only mesh; existing paths are protected."""
         with Path(path).open("xb") as stream:
-            np.savez_compressed(stream, nodes=self.nodes, cells=self.cells,
-                                materials=self.materials, dirichlet=self.dirichlet,
-                                axisymmetric=np.array(self.axisymmetric))
+            np.savez_compressed(
+                stream,
+                nodes=self.nodes,
+                cells=self.cells,
+                materials=self.materials,
+                dirichlet=self.dirichlet,
+                axisymmetric=np.array(self.axisymmetric),
+            )
 
     @classmethod
     def load(cls, path):
         with np.load(path, allow_pickle=False) as data:
-            return cls(*(data[k] for k in ("nodes", "cells", "materials", "dirichlet")),
-                       axisymmetric=bool(data["axisymmetric"].item()))
+            return cls(
+                *(data[k] for k in ("nodes", "cells", "materials", "dirichlet")),
+                axisymmetric=bool(data["axisymmetric"].item()),
+            )
 
 
 def orient_cells(nodes, cells):
@@ -141,16 +150,13 @@ def simplex_geometry(mesh):
     if mesh.axisymmetric:
         radii = vertices[:, :, 0]
         # Exact integral of r*N_i. Positive on every nondegenerate cell.
-        local_mass = (2 * np.pi * volume[:, None]
-                      * (radii.sum(axis=1)[:, None] + radii) / 12)
+        local_mass = 2 * np.pi * volume[:, None] * (radii.sum(axis=1)[:, None] + radii) / 12
     else:
-        local_mass = np.repeat((volume / (mesh.dimension + 1))[:, None],
-                               mesh.dimension + 1, axis=1)
+        local_mass = np.repeat((volume / (mesh.dimension + 1))[:, None], mesh.dimension + 1, axis=1)
     return gradients, local_mass
 
 
-def assemble_thermal(mesh, conductivity, capacity, velocity=None, source=None,
-                     streamline=False):
+def assemble_thermal(mesh, conductivity, capacity, velocity=None, source=None, streamline=False):
     """Assemble diffusion, nonconservative transport, and optional streamline diffusion.
 
     Conductivity is a symmetric positive-definite tensor per cell. Capacity and
@@ -183,13 +189,16 @@ def assemble_thermal(mesh, conductivity, capacity, velocity=None, source=None,
     if quadratic_flow:
         # Degree-five triangle quadrature integrates r*N_i*v_P2 exactly.
         bary, quadrature_weights = triangle_quadrature()
-        shape = np.column_stack((bary * (2 * bary - 1),
-                                 4 * bary[:, 0] * bary[:, 1],
-                                 4 * bary[:, 0] * bary[:, 2],
-                                 4 * bary[:, 1] * bary[:, 2]))
+        shape = np.column_stack(
+            (
+                bary * (2 * bary - 1),
+                4 * bary[:, 0] * bary[:, 1],
+                4 * bary[:, 0] * bary[:, 2],
+                4 * bary[:, 1] * bary[:, 2],
+            )
+        )
         samples = np.einsum("qa,ead->eqd", shape, v)
-        volume = np.linalg.det(mesh.nodes[mesh.cells[:, 1:]]
-                               - mesh.nodes[mesh.cells[:, :1]]) / 2
+        volume = np.linalg.det(mesh.nodes[mesh.cells[:, 1:]] - mesh.nodes[mesh.cells[:, :1]]) / 2
         qmeasure = volume[:, None] * quadrature_weights
         if mesh.axisymmetric:
             qmeasure = qmeasure * 2 * np.pi * (mesh.nodes[mesh.cells, 0] @ bary.T)
@@ -205,8 +214,9 @@ def assemble_thermal(mesh, conductivity, capacity, velocity=None, source=None,
         verts = mesh.nodes[mesh.cells]
         h = np.max(np.linalg.norm(verts[:, :, None] - verts[:, None, :], axis=3), axis=(1, 2))
         speed = c * np.linalg.norm(v, axis=1)
-        tau = np.minimum(h / (2 * np.maximum(speed, np.finfo(float).tiny)),
-                         h**2 / (12 * eigenvalues[:, 0]))
+        tau = np.minimum(
+            h / (2 * np.maximum(speed, np.finfo(float).tiny)), h**2 / (12 * eigenvalues[:, 0])
+        )
         stabilization = (measure * tau)[:, None, None] * (
             transport_gradient[:, :, None] * transport_gradient[:, None, :]
         )
@@ -220,19 +230,35 @@ def assemble_thermal(mesh, conductivity, capacity, velocity=None, source=None,
     def vector(values):
         return np.bincount(mesh.cells.ravel(), weights=values.ravel(), minlength=size)
 
-    return ThermalAssembly(mesh, vector(lump), vector(c[:, None] * lump),
-                           matrix(diffusion), matrix(transport), matrix(stabilization),
-                           vector(q[:, None] * lump))
+    return ThermalAssembly(
+        mesh,
+        vector(lump),
+        vector(c[:, None] * lump),
+        matrix(diffusion),
+        matrix(transport),
+        matrix(stabilization),
+        vector(q[:, None] * lump),
+    )
 
 
 def triangle_quadrature():
     """Seven-point degree-five rule, normalized to unit total weight."""
     a, b = 0.059715871789770, 0.470142064105115
     c, d = 0.797426985353087, 0.101286507323456
-    return (np.array([[1/3, 1/3, 1/3], [a, b, b], [b, a, b], [b, b, a],
-                      [c, d, d], [d, c, d], [d, d, c]]),
-            np.array([0.225, *([0.132394152788506] * 3),
-                      *([0.125939180544827] * 3)]))
+    return (
+        np.array(
+            [
+                [1 / 3, 1 / 3, 1 / 3],
+                [a, b, b],
+                [b, a, b],
+                [b, b, a],
+                [c, d, d],
+                [d, c, d],
+                [d, d, c],
+            ]
+        ),
+        np.array([0.225, *([0.132394152788506] * 3), *([0.125939180544827] * 3)]),
+    )
 
 
 def add_facet_load(assembly, facets, flux):
@@ -258,13 +284,12 @@ def add_facet_load(assembly, facets, flux):
     if mesh.dimension == 2:
         area = np.linalg.norm(x[:, 1] - x[:, 0], axis=1)
         if mesh.axisymmetric:
-            weights = 2 * np.pi * area[:, None] * (
-                x[:, :, 0].sum(axis=1)[:, None] + x[:, :, 0]
-            ) / 6
+            weights = 2 * np.pi * area[:, None] * (x[:, :, 0].sum(axis=1)[:, None] + x[:, :, 0]) / 6
         else:
             weights = np.repeat((area / 2)[:, None], 2, axis=1)
     else:
         area = np.linalg.norm(np.cross(x[:, 1] - x[:, 0], x[:, 2] - x[:, 0]), axis=1) / 2
         weights = np.repeat((area / 3)[:, None], 3, axis=1)
-    assembly.load += np.bincount(faces.ravel(), weights=(q[:, None] * weights).ravel(),
-                                minlength=len(mesh.nodes))
+    assembly.load += np.bincount(
+        faces.ravel(), weights=(q[:, None] * weights).ravel(), minlength=len(mesh.nodes)
+    )

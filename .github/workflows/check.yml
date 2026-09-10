@@ -53,6 +53,10 @@ jobs:
           "$example_env/venv/bin/python" -m deflation_example.benchmark_cht_conditioning --output conditioning
           "$example_env/venv/bin/python" -m deflation_example.benchmark_cht_validation --output independent-validation
           "$example_env/venv/bin/python" -m deflation_example.benchmark_cht_support --validation-root independent-validation --conditioning-root conditioning --pilot-roots trajectory --output supporting-tables
+          "$example_env/venv/bin/python" -m deflation_example.benchmark_mesh targets=2 transient=true rank=20 spatial_reference=scaled_schur temporal_metric=jacobi output=mesh-trajectory
+          "$example_env/venv/bin/python" -m deflation_example.mesh_transfer --record mesh-trajectory/reference-0/record.json --output mesh-transfer --samples 2 --repeats 1
+          "$example_env/venv/bin/python" -m deflation_example.mesh_presentation --records mesh-trajectory --output mesh-figures --fields
+          "$example_env/venv/bin/python" -m deflation_example.validate_mesh --output mesh-independent-validation
   release:
     if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
     needs: cpu

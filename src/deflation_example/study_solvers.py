@@ -75,7 +75,11 @@ class StudySolver:
             raise ValueError("Internal stopping factors must not exceed one")
         self.method, self.device = method, device
         self.reference, self.torch, self.api = reference, torch, api
-        self.history = RecycleSpace(rank, window, device, resident=resident_recycling) if method == "recycling" else None
+        self.history = (
+            RecycleSpace(rank, window, device, resident=resident_recycling)
+            if method == "recycling"
+            else None
+        )
         self.session = None
         self.previous = None
         if method == "amgx":
@@ -99,8 +103,11 @@ class StudySolver:
         else:
             newly_inactive = len(np.setdiff1d(indices, self.previous, assume_unique=True))
             newly_active = len(np.setdiff1d(self.previous, indices, assume_unique=True))
-        device_reference = (self.method == "reference" and self.device == "cuda"
-                            and callable(getattr(self.reference, "restrict_device", None)))
+        device_reference = (
+            self.method == "reference"
+            and self.device == "cuda"
+            and callable(getattr(self.reference, "restrict_device", None))
+        )
         device_basis = device_reference or (self.history is not None and self.history.resident)
         basis = (
             self.reference.restrict_device(indices)
@@ -193,8 +200,9 @@ class StudySolver:
             "newly_inactive": newly_inactive,
             "newly_active": newly_active,
             "input_basis_columns": 0 if basis is None else basis.shape[1],
-            "restricted_basis_bytes": 0 if basis is None else (
-                basis.numel()*basis.element_size() if device_basis else basis.nbytes),
+            "restricted_basis_bytes": 0
+            if basis is None
+            else (basis.numel() * basis.element_size() if device_basis else basis.nbytes),
             "reference_restriction_device": "cuda" if device_reference else "cpu",
             "basis_transfer_device": "cuda" if device_basis else "cpu",
             "callback_seconds": time.perf_counter() - start,

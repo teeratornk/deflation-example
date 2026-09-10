@@ -17,6 +17,7 @@ from threadpoolctl import threadpool_info
 def environment():
     """Record the installed source, even outside Git or after wheel installation."""
     from . import __version__
+
     source = Path(__file__).resolve().parent
     head, source_tree_clean = None, None
     candidate = source.parent.parent

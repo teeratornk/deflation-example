@@ -22,18 +22,18 @@ class MeshShowcase:
     preparation: dict
 
 
-def engine_velocity(points, speed=50.):
+def engine_velocity(points, speed=50.0):
     """Smooth divergence-free azimuthal flow, zero on the analytic bore boundary."""
     x, y, z = points.T
-    dx, dy = x - .5, y - .5
+    dx, dy = x - 0.5, y - 0.5
     radius2 = dx**2 + dy**2
-    axial = np.maximum((z - .12) * (.78 - z), 0)**2
-    radial = np.maximum(.3**2 - radius2, 0)**2
+    axial = np.maximum((z - 0.12) * (0.78 - z), 0) ** 2
+    radial = np.maximum(0.3**2 - radius2, 0) ** 2
     # max r*(R^2-r^2)^2 occurs at r=R/sqrt(5).
-    rmax = .3 / np.sqrt(5)
-    norm = rmax * (.3**2 - rmax**2)**2 * (.66**2/4)**2
+    rmax = 0.3 / np.sqrt(5)
+    norm = rmax * (0.3**2 - rmax**2) ** 2 * (0.66**2 / 4) ** 2
     factor = speed * axial * radial / norm
-    return np.column_stack((-dy*factor, dx*factor, np.zeros_like(x)))
+    return np.column_stack((-dy * factor, dx * factor, np.zeros_like(x)))
 
 
 def _assembly(mesh, parameters, velocity=None, source=None):
@@ -46,7 +46,7 @@ def _assembly(mesh, parameters, velocity=None, source=None):
         k[mesh.materials == 2] *= p["baffle_conductivity_W_m_K"] / conductivity_scale
         capacity = np.array(p["capacity_J_m3_K"])[mesh.materials] / p["capacity_J_m3_K"][0]
         velocity = velocity * p["time_scale_s"] / p["length_scale_m"]
-        source = source * p["length_scale_m"]**2 / (conductivity_scale * p["temperature_scale_K"])
+        source = source * p["length_scale_m"] ** 2 / (conductivity_scale * p["temperature_scale_K"])
         return assemble_thermal(mesh, k, capacity, velocity, source, streamline=True)
     k[mesh.materials == 1] *= p["conductivity_ratio"]
     center = mesh.nodes[mesh.cells].mean(axis=1)
@@ -55,11 +55,13 @@ def _assembly(mesh, parameters, velocity=None, source=None):
     capacity = np.array(p["dimensionless_capacity"])[mesh.materials]
     result = assemble_thermal(mesh, k, capacity, velocity, streamline=True)
     # An interface source contributes once to the single conforming temperature equation.
-    faces = np.concatenate([mesh.cells[:, face] for face in ((0, 1, 2), (0, 1, 3),
-                                                            (0, 2, 3), (1, 2, 3))])
+    faces = np.concatenate(
+        [mesh.cells[:, face] for face in ((0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3))]
+    )
     material = np.tile(mesh.materials, 4)
-    unique, inverse, counts = np.unique(np.sort(faces, axis=1), axis=0,
-                                        return_inverse=True, return_counts=True)
+    unique, inverse, counts = np.unique(
+        np.sort(faces, axis=1), axis=0, return_inverse=True, return_counts=True
+    )
     gas_incidence = np.bincount(inverse, weights=material == 0, minlength=len(unique))
     interface = unique[(counts == 2) & (gas_incidence == 1)]
     if not len(interface):
@@ -75,8 +77,11 @@ def build_showcase(geometry="engine_3d", level=0, data_directory=None):
     if geometry not in {"engine_3d", "transformer_2d"}:
         raise ValueError("Choose transformer_2d or engine_3d")
     level = integer(level, "Mesh refinement level")
-    directory = (Path(__file__).parent / "data" / geometry
-                 if data_directory is None else Path(data_directory))
+    directory = (
+        Path(__file__).parent / "data" / geometry
+        if data_directory is None
+        else Path(data_directory)
+    )
     parameters = json.loads((directory / "parameters.json").read_text())
     if parameters["geometry"] != geometry or parameters["schema"] != "mesh-cht-input-v1":
         raise ValueError("The mesh input manifest does not match the requested geometry")
@@ -97,15 +102,27 @@ def build_showcase(geometry="engine_3d", level=0, data_directory=None):
         mesh = fine
         P = interpolation @ P
     current = coarse if not level else _assembly(mesh, parameters, velocity, source)
-    return MeshShowcase(current, coarse, P[mesh.free][:, base.free], parameters,
-                        {"mesh_and_assembly_seconds": time.perf_counter() - start,
-                         "input_sha256": {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-                                          for p in sorted(directory.glob("*")) if p.is_file()},
-                         "refinement": "nested simplex subdivision with inherited materials",
-                         "level": level, "nodes": len(mesh.nodes), "cells": len(mesh.cells),
-                         "state_degrees_of_freedom": len(mesh.free),
-                         "weighted_volume": float(current.mass.sum()),
-                         "coarse_weighted_volume": float(coarse.mass.sum())})
+    return MeshShowcase(
+        current,
+        coarse,
+        P[mesh.free][:, base.free],
+        parameters,
+        {
+            "mesh_and_assembly_seconds": time.perf_counter() - start,
+            "input_sha256": {
+                p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in sorted(directory.glob("*"))
+                if p.is_file()
+            },
+            "refinement": "nested simplex subdivision with inherited materials",
+            "level": level,
+            "nodes": len(mesh.nodes),
+            "cells": len(mesh.cells),
+            "state_degrees_of_freedom": len(mesh.free),
+            "weighted_volume": float(current.mass.sum()),
+            "coarse_weighted_volume": float(coarse.mass.sum()),
+        },
+    )
 
 
 def desired_temperature(problem, query, count):
@@ -115,20 +132,27 @@ def desired_temperature(problem, query, count):
     if query >= count:
         raise ValueError("Query index must be smaller than query count")
     x = problem.assembly.mesh.nodes[problem.free]
-    lower, extent = problem.assembly.mesh.nodes.min(axis=0), np.ptp(problem.assembly.mesh.nodes, axis=0)
+    lower, extent = (
+        problem.assembly.mesh.nodes.min(axis=0),
+        np.ptp(problem.assembly.mesh.nodes, axis=0),
+    )
     x = (x - lower) / extent
-    theta = (query + .25) / count
-    times = np.cumsum(problem.steps) if len(problem.steps) else np.array([0.])
+    theta = (query + 0.25) / count
+    times = np.cumsum(problem.steps) if len(problem.steps) else np.array([0.0])
     fields = []
     for t in times:
         phase = 0 if not len(problem.steps) else t / times[-1]
-        center = np.array([.5 + .24*np.cos(2*np.pi*theta + phase),
-                           .5 + .27*np.sin(2*np.pi*theta + .7*phase)])
+        center = np.array(
+            [
+                0.5 + 0.24 * np.cos(2 * np.pi * theta + phase),
+                0.5 + 0.27 * np.sin(2 * np.pi * theta + 0.7 * phase),
+            ]
+        )
         if x.shape[1] == 3:
-            center = np.r_[center, .28 + .42*theta + .06*np.sin(2*np.pi*phase)]
-        width = .15 if x.shape[1] == 2 else .24
-        gaussian = np.exp(-np.sum(((x - center)/width)**2, axis=1))
-        second = np.exp(-np.sum(((x - (.75 - .45*center))/(width*.8))**2, axis=1))
-        pulse = 1 if not len(problem.steps) else .25 + .75*np.sin(np.pi*phase)**2
-        fields.append(.1 + pulse*((1 + .15*theta)*gaussian + .35*second))
+            center = np.r_[center, 0.28 + 0.42 * theta + 0.06 * np.sin(2 * np.pi * phase)]
+        width = 0.15 if x.shape[1] == 2 else 0.24
+        gaussian = np.exp(-np.sum(((x - center) / width) ** 2, axis=1))
+        second = np.exp(-np.sum(((x - (0.75 - 0.45 * center)) / (width * 0.8)) ** 2, axis=1))
+        pulse = 1 if not len(problem.steps) else 0.25 + 0.75 * np.sin(np.pi * phase) ** 2
+        fields.append(0.1 + pulse * ((1 + 0.15 * theta) * gaussian + 0.35 * second))
     return np.concatenate(fields)

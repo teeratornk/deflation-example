@@ -238,12 +238,20 @@ and target hashes. It requires neither a GPU nor the optional full state-field
 archives. The full state, control, and multiplier fields remain available
 after a new benchmark run for additional inspection.
 
-The code release is `v0.5.0`. The separate `mesh-cht-data-v1` tag freezes
+The code release is `v0.5.1`. The separate `mesh-cht-data-v1` tag freezes
 the numerical records and source snapshots without installing them as package
 dependencies. The generated memory-budget table is a retrospective screen
 over measured ranks 20, 100, and 200. It uses the largest sampled GPU process
 allocation over all five repetitions. Execution did not impose these memory
 budgets. Host RSS is reported separately and includes retained output fields.
+
+Version 0.5.1 applies source formatting without changing the numerical Python
+syntax trees. Frozen records retain their original byte hashes. To rerun the
+frozen mesh traces with `mesh_transfer`, use `v0.5.0`, whose checked mesh
+modules match those recorded hashes. New runs and their replays use the
+current checkout together. The
+`mesh_evidence` command regenerates the submitted artifacts from either
+release and the frozen data without rerunning optimization.
 
 The rank controls repeat the engine level-2 steady sequence at ranks 20 and
 200, matching the recycling rank to each reference rank. The time controls

@@ -23,9 +23,7 @@ class WeightedReducedOperator(LinearOperator):
         if np.any(self.weights <= 0):
             raise ValueError("Objective weights must be positive")
         self.assembled_restriction = bool(assembled_restriction)
-        self._diagonal = self.weights + alpha * np.asarray(
-            self.A.power(2).T @ self.weights
-        ).ravel()
+        self._diagonal = self.weights + alpha * np.asarray(self.A.power(2).T @ self.weights).ravel()
         super().__init__(dtype=np.dtype(float), shape=self.A.shape)
 
     def _matvec(self, x):
@@ -55,19 +53,22 @@ class WeightedReducedOperator(LinearOperator):
             raise ValueError("Inactive indices are out of range")
         AI = self.A[:, I]
         if self.assembled_restriction:
-            return (sparse.diags(self.weights[I])
-                    + self.alpha * AI.T @ sparse.diags(self.weights) @ AI).tocsr()
+            return (
+                sparse.diags(self.weights[I]) + self.alpha * AI.T @ sparse.diags(self.weights) @ AI
+            ).tocsr()
 
         def action(x):
             x = np.asarray(x).reshape(-1)
-            return (self.weights[I] * x + self.alpha * (AI.T @ (self.weights * (AI @ x))))
+            return self.weights[I] * x + self.alpha * (AI.T @ (self.weights * (AI @ x)))
 
         def block(x):
-            return (self.weights[I, None] * x
-                    + self.alpha * (AI.T @ (self.weights[:, None] * (AI @ x))))
+            return self.weights[I, None] * x + self.alpha * (
+                AI.T @ (self.weights[:, None] * (AI @ x))
+            )
 
-        op = LinearOperator((len(I), len(I)), matvec=action, rmatvec=action,
-                            matmat=block, dtype=float)
+        op = LinearOperator(
+            (len(I), len(I)), matvec=action, rmatvec=action, matmat=block, dtype=float
+        )
         op.diagonal = lambda: self._diagonal[I].copy()
         return op
 
@@ -103,9 +104,7 @@ class MeshControlProblem:
         desired = real_array(desired, "Desired temperature")
         if desired.shape != (self.size,) or not np.isfinite(desired).all():
             raise ValueError("Desired temperature must match the complete problem")
-        return self.weights * desired + self.alpha * (
-            self.A.T @ (self.weights * self.forcing)
-        )
+        return self.weights * desired + self.alpha * (self.A.T @ (self.weights * self.forcing))
 
     def recover(self, state):
         control = self.A @ state - self.forcing
@@ -114,9 +113,11 @@ class MeshControlProblem:
 
     def objective(self, state, desired):
         control, _ = self.recover(state)
-        return float(0.5 * self.objective_scale * np.sum(
-            self.weights * ((state - desired)**2 + self.alpha * control**2)
-        ))
+        return float(
+            0.5
+            * self.objective_scale
+            * np.sum(self.weights * ((state - desired) ** 2 + self.alpha * control**2))
+        )
 
     def forward(self, control):
         """Independent spatial solve or sequential forward substitution."""
@@ -127,8 +128,9 @@ class MeshControlProblem:
         states = []
         for step, un in zip(self.steps, u, strict=True):
             C = self.nodal_capacity / step
-            previous = spsolve(self.spatial_A + sparse.diags(C),
-                              un + self.spatial_forcing + C * previous)
+            previous = spsolve(
+                self.spatial_A + sparse.diags(C), un + self.spatial_forcing + C * previous
+            )
             states.append(previous)
         return np.concatenate(states)
 
@@ -145,8 +147,14 @@ class MeshControlProblem:
         return result.ravel()
 
 
-def build_mesh_control(assembly, alpha=0.001, time_steps=None, initial=None,
-                       boundary_value=0.0, assembled_restriction=True):
+def build_mesh_control(
+    assembly,
+    alpha=0.001,
+    time_steps=None,
+    initial=None,
+    boundary_value=0.0,
+    assembled_restriction=True,
+):
     """Eliminate the control from K*y = M_l*u + f after boundary lifting.
 
     Coordinates, coefficients, sources, and temperatures must already use the
@@ -169,7 +177,9 @@ def build_mesh_control(assembly, alpha=0.001, time_steps=None, initial=None,
     spatial_A = (sparse.diags(1 / mass) @ K[I][:, I]).tocsr()
     forcing = (assembly.load[I] - K[I][:, J] @ boundary) / mass
     capacity = assembly.capacity[I] / mass
-    steps = np.array([], dtype=float) if time_steps is None else real_array(time_steps, "Time steps")
+    steps = (
+        np.array([], dtype=float) if time_steps is None else real_array(time_steps, "Time steps")
+    )
     if steps.ndim != 1 or not np.isfinite(steps).all() or np.any(steps <= 0):
         raise ValueError("Time steps must be a positive finite vector")
     y0 = np.zeros(len(I)) if initial is None else real_array(initial, "Initial temperature")
@@ -178,16 +188,28 @@ def build_mesh_control(assembly, alpha=0.001, time_steps=None, initial=None,
     weights = mass / mass.mean()
     A, f, scale = spatial_A, forcing.copy(), float(mass.mean())
     if len(steps):
-        T = sparse.diags([1 / steps, -1 / steps[1:]], [0, -1],
-                         shape=(len(steps), len(steps)), format="csr")
-        A = (sparse.kron(sparse.eye(len(steps)), spatial_A, format="csr")
-             + sparse.kron(T, sparse.diags(capacity), format="csr")).tocsr()
+        T = sparse.diags(
+            [1 / steps, -1 / steps[1:]], [0, -1], shape=(len(steps), len(steps)), format="csr"
+        )
+        A = (
+            sparse.kron(sparse.eye(len(steps)), spatial_A, format="csr")
+            + sparse.kron(T, sparse.diags(capacity), format="csr")
+        ).tocsr()
         f = np.tile(forcing, len(steps))
-        f[:len(I)] += capacity * y0 / steps[0]
+        f[: len(I)] += capacity * y0 / steps[0]
         weights = np.kron(steps / steps.mean(), weights)
         scale *= float(steps.mean())
     return MeshControlProblem(
-        assembly, A, weights, f, alpha, steps.copy(), y0.copy(), spatial_A,
-        forcing.copy(), capacity, scale,
+        assembly,
+        A,
+        weights,
+        f,
+        alpha,
+        steps.copy(),
+        y0.copy(),
+        spatial_A,
+        forcing.copy(),
+        capacity,
+        scale,
         WeightedReducedOperator(A, weights, alpha, assembled_restriction),
     )

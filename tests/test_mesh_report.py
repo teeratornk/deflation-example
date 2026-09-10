@@ -17,13 +17,25 @@ def records(tmp_path):
     with threadpool_limits(2):
         record, _, _ = sequence(c, "jacobi")
     assert record["success"]
-    record.update(controls=c, repetition=0, startup_after_import_seconds=.1, finalization_seconds=.01)
+    record.update(
+        controls=c, repetition=0, startup_after_import_seconds=0.1, finalization_seconds=0.01
+    )
     source = tmp_path / "records"
     (source / "jacobi-0").mkdir(parents=True)
     (source / "protocol.json").write_text(json.dumps(c))
-    (source / "attempts.json").write_text(json.dumps([{
-        "method": "jacobi", "repetition": 0, "status": "completed",
-        "process_wall_seconds": record["seconds"] + .2, "record": "jacobi-0/record.json"}]))
+    (source / "attempts.json").write_text(
+        json.dumps(
+            [
+                {
+                    "method": "jacobi",
+                    "repetition": 0,
+                    "status": "completed",
+                    "process_wall_seconds": record["seconds"] + 0.2,
+                    "record": "jacobi-0/record.json",
+                }
+            ]
+        )
+    )
     (source / "jacobi-0/record.json").write_text(json.dumps(record))
     return source
 

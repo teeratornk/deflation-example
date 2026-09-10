@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+- Apply the configured source formatting; the formatted Python syntax trees are unchanged.
+- Exercise the installed wheel's mesh trajectory, transfer replay, plotting, and independent verification in CI.
+- Preserve all frozen numerical records and their exact source identifiers.
+
 ## 0.5.0
 
 - Add self-contained axisymmetric transformer and three-dimensional bore-in-block meshes.

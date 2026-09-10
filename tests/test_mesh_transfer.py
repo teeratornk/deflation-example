@@ -12,8 +12,17 @@ from deflation_example.reporting import environment
 
 @pytest.fixture
 def source(tmp_path):
-    c = controls(OmegaConf.create({"targets": 2, "rank": 5, "methods": ["reference"],
-                                   "spatial_reference": "scaled_schur", "save_fields": False}))
+    c = controls(
+        OmegaConf.create(
+            {
+                "targets": 2,
+                "rank": 5,
+                "methods": ["reference"],
+                "spatial_reference": "scaled_schur",
+                "save_fields": False,
+            }
+        )
+    )
     with threadpool_limits(2):
         record, _, _ = sequence(c, "reference")
     assert record["success"]
@@ -34,7 +43,9 @@ def test_mesh_transfer_replays_exact_systems_and_reports_disjoint_costs(source, 
             assert method["correction"]["status"] == "verified"
             assert "effective_condition" in method["correction"]
             for rep in method["repetitions"]:
-                np.testing.assert_allclose(rep["seconds"], rep["basis_transfer_seconds"] + rep["kernel_seconds"])
+                np.testing.assert_allclose(
+                    rep["seconds"], rep["basis_transfer_seconds"] + rep["kernel_seconds"]
+                )
                 assert rep["original_residual"] <= 1e-10
     first = result["rows"][0]["methods"]
     assert first["full_reference"]["correction"] == first["sequential_transfer"]["correction"]

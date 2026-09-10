@@ -67,11 +67,19 @@ def _gpu_deflated_cg(
     )
     basis = None if basis is None else real_array(basis, "Basis")
     if device_basis is not None:
-        if (basis is not None or basis_backend != "gpu_qr" or not torch.is_tensor(device_basis)
+        if (
+            basis is not None
+            or basis_backend != "gpu_qr"
+            or not torch.is_tensor(device_basis)
             or device_basis.device != torch.device("cuda", torch.cuda.current_device())
-            or device_basis.dtype != torch.float64 or device_basis.ndim != 2
-            or device_basis.shape[0] != len(b) or not bool(torch.isfinite(device_basis).all())):
-            raise ValueError("Device basis must be finite float64 on the current CUDA device, with GPU QR and no CPU basis")
+            or device_basis.dtype != torch.float64
+            or device_basis.ndim != 2
+            or device_basis.shape[0] != len(b)
+            or not bool(torch.isfinite(device_basis).all())
+        ):
+            raise ValueError(
+                "Device basis must be finite float64 on the current CUDA device, with GPU QR and no CPU basis"
+            )
     torch.cuda.reset_peak_memory_stats()
     start = timer.start
     baseline = torch.cuda.memory_allocated()
@@ -108,7 +116,11 @@ def _gpu_deflated_cg(
         timer.mark("basis_processing")
         timer.synchronize(torch.cuda.synchronize)
     rank = 0 if V is None else V.shape[1]
-    requested_rank = device_basis.shape[1] if device_basis is not None else (0 if basis is None else basis.shape[1])
+    requested_rank = (
+        device_basis.shape[1]
+        if device_basis is not None
+        else (0 if basis is None else basis.shape[1])
+    )
     orthogonalized_rank = rank
     condition, fallback, coarse_failed = 1.0, None, False
 
