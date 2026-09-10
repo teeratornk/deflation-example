@@ -314,7 +314,7 @@ and target hashes. It requires neither a GPU nor the optional full state-field
 archives. The full state, control, and multiplier fields remain available
 after a new benchmark run for additional inspection.
 
-The code release is `v0.6.0`. The separate `mesh-cht-data-v1` tag freezes
+The code release is `v0.6.1`. The separate `mesh-cht-data-v1` tag freezes
 the numerical records and source snapshots without installing them as package
 dependencies. The generated memory-budget table is a retrospective screen
 over measured ranks 20, 100, and 200. It uses the largest sampled GPU process

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1
+
+- Keep the complete normalized-temperature labels inside the saved body-fitted figure.
+- Preserve the numerical implementation and the frozen correction-study records from 0.6.0.
+
 ## 0.6.0
 
 - Diagnose projected-CG scalar breakdown with recurrence, original residual, curvature and coarse-orthogonality measurements.

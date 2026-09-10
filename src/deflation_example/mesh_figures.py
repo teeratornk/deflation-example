@@ -144,13 +144,13 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
                 )
             axis.set_title(title, fontsize=9)
             if col == len(queries):
-                fig.colorbar(artist, ax=axis, label="Normalized desired temperature", shrink=0.8)
+                fig.colorbar(artist, ax=axis, label="Desired temperature\n(normalized)", shrink=0.8)
                 bar = fig.colorbar(active_artist, ax=active_axis, ticks=[0.25, 0.75], shrink=0.8)
                 bar.ax.set_yticklabels(["Inactive", "Active"], fontsize=8)
     metadata = (
         {"CreationDate": None, "ModDate": None} if Path(output).suffix.lower() == ".pdf" else None
     )
-    fig.savefig(output, dpi=200, metadata=metadata)
+    fig.savefig(output, dpi=200, metadata=metadata, bbox_inches="tight")
     plt.close(fig)
 
 
