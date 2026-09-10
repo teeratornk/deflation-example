@@ -50,6 +50,7 @@ def _gpu_deflated_cg(
     acceptance_rtol,
     direction_callback,
     completion_callback,
+    cache_operator_product,
 ):
     """Return (LinearResult, timing/memory metrics), verified with the CPU matrix.
 
@@ -103,8 +104,10 @@ def _gpu_deflated_cg(
     def apply(v):
         return torch.mv(H, v)
 
+    AV = None
     if rank:
-        E = V.T @ torch.mm(H, V)
+        AV = torch.mm(H, V)
+        E = V.T @ AV
         E = (E + E.T) / 2
         eigenvalues = torch.linalg.eigvalsh(E)
         condition = (
@@ -117,6 +120,8 @@ def _gpu_deflated_cg(
         else:
             chol, info = torch.linalg.cholesky_ex(E)
             coarse_failed = bool(info)
+        if not cache_operator_product or not rank:
+            AV = None
     timer.mark("coarse_or_hierarchy_setup")
     timer.synchronize(torch.cuda.synchronize)
 
@@ -129,6 +134,8 @@ def _gpu_deflated_cg(
 
     def precondition(r):
         z = r / diag
+        if rank and AV is not None:
+            return z - V @ torch.cholesky_solve((AV.T @ z)[:, None], chol)[:, 0]
         return z - Q(apply(z)) if rank else z
 
     rhs_scale = float(np.max(np.abs(b))) or 1.0
@@ -215,6 +222,8 @@ def _gpu_deflated_cg(
         "iteration_rtol": rtol,
         "acceptance_rtol": acceptance_rtol,
         "completion": completion_metrics,
+        "operator_product_cached": AV is not None,
+        "cached_operator_product_bytes": 0 if AV is None else AV.numel() * AV.element_size(),
     }
 
 
@@ -233,6 +242,7 @@ def gpu_deflated_cg(
     acceptance_rtol=None,
     direction_callback=None,
     completion_callback=None,
+    cache_operator_product=False,
 ):
     """Verified CUDA solve, including conversion, transfers and temporary cleanup.
 
@@ -249,6 +259,8 @@ def gpu_deflated_cg(
     """
     if basis_backend not in {"cpu_svd", "gpu_qr"}:
         raise ValueError("Basis backend must be cpu_svd or gpu_qr")
+    if not isinstance(cache_operator_product, bool):
+        raise ValueError("Operator-product caching must be Boolean")
     for callback in (direction_callback, completion_callback):
         if callback is not None and not callable(callback):
             raise ValueError("Solver callbacks must be callable")
@@ -275,6 +287,7 @@ def gpu_deflated_cg(
         acceptance_rtol=acceptance_rtol,
         direction_callback=direction_callback,
         completion_callback=completion_callback,
+        cache_operator_product=cache_operator_product,
     )
     # Returning from the helper releases its temporary GPU tensors. The
     # returned solution owns CPU storage only. No empty_cache() is charged.

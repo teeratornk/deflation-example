@@ -12,6 +12,9 @@ from .reporting import atomic_output, write_report
 from .tutorials import Records
 
 
+KKT_COMPONENTS = {"stationarity", "primal", "dual", "complementarity", "projected_gradient"}
+
+
 def close(a, b, name):
     if not np.isfinite(a) or not np.isfinite(b) or not np.isclose(a, b, rtol=1e-8, atol=1e-8):
         raise ValueError(f"Inconsistent {name}")
@@ -51,10 +54,12 @@ def validate_sequence(sequence, protocol):
             raise ValueError("Accepted sequence contains a failed target")
         if case["status"] == "converged":
             kkt = case["kkt"]
-            if not kkt or any(
+            if set(kkt) != KKT_COMPONENTS or any(
                 not np.isfinite(v) or v > c["outer_tolerance"] or v < 0 for v in kkt.values()
             ):
                 raise ValueError("Accepted target fails KKT criteria")
+            if any(i["status"] != "converged" for i in case["inner"]):
+                raise ValueError("Accepted target includes a failed inner solve")
             active = unpack_mask(case["final_active_bits"], dimension)
             if active.sum() != case["final_active_count"]:
                 raise ValueError("Final active count differs from its mask")
@@ -85,7 +90,9 @@ def validate_sequence(sequence, protocol):
                 raise ValueError("Accepted inner solve fails the original residual check")
             if not np.isclose(inner["acceptance_rtol"], c["rtol"], rtol=1e-12, atol=0):
                 raise ValueError("Final residual target differs from the protocol")
-            expected = c["rtol"] * (c["amgx_factor"] if sequence["method"] == "amgx" else 1.0)
+            expected = c["rtol"] * (
+                c["amgx_factor"] if sequence["method"] == "amgx" else c.get("cg_factor", 1.0)
+            )
             if not np.isclose(inner["iteration_rtol"], expected, rtol=1e-12, atol=0):
                 raise ValueError("Internal stopping target differs from the protocol")
             mask = unpack_mask(inner["inactive_mask_bits"], dimension)
@@ -100,6 +107,10 @@ def validate_sequence(sequence, protocol):
                 raise ValueError("Deployed space exceeds coarse conditioning limit")
             if inner["fallback_reason"] is not None and rank != 0:
                 raise ValueError("Fallback did not deploy rank zero")
+            if sequence["method"] == "amgx" and (
+                inner["hierarchy_reused"] or not inner["resources_reused"]
+            ):
+                raise ValueError("AmgX resource policy differs from the protocol")
             selection = inner.get("completion")
             if selection and selection["status"] == "selected":
                 if selection["selected_rank"] > min(c["recycle_rank"], selection["candidate_rank"]):
@@ -132,7 +143,7 @@ def load_study(root):
     expected = {
         (m, w, r) for m in c["methods"] for w in c["warm_starts"] for r in range(c["repeats"])
     }
-    seen, sequences = set(), []
+    seen, sequences, target_hashes = set(), [], {}
     for entry in manifest["sequences"]:
         key = (entry["method"], entry["warm_start"], entry["repetition"])
         if key not in expected or key in seen:
@@ -149,11 +160,25 @@ def load_study(root):
         ] != entry["success"]:
             raise ValueError("Sequence labels or acceptance differ from the manifest")
         validate_sequence(sequence, protocol)
+        for case in sequence.get("cases", []):
+            if (
+                target_hashes.setdefault(case["query"], case["target_sha256"])
+                != case["target_sha256"]
+            ):
+                raise ValueError("Desired trajectory changed between methods or repetitions")
         sequences.append(sequence)
     if manifest.get("complete") and seen != expected:
         raise ValueError("Completed study has missing declared sequences")
     if manifest["success"] and (seen != expected or not all(s["success"] for s in sequences)):
         raise ValueError("Accepted study has incomplete or failed sequences")
+    if len(set(target_hashes.values())) != len(target_hashes):
+        raise ValueError("Distinct query indices contain duplicate desired trajectories")
+    if c["phase"] == "final":
+        if not manifest.get("complete") or seen != expected:
+            raise ValueError("Final study is missing declared attempts")
+        for sequence in sequences:
+            if "environment" in sequence and not sequence["environment"]["source_tree_clean"]:
+                raise ValueError("Final measurement source is dirty")
     return protocol, sequences, records.manifest
 
 
@@ -193,6 +218,9 @@ def summarize(protocol, sequences):
                     "declared_sequences": c["repeats"],
                     "recorded_sequences": len(selected),
                     "accepted_sequences": len(accepted),
+                    "numerically_completed_sequences": sum(
+                        s.get("numerical_success", s["success"]) for s in selected
+                    ),
                     "failure_statuses": dict(
                         Counter(
                             s.get("status", s.get("error_type") or "target_failure") for s in failed

@@ -46,9 +46,11 @@ class StudySolver:
         window=20,
         reference=None,
         rtol=1e-10,
+        cg_factor=1.0,
         amgx_factor=0.1,
         maxiter=10000,
         refresh=1000,
+        cache_operator_product=True,
         torch=None,
         api=None,
     ):
@@ -61,11 +63,15 @@ class StudySolver:
         self.rank = integer(rank, "Rank")
         self.window = integer(window, "Direction window", 1)
         self.rtol = positive_real(rtol, "Final relative tolerance")
+        self.cg_factor = positive_real(cg_factor, "CG stopping factor")
         self.maxiter = integer(maxiter, "Iteration cap", 1)
         self.refresh = integer(refresh, "Residual refresh interval", 1)
+        if not isinstance(cache_operator_product, bool):
+            raise ValueError("Operator-product caching must be Boolean")
+        self.cache_operator_product = cache_operator_product
         self.amgx_factor = positive_real(amgx_factor, "AmgX stopping factor")
-        if self.amgx_factor > 1:
-            raise ValueError("AmgX stopping factor must not exceed one")
+        if max(self.amgx_factor, self.cg_factor) > 1:
+            raise ValueError("Internal stopping factors must not exceed one")
         self.method, self.device = method, device
         self.reference, self.torch, self.api = reference, torch, api
         self.history = RecycleSpace(rank, window, device) if method == "recycling" else None
@@ -123,11 +129,12 @@ class StudySolver:
                 basis,
                 diagonal,
                 x0=initial,
-                rtol=self.rtol,
+                rtol=self.rtol * self.cg_factor,
                 acceptance_rtol=self.rtol,
                 maxiter=self.maxiter,
                 basis_backend="gpu_qr",
                 refresh=self.refresh,
+                cache_operator_product=self.cache_operator_product,
                 direction_callback=None if self.history is None else self.history.capture,
                 completion_callback=None if self.history is None else self.history.finish,
             )
@@ -139,12 +146,15 @@ class StudySolver:
                 basis,
                 diagonal,
                 x0=initial,
-                rtol=self.rtol,
+                rtol=self.rtol * self.cg_factor,
                 maxiter=self.maxiter,
                 refresh=self.refresh,
+                cache_operator_product=self.cache_operator_product,
                 direction_callback=None if self.history is None else self.history.capture,
             )
             kernel_seconds = time.perf_counter() - tick
+            if result.status in {"maxiter", "residual_failed"} and result.residual <= self.rtol:
+                result.status = "converged"
             tick = time.perf_counter()
             selection = None
             if self.history is not None:
@@ -160,8 +170,12 @@ class StudySolver:
                 "total_seconds": kernel_seconds + selection_seconds,
                 "components_seconds": parts,
                 "completion": selection,
-                "iteration_rtol": self.rtol,
+                "iteration_rtol": self.rtol * self.cg_factor,
                 "acceptance_rtol": self.rtol,
+                "operator_product_cached": bool(self.cache_operator_product and result.rank),
+                "cached_operator_product_bytes": B.shape[0] * result.rank * 8
+                if self.cache_operator_product
+                else 0,
             }
         self.previous = indices
         return result, {

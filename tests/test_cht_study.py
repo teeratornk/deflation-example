@@ -73,6 +73,46 @@ def test_summary_checks_semantic_acceptance_and_timing(monkeypatch):
         validate_sequence(bad, protocol)
 
 
+def test_memory_budget_failure_preserves_numerical_completion(monkeypatch):
+    monkeypatch.setattr(
+        benchmark_cht,
+        "ProcessMemory",
+        lambda *args: ProcessMemory(interval=60, query=lambda: (100, 0)),
+    )
+    config = small_config()
+    config.host_memory_budget_bytes = 99
+    record = benchmark_cht.complete_sequence(
+        benchmark_cht.specification(config), "jacobi", "outer_inner"
+    )
+    assert record["numerical_success"] and not record["success"]
+    assert not record["memory_budget_satisfied"]
+    assert record["status"] == "memory_budget_exceeded"
+    assert all(c["status"] == "converged" for c in record["cases"])
+
+
+def test_calibration_input_is_hashed_and_does_not_export_its_path(tmp_path):
+    config = small_config("transient")
+    source = benchmark_cht.specification(config)
+    record = {
+        "specification": source,
+        "protocol_sha256": "a" * 64,
+        "environment": {"git_head": "b" * 40},
+        "calibration_seconds": 12.5,
+    }
+    path = tmp_path / "private-input.json"
+    benchmark_cht.write_report(path, record)
+    config.calibration_report = str(path)
+    config.slabs = 6
+    protocol = benchmark_cht.specification(config)
+    assert str(path) not in json.dumps(protocol)
+    assert protocol["calibration_input"]["calibration_seconds"] == 12.5
+    assert protocol["calibration_input"]["time_slabs"] == 3
+    assert len(protocol["calibration_input"]["source_record_sha256"]) == 64
+    config.horizon *= 2
+    with pytest.raises(ValueError, match="horizon"):
+        benchmark_cht.specification(config)
+
+
 @pytest.mark.parametrize("size", [0, 1, 31, 10000])
 def test_mask_encoding_round_trip_and_dimension_check(size):
     mask = np.random.default_rng(12).random(size) > 0.2

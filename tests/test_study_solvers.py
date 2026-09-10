@@ -20,6 +20,7 @@ def run_small_sequence(method, device="cpu", torch=None, api=None):
         window=10,
         reference=ArrayReference(basis, "analytical"),
         maxiter=2000,
+        cg_factor=0.1,
         torch=torch,
         api=api,
     )
@@ -55,6 +56,8 @@ def run_small_sequence(method, device="cpu", torch=None, api=None):
     for result, timing in calls:
         assert timing["callback_seconds"] >= timing["total_seconds"]
         assert timing["restricted_basis_bytes"] >= 0
+        assert timing["iteration_rtol"] == pytest.approx(1e-11, rel=1e-12, abs=0)
+        assert timing["acceptance_rtol"] == pytest.approx(1e-10, rel=1e-12, abs=0)
         if method == "jacobi":
             assert result.rank == 0 and timing["input_basis_columns"] == 0
         if method == "recycling":

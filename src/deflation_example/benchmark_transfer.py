@@ -259,11 +259,17 @@ def run(
                                 b,
                                 basis,
                                 B.diagonal(),
-                                rtol=c["rtol"],
+                                rtol=c["rtol"] * c.get("cg_factor", 1.0),
                                 maxiter=c["inner_cap"],
                                 refresh=c.get("residual_refresh", 1000),
+                                cache_operator_product=c.get("cache_operator_product", False),
                             )
                             kernel_seconds = time.perf_counter() - tick
+                            if (
+                                solved.status in {"maxiter", "residual_failed"}
+                                and solved.residual <= c["rtol"]
+                            ):
+                                solved.status = "converged"
                         else:
                             from .gpu import gpu_deflated_cg
 
@@ -272,10 +278,12 @@ def run(
                                 b,
                                 basis,
                                 B.diagonal(),
-                                rtol=c["rtol"],
+                                rtol=c["rtol"] * c.get("cg_factor", 1.0),
+                                acceptance_rtol=c["rtol"],
                                 maxiter=c["inner_cap"],
                                 basis_backend="gpu_qr",
                                 refresh=c.get("residual_refresh", 1000),
+                                cache_operator_product=c.get("cache_operator_product", False),
                             )
                             kernel_seconds = timing["total_seconds"]
                         entry = {

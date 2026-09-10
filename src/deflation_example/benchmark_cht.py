@@ -53,10 +53,12 @@ class StudyConfig:
     methods: list[str] = field(default_factory=lambda: list(METHODS))
     warm_starts: list[str] = field(default_factory=lambda: ["outer_inner"])
     rtol: float = 1e-10
+    cg_factor: float = 1.0
     amgx_factor: float = 0.1
     outer_tolerance: float = 1e-8
     inner_cap: int = 10000
     residual_refresh: int = 1000
+    cache_operator_product: bool = True
     outer_cap: int = 100
     initial_active: str = "empty"
     threads: int = 4
@@ -64,6 +66,9 @@ class StudyConfig:
     calibration_grid: int = 8
     calibration_steps: int = 8
     calibration_activity: float = 0.2
+    calibration_report: str | None = None
+    host_memory_budget_bytes: int | None = None
+    gpu_memory_budget_bytes: int | None = None
     memory_interval: float = 0.01
     sequence_timeout: float = 7200
     output: str = "runs/cht-study"
@@ -79,6 +84,7 @@ def specification(config):
     config = OmegaConf.merge(OmegaConf.structured(StudyConfig), config)
     values = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
     values.pop("output")
+    calibration_path = values.pop("calibration_report")
     if values["phase"] not in {"pilot", "final"}:
         raise ValueError("Declare pilot or final phase")
     if values["device"] not in {"cpu", "cuda"}:
@@ -112,12 +118,53 @@ def specification(config):
     dimension = values["n"] ** 3 * (values["slabs"] if values["problem"] == "transient" else 1)
     if max(values["rank"], values["recycle_rank"]) >= dimension:
         raise ValueError("Ranks must be smaller than the full optimization dimension")
-    for key in ("rtol", "amgx_factor", "outer_tolerance", "memory_interval", "sequence_timeout"):
+    for key in (
+        "rtol",
+        "cg_factor",
+        "amgx_factor",
+        "outer_tolerance",
+        "memory_interval",
+        "sequence_timeout",
+    ):
         positive_real(values[key], key)
-    if values["amgx_factor"] > 1 or not 0 < values["calibration_activity"] < 1:
+    if (
+        max(values["cg_factor"], values["amgx_factor"]) > 1
+        or not 0 < values["calibration_activity"] < 1
+    ):
         raise ValueError("Invalid stopping margin or calibration fraction")
     if values["bound"] is not None:
         positive_real(values["bound"], "Physical bound")
+    for key in ("host_memory_budget_bytes", "gpu_memory_budget_bytes"):
+        if values[key] is not None:
+            integer(values[key], key, 1)
+    calibration_input = None
+    if calibration_path is not None:
+        raw = Path(calibration_path).read_bytes()
+        previous = json.loads(raw)
+        source = previous["specification"]["controls"]
+        bound = positive_real(source["bound"], "Recorded physical bound")
+        if source["problem"] != values["problem"]:
+            raise ValueError("Calibration must use the same steady or transient family")
+        if values["problem"] == "transient" and any(
+            source[key] != values[key]
+            for key in ("horizon", "solid_capacity", "fluid_capacity", "initial_temperature")
+        ):
+            raise ValueError("Calibration must preserve the horizon, capacities and initial data")
+        if values["bound"] is not None and values["bound"] != bound:
+            raise ValueError("Declared physical bound differs from its calibration record")
+        values["bound"] = bound
+        calibration_input = {
+            "source_record_sha256": hashlib.sha256(raw).hexdigest(),
+            "source_protocol_sha256": previous["protocol_sha256"],
+            "source_git_head": previous["environment"]["git_head"],
+            "calibration_seconds": positive_real(
+                previous["calibration_seconds"], "Recorded calibration cost"
+            ),
+            "bound": bound,
+            "spatial_grid": source["calibration_grid"],
+            "time_slabs": source["slabs"] if source["problem"] == "transient" else 1,
+            "scope": "measured once in the supplied calibration record; charged once in preparation-inclusive sequence totals",
+        }
     for key, allowed in (("methods", METHODS), ("warm_starts", ("cold", "outer_inner"))):
         requested = values[key]
         if not requested or len(set(requested)) != len(requested) or set(requested) - set(allowed):
@@ -127,6 +174,7 @@ def specification(config):
     return {
         "protocol": "full-reference-cht-study-v1",
         "controls": values,
+        "calibration_input": calibration_input,
         "physics": {"alpha": 0.001, "conductivity_ratio": 100.0, "transport_amplitude": 50.0},
         "targets": [query_parameters(m, values["targets"]) for m in range(values["targets"])],
         "reference_policy": "one full-domain analytical Laplacian space per sequence; restrict at every inner solve",
@@ -135,9 +183,10 @@ def specification(config):
         "temporal_target": "existing unequal Gaussian weights and query-dependent centers, plus rotation 0.8*t/T, vertical motion 0.05*sin(2*pi*t/T), and amplitude 0.15+0.85*sin(pi*t/T)^2",
         "recycling_policy": "empty initial history; retain deployed coarse vectors and the last window new directions from each accepted CG solve; normalize columns in Jacobi coordinates; QR/small-factor SVD rank threshold 1e-12; retain the lowest scaled Ritz vectors; transfer by zero extension; coarse space fixed during a solve and residual restarts; clear history after a failed target",
         "coarse_condition_limit": 1e10,
+        "cached_products": "reference and recycling CG optionally retain BZ for projected preconditioning; construction and storage are charged; Jacobi rank zero has no coarse-space operator product",
         "rank_threshold": 1e-12,
         "residual_refresh": values["residual_refresh"],
-        "stopping": "same independent original relative residual and outer KKT limits; AmgX native absolute target is amgx_factor*rtol*||b||; CG triggers fresh verification at rtol",
+        "stopping": "same independent original relative residual and outer KKT limits; AmgX native absolute target is amgx_factor*rtol*||b||; CG triggers fresh verification at cg_factor*rtol; solver-specific internal margins are declared before each comparison",
         "amgx_configuration": amgx_configuration(
             values["rtol"] * values["amgx_factor"], values["inner_cap"], True
         ),
@@ -145,6 +194,7 @@ def specification(config):
         "warm_starts": "outer_inner passes the previous accepted target's active set and state; every accepted inner solve updates the full state; without accepted outer history use the declared initial_active policy; cold uses that same initial active set and zero inner guesses for each query; each repetition starts without history",
         "timing": "fresh process for every method/repetition/start policy; one complete sequence includes assembly, reference or resource setup, all targets and PDAS inner solves, transfers, recycling updates, verification and cleanup; all-method small warmup and process initialization are separate",
         "memory": "10 ms default sampled host RSS and NVML allocation of the same solver process; independent monitor process avoids delays from native calls holding the solver interpreter lock; all solver libraries and allocator caches included; monitor memory excluded; fresh worker process per sequence; sampling interval and maximum gap reported",
+        "memory_budget": "optional common host/GPU sampled-peak budgets are feasibility screens, not hard allocator caps; numerically completed sequences exceeding a declared budget retain their results and are excluded from budget-feasible accepted timings",
         "failures": "retain every declared sequence and target, inner cap, outer cap, cycle, exception, timeout and memory error; clear warm-start and recycling history after a failed target; report accepted timings separately",
         "mask_encoding": "zlib: followed by base64 of zlib-compressed, little-endian packed Boolean bits",
     }
@@ -248,9 +298,11 @@ def complete_sequence(protocol, method, warm, torch=None, api=None):
             window=c["window"],
             reference=reference,
             rtol=c["rtol"],
+            cg_factor=c["cg_factor"],
             amgx_factor=c["amgx_factor"],
             maxiter=c["inner_cap"],
             refresh=c["residual_refresh"],
+            cache_operator_product=c["cache_operator_product"],
             torch=torch,
             api=api,
         )
@@ -395,6 +447,13 @@ def complete_sequence(protocol, method, warm, torch=None, api=None):
         parts["cleanup"] = time.perf_counter() - tick
     total = time.perf_counter() - start
     memory = sampler.finish()
+    budget_satisfied = memory["complete"] and all(
+        c.get(key) is None or memory[measurement] <= c[key]
+        for key, measurement in (
+            ("host_memory_budget_bytes", "peak_host_rss_bytes"),
+            ("gpu_memory_budget_bytes", "peak_gpu_process_bytes"),
+        )
+    )
     for key in PHASES:
         parts["kernel_" + key] = sum(
             row["components_seconds"][key] for case in cases for row in case["inner"]
@@ -411,6 +470,11 @@ def complete_sequence(protocol, method, warm, torch=None, api=None):
     parts["remaining_host_work"] = total - sum(parts.values())
     if parts["remaining_host_work"] < -1e-9:
         raise ValueError("Complete-sequence timing components overlap")
+    numerical_success = (
+        error is None
+        and len(cases) == c["targets"]
+        and all(case["status"] == "converged" for case in cases)
+    )
     return {
         "method": method,
         "warm_start": warm,
@@ -419,12 +483,19 @@ def complete_sequence(protocol, method, warm, torch=None, api=None):
         "cases": cases,
         "storage": storage,
         "memory": memory,
+        "memory_budget_satisfied": budget_satisfied,
+        "numerical_success": numerical_success,
         "error_type": error,
         "inner_iterations": sum(case["inner_iterations"] for case in cases),
         "outer_iterations": sum(case["outer_iterations"] for case in cases),
-        "success": error is None
-        and len(cases) == c["targets"]
-        and all(case["status"] == "converged" for case in cases),
+        "status": "converged"
+        if numerical_success and budget_satisfied
+        else "memory_measurement_failed"
+        if not memory["complete"]
+        else "memory_budget_exceeded"
+        if not budget_satisfied
+        else "sequence_failed",
+        "success": numerical_success and budget_satisfied,
     }
 
 
@@ -553,6 +624,9 @@ def run(config):
             )
             del calibration, calibration_load
     calibration_seconds = time.perf_counter() - tick
+    bound_preparation_seconds = calibration_seconds
+    if protocol["calibration_input"] is not None:
+        calibration_seconds = protocol["calibration_input"]["calibration_seconds"]
     write_report(output / "protocol.json", protocol)
     protocol_hash = hashlib.sha256((output / "protocol.json").read_bytes()).hexdigest()
     report = {
@@ -560,6 +634,8 @@ def run(config):
         "protocol_sha256": protocol_hash,
         "environment": environment(),
         "calibration_seconds": calibration_seconds,
+        "bound_preparation_seconds": bound_preparation_seconds,
+        "calibration_reused": protocol["calibration_input"] is not None,
         "calibrated_activity": fraction,
         "sequences": [],
         "success": False,

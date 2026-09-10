@@ -71,6 +71,7 @@ def deflated_cg(
     refresh=1000,
     condition_limit=1e10,
     direction_callback=None,
+    cache_operator_product=False,
 ):
     """Coarse-corrected, projected-direction CG (exact-coarse A-DEF2).
 
@@ -82,6 +83,8 @@ def deflated_cg(
     A = matrix(A)
     if direction_callback is not None and not callable(direction_callback):
         raise ValueError("Direction callback must be callable")
+    if not isinstance(cache_operator_product, bool):
+        raise ValueError("Operator-product caching must be Boolean")
     b, x, d = validate_linear_inputs(
         A, b, basis, diagonal, x0, rtol, maxiter, refresh, condition_limit
     )
@@ -112,6 +115,8 @@ def deflated_cg(
 
     def precondition(r):
         z = r / d
+        if rank and cache_operator_product:
+            return z - Z @ linalg.cho_solve(factor, AZ.T @ z)
         return z - Q(A @ z) if rank else z
 
     x += Q(b - A @ x)

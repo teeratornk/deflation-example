@@ -171,3 +171,29 @@ all numerical libraries and allocator caches. Its own storage is excluded.
 The recorded maximum sampling gap quantifies the resolution of the sampled
 peak. Monitor initialization and finalization lie outside the complete solve
 interval and enter the preparation-inclusive process time.
+
+`cg_factor` and `amgx_factor` specify the internal stopping margins relative to
+the shared independently checked tolerance. A CG margin can prevent a small
+difference between CPU and GPU residual evaluation from rejecting a solve at
+the threshold. The report verifies both internal targets against the protocol.
+
+A refinement run can read `calibration_report` from an earlier study's
+`results.json`. It checks the physical bound and model conventions, records the
+input hashes, and charges the measured calibration once in each
+preparation-inclusive total. The filesystem location stays out of the report.
+Changing the number of time slabs preserves the horizon and physical bound.
+
+Optional `host_memory_budget_bytes` and `gpu_memory_budget_bytes` specify common
+sampled-peak feasibility limits. A numerically completed sequence that exceeds
+either limit retains its solution checks and timing but receives
+`memory_budget_exceeded` status. These limits screen measured storage; they do
+not enforce hard allocator caps. Rank and memory-budget comparisons are reported
+as separate experiments.
+
+The complete-study adapters cache `BZ` for both reference deflation and recycling.
+The projection then uses `(BZ).T @ z`, which avoids an additional sparse matrix
+application in each preconditioning step. Construction and retained storage enter
+the same timing and memory boundary. The rank-zero Jacobi path allocates no such
+product. The underlying CPU and GPU kernels expose this as an explicit option;
+their legacy default remains uncached. Tests compare both implementations with
+independent solutions and verify rank-zero and conditioning-fallback behavior.

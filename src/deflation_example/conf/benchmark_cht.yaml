@@ -22,10 +22,12 @@ repeats: 1
 methods: [jacobi, reference, recycling, amgx]
 warm_starts: [outer_inner]
 rtol: 1.0e-10
+cg_factor: 1.0
 amgx_factor: 0.1
 outer_tolerance: 1.0e-8
 inner_cap: 10000
 residual_refresh: 1000
+cache_operator_product: true
 outer_cap: 100
 initial_active: empty
 threads: 4
@@ -33,6 +35,9 @@ bound: null
 calibration_grid: 8
 calibration_steps: 8
 calibration_activity: 0.2
+calibration_report: null
+host_memory_budget_bytes: null
+gpu_memory_budget_bytes: null
 memory_interval: 0.01
 sequence_timeout: 7200
 output: runs/cht-study-${now:%Y%m%d-%H%M%S-%f}
