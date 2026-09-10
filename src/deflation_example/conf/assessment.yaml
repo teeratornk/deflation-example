@@ -1,0 +1,36 @@
+# Published-momentum-parameter forward assessment; original controls remain fixed.
+defaults:
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+  - _self_
+
+controls_directory: null
+output: runs/coupled-assessment
+role: nominal
+mode: coupled
+level: 0
+time_step_s: 37.5
+viscosity: nominal
+threads: 4
+coupled_tolerance: 1.0e-8
+mass_tolerance: 1.0e-6
+energy_tolerance: 1.0e-6
+coupling_cap: 100
+flow_cap: 100
+relaxation: 0.5
+baseline_only: false
+flow_method: newton
+convection_form: advective
+baseline_continuation: true
+baseline_strategy: viscosity
+baseline_directory: null
+baseline_restart_directory: null
+hydra:
+  run:
+    dir: .
+  sweep:
+    dir: .
+    subdir: .
+  output_subdir: null
+  job:
+    chdir: false

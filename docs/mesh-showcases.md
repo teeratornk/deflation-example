@@ -7,6 +7,11 @@ optimizes the complete trajectory, with an upper temperature bound at every
 positive time level. Velocity and material properties remain fixed during
 optimization.
 
+A separate [forward-assessment example](../examples/coupled_assessment/README.md)
+prepares fixed optimized controls and verifies axisymmetric momentum
+components for a proposed two-way flow–temperature assessment. Coupled
+application results and the material-model check remain pending.
+
 ## Run the examples
 
 The small engine example runs on a CPU and uses the packaged mesh:

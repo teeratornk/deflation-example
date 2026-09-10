@@ -1,0 +1,58 @@
+{
+  "schema": "cht-forward-assessment-v1",
+  "status": "predeclared; physical-model approval and forward verification pending",
+  "geometry": "transformer_2d",
+  "optimization_data_version": "mesh-cht-data-v1",
+  "optimization_source": "dc89ae8518ff6a975eadf2f6f3bae1acbd17b83b",
+  "optimization_method": "reference",
+  "optimization_repetition": 0,
+  "optimization_level": 0,
+  "optimization_alpha": 1e-14,
+  "optimization_bound": 0.8,
+  "optimization_horizon_s": 600.0,
+  "targets_per_population": 16,
+  "populations": ["steady", "transient_four_slabs"],
+  "selection": {
+    "order": ["nominal", "active", "demanding"],
+    "nominal": "Minimize abs((query+0.25)/16 - 0.5).",
+    "active": "Among unselected targets, maximize the final active fraction.",
+    "demanding": "Among unselected targets, maximize the weighted mean square of the saved source control.",
+    "ties": "Choose the smallest zero-based query index.",
+    "outcome_policy": "Retain every selected case and every attempted forward termination status."
+  },
+  "source_policy": {
+    "source": "Saved control array; never recover a replacement from a changed operator.",
+    "units": "W/m^3 = stored control * oil_conductivity_W_m_K * temperature_scale_K / length_scale_m^2",
+    "space": "P1 nodal field, zero extension at inlet Dirichlet nodes; original nodal mass-lumped loading at the optimization resolution.",
+    "refinement": "Evaluate this same P1 field on nested meshes. Report source-integral and disabled-feedback discretization changes.",
+    "time": "Right-slab piecewise constant on (t[n-1],t[n]], with stored slab n applied throughout that interval.",
+    "initial_temperature": "Use the saved optimization initial condition.",
+    "target": "Use the original analytic desired-temperature function at assessment time levels."
+  },
+  "comparisons": [
+    "original prescribed velocity",
+    "computed flow with thermal feedback disabled",
+    "computed flow with thermal feedback enabled"
+  ],
+  "proposed_feedback": {
+    "model": "axisymmetric laminar incompressible Navier-Stokes with Boussinesq forcing",
+    "gravity_rz_m_s2": [0.0, -9.81],
+    "thermal_coefficients": "Keep the optimization coefficients and background heat sources unchanged.",
+    "momentum_properties": "Require density, dynamic viscosity, expansion coefficient, reference temperature and a traceable property source before application runs.",
+    "scope": "A single-feedback sensitivity assessment with frozen transport properties. Its physical suitability requires a property-variation and flow-regime check."
+  },
+  "verification": {
+    "original_forward_relative_residual": 1e-10,
+    "original_forward_max_difference_K": 1e-5,
+    "coupled_relative_residual": 1e-8,
+    "mass_relative_imbalance": 1e-6,
+    "thermal_relative_balance_defect": 1e-6,
+    "maximum_coupling_iterations": 100,
+    "temperature_resolution_target_K": 0.05,
+    "tracking_relative_resolution_target": 0.01,
+    "refinement_targets": ["nominal", "demanding"],
+    "spatial_levels": [0, 1, 2],
+    "transient_steps_s": [37.5, 18.75, 9.375],
+    "uncertainty": "Report spatial and temporal differences separately. A failed resolution target leaves the physical comparison unresolved."
+  }
+}

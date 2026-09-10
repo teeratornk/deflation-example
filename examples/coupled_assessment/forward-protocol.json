@@ -1,0 +1,108 @@
+{
+  "schema": "cht-forward-published-oil-v2-pilot",
+  "selection_protocol": "cht-forward-assessment-v1",
+  "status": "Published parameters and control populations declared; flow initialization under verification before application comparisons.",
+  "material_source": "10.1049/hve2.12345, equations (5)-(8)",
+  "source_temperature_domain_K": [
+    273.15,
+    373.15
+  ],
+  "material_reference_temperature_K": 348.15,
+  "hydrostatic_reference_temperature_K": 341.3,
+  "viscosity_temperature_K": {
+    "low": 357.3,
+    "nominal": 348.15,
+    "high": 341.3
+  },
+  "viscosity_policy": "Vary constant dynamic viscosity alone; freeze density and expansion at 348.15 K. Preserve the original thermal conductivities and volumetric capacities.",
+  "gravity_rz_m_s2": [
+    0,
+    -9.81
+  ],
+  "physical_scope": "Buoyancy-only, laminar, axisymmetric sensitivity assessment with frozen transport properties. These published assessment parameters leave the original oil identity unspecified.",
+  "controls": "All six previously frozen fields and all subsequent outcomes remain included.",
+  "pilot": "Nominal steady target at level 0; verify the computed-flow baseline before the coupled solve.",
+  "primary_comparison": {
+    "roles": [
+      "nominal",
+      "active",
+      "demanding"
+    ],
+    "populations": [
+      "steady",
+      "transient_four_slabs"
+    ],
+    "modes": [
+      "prescribed",
+      "frozen",
+      "coupled"
+    ],
+    "level": 0,
+    "time_step_s": 37.5,
+    "viscosity": "nominal"
+  },
+  "viscosity_sensitivity": {
+    "roles": [
+      "nominal",
+      "active",
+      "demanding"
+    ],
+    "populations": [
+      "steady",
+      "transient_four_slabs"
+    ],
+    "modes": [
+      "frozen",
+      "coupled"
+    ],
+    "viscosity": [
+      "low",
+      "high"
+    ]
+  },
+  "resolution": {
+    "roles": [
+      "nominal",
+      "demanding"
+    ],
+    "spatial_levels": [
+      0,
+      1,
+      2
+    ],
+    "time_steps_s": [
+      37.5,
+      18.75,
+      9.375
+    ],
+    "temperature_target_K": 0.05,
+    "tracking_relative_target": 0.01
+  },
+  "solver": {
+    "flow": "P2/P1 axisymmetric Navier-Stokes; damped Newton with a verified Jacobian and sparse direct inner solves. The initial Picard and direct Newton attempts remain in the pilot records.",
+    "thermal": "Original P1 operator and streamline stabilization; mass-lumped source and storage",
+    "coupling": "Segregated flow and thermal solves; temperature relaxation 0.5; final momentum rebuilt at updated temperature",
+    "coupled_relative_tolerance": 1e-8,
+    "flow_internal_tolerance": 1e-9,
+    "mass_relative_imbalance": 0.000001,
+    "discrete_energy_relative_defect": 0.000001,
+    "flow_cap": 100,
+    "coupling_cap": 100,
+    "initialization": {
+      "viscosity": "Start at 64 times the physical viscosity; adaptive logarithmic reductions; retain every rejected step; at most 80 stages with at most 30 Newton iterations each; final acceptance requires the physical viscosity.",
+      "pseudo_time": "Separate initialization control at physical viscosity: start at 0.001 s, adapt increments using Newton work, at most 200 steps and 12 Newton iterations per step; verify the original steady residual independently.",
+      "line_search": "Armijo factor 1e-4, halving up to 24 times; failed line searches remain explicit.",
+      "stagnation": "Stop a Newton attempt after six steps with damping below 1e-4 and less than one percent change in the momentum residual.",
+      "status": "Pilot choice of initialization remains open. Freeze it before the selected-control application comparisons."
+    },
+    "quadrature": "Positive degree-eight triangle rule for axisymmetric P2 momentum; unchanged degree-five thermal integration.",
+    "convection_forms": {
+      "advective": "Original initialization control.",
+      "skew": "Add one half of div(v)*v; verify the kinetic-energy flux identity. See 10.1016/j.jcp.2017.02.039. Both forms represent the same incompressible continuous equation."
+    }
+  },
+  "boundary_conditions": "Original inlet velocity 0.027 m/s, including inlet corner values; no slip on remaining fluid walls and interfaces; natural viscous-pressure traction at outlet interior; original thermal boundary and sources.",
+  "initial_flow": "Computed steady baseline with feedback disabled, at the same viscosity setting.",
+  "accuracy_scope": "Discrete coupled-equation convergence and conservation are distinct from physical and temporal resolution. Report violations and unresolved resolution separately.",
+  "timing": "Forward-assessment cost only; preparation and computed-flow baseline reported separately. No deflation or optimization speedup claim."
+}
