@@ -43,6 +43,45 @@ def test_discrete_kinetic_identity_includes_pointwise_divergence(convection_form
     assert abs(diagnostics["divergence_energy_term"]) < 1e-15
 
 
+def test_grad_div_form_matches_the_divergence_integral():
+    flow = AxisymmetricFlow(annular_rectangle(3), 0.1, grad_div=0.5)
+    velocity = np.random.default_rng(37).normal(size=(flow.nv, 2)) * 0.1
+    x = np.r_[velocity[:, 0], velocity[:, 1], np.zeros(flow.np)]
+    divergence = np.einsum("eia,eqia->eq", velocity[flow.p2], flow.div_basis)
+    expected = np.sum(flow.measure * divergence**2)
+    assert x @ (flow.grad_div_operator @ x) == pytest.approx(expected, rel=1e-13)
+    assert expected > 0
+    r, z = flow.points.T
+    exact = np.r_[0.02 * r * z, -0.02 * z * z, np.zeros(flow.np)]
+    assert np.max(np.abs(flow.grad_div_operator @ exact)) < 1e-14
+
+
+@pytest.mark.parametrize("convection_form", ["advective", "skew"])
+def test_matrix_free_force_and_quadratic_line_search_identity(convection_form):
+    flow = AxisymmetricFlow(
+        annular_rectangle(3), 0.03, convection_form=convection_form, grad_div=0.2
+    )
+    rng = np.random.default_rng(123)
+    x, step, rhs = (rng.normal(size=flow.size) * 0.1 for _ in range(3))
+
+    def velocity(a):
+        return np.column_stack((a[: flow.nv], a[flow.nv : 2 * flow.nv]))
+
+    v, dv = velocity(x), velocity(step)
+    np.testing.assert_allclose(
+        flow.nonlinear_force(v), flow.convection(v) @ v, rtol=1e-12, atol=1e-14
+    )
+    A = flow.operator(v, time_step=0.2)
+    J = A + flow.convection_derivative(v)
+    nonlinear = flow.nonlinear_force(dv)
+    quadratic = np.r_[nonlinear[:, 0], nonlinear[:, 1], np.zeros(flow.np)]
+    for damping in (1.0, 0.1, 1e-5):
+        trial = x + damping * step
+        actual = flow.operator(velocity(trial), time_step=0.2) @ trial - rhs
+        predicted = A @ x - rhs + damping * (J @ step) + damping * damping * quadratic
+        np.testing.assert_allclose(actual, predicted, rtol=1e-12, atol=1e-13)
+
+
 def test_p2_partition_affine_gradient_and_cylindrical_divergence():
     flow = AxisymmetricFlow(annular_rectangle(3), 0.1)
     np.testing.assert_allclose(flow.shape.sum(axis=1), 1, atol=1e-14)
@@ -87,8 +126,11 @@ def test_nonlinear_manufactured_affine_flow_with_buoyancy(method, convection_for
 
 
 @pytest.mark.parametrize("convection_form", ["advective", "skew"])
-def test_full_newton_jacobian_matches_directional_difference(convection_form):
-    flow = AxisymmetricFlow(annular_rectangle(3), 0.03, convection_form=convection_form)
+@pytest.mark.parametrize("grad_div", [0.0, 10.0])
+def test_full_newton_jacobian_matches_directional_difference(convection_form, grad_div):
+    flow = AxisymmetricFlow(
+        annular_rectangle(3), 0.03, convection_form=convection_form, grad_div=grad_div
+    )
     rng = np.random.default_rng(18)
     x = rng.normal(size=flow.size) * 0.01
     direction = rng.normal(size=flow.size)

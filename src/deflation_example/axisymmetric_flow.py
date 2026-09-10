@@ -48,7 +48,9 @@ def flow_quadrature():
 class AxisymmetricFlow:
     """P2 velocity and P1 pressure on the fluid triangles of a thermal mesh."""
 
-    def __init__(self, mesh, viscosity, fluid_material=0, convection_form="advective"):
+    def __init__(
+        self, mesh, viscosity, fluid_material=0, convection_form="advective", grad_div=0.0
+    ):
         if mesh.dimension != 2 or not mesh.axisymmetric or np.min(mesh.nodes[:, 0]) <= 0:
             raise ValueError("Flow requires an axisymmetric triangular mesh bounded away from r=0")
         self.mesh = mesh
@@ -56,6 +58,9 @@ class AxisymmetricFlow:
         if convection_form not in {"advective", "skew"}:
             raise ValueError("Unknown convection form")
         self.convection_form = convection_form
+        self.grad_div = float(grad_div)
+        if not np.isfinite(self.grad_div) or self.grad_div < 0:
+            raise ValueError("Grad-div coefficient must be finite and nonnegative")
         self.fluid_cells = np.flatnonzero(mesh.materials == fluid_material)
         if not len(self.fluid_cells):
             raise ValueError("At least one fluid cell is required")
@@ -111,6 +116,8 @@ class AxisymmetricFlow:
             ),
             axis=2,
         )
+        self.div_basis = self.grad.copy()
+        self.div_basis[:, :, :, 0] += self.shape[None, :, :] / self.radius[:, :, None]
         local_mass = np.einsum("eq,qi,qj->eij", self.measure, self.shape, self.shape)
         local_diff = np.einsum("eq,eqid,eqjd->eij", self.measure, self.grad, self.grad)
         local_hoop = np.einsum(
@@ -124,6 +131,28 @@ class AxisymmetricFlow:
         for gradient in (radial, self.grad[:, :, :, 1]):
             local_div = np.einsum("eq,qi,eqj->eij", self.measure, bary, gradient)
             self.divergence.append(self._matrix(local_div, self.p1, self.p2, (self.np, self.nv)))
+        self.grad_div_operator = None
+        if self.grad_div:
+            blocks = []
+            for a in range(2):
+                blocks.append([])
+                for b in range(2):
+                    local = np.einsum(
+                        "eq,eqi,eqj->eij",
+                        self.measure,
+                        self.div_basis[:, :, :, a],
+                        self.div_basis[:, :, :, b],
+                    )
+                    blocks[-1].append(self._matrix(local, self.p2, self.p2, (self.nv, self.nv)))
+                blocks[-1].append(sparse.csr_matrix((self.nv, self.np)))
+            blocks.append(
+                [
+                    sparse.csr_matrix((self.np, self.nv)),
+                    sparse.csr_matrix((self.np, self.nv)),
+                    sparse.csr_matrix((self.np, self.np)),
+                ]
+            )
+            self.grad_div_operator = sparse.bmat(blocks, format="csr")
 
     @staticmethod
     def _matrix(values, rows, columns, shape):
@@ -162,9 +191,7 @@ class AxisymmetricFlow:
                     "eq,qi,qj,eq->eij", self.measure, self.shape, self.shape, gradient[:, :, a, b]
                 )
                 if self.convection_form == "skew":
-                    divergence_basis = self.grad[:, :, :, b].copy()
-                    if b == 0:
-                        divergence_basis += self.shape[None, :, :] / self.radius[:, :, None]
+                    divergence_basis = self.div_basis[:, :, :, b]
                     sample_a = np.einsum("qi,ei->eq", self.shape, velocity[self.p2, a])
                     local += 0.5 * np.einsum(
                         "eq,qi,eqj,eq->eij", self.measure, self.shape, divergence_basis, sample_a
@@ -180,6 +207,18 @@ class AxisymmetricFlow:
             ]
         )
         return sparse.bmat(blocks, format="csr")
+
+    def nonlinear_force(self, velocity):
+        """Integrate the quadratic momentum term without assembling a matrix."""
+        samples = self.sampled_velocity(velocity)
+        gradient = np.einsum("eia,eqib->eqab", velocity[self.p2], self.grad)
+        force = np.einsum("eqb,eqab->eqa", samples, gradient)
+        if self.convection_form == "skew":
+            divergence = (
+                gradient[:, :, 0, 0] + gradient[:, :, 1, 1] + samples[:, :, 0] / self.radius
+            )
+            force += 0.5 * divergence[:, :, None] * samples
+        return self.load(force)
 
     def load(self, acceleration):
         """Integrate supplied acceleration samples at the declared quadrature points."""
@@ -226,7 +265,7 @@ class AxisymmetricFlow:
         if time_step is not None:
             K = K + self.mass / positive_real(time_step, "Physical time step")
         Br, Bz = self.divergence
-        return sparse.bmat(
+        result = sparse.bmat(
             [
                 [K + self.viscosity * self.hoop, None, -Br.T],
                 [None, K, -Bz.T],
@@ -234,6 +273,9 @@ class AxisymmetricFlow:
             ],
             format="csr",
         )
+        if self.grad_div_operator is not None:
+            result += self.grad_div * self.grad_div_operator
+        return result
 
     def solve(
         self,
@@ -331,12 +373,25 @@ class AxisymmetricFlow:
             damping = relaxation
             if method == "newton" and convection:
                 original = x.copy()
-                original_norm = np.linalg.norm((A @ x - rhs)[free])
+                original_residual = (A @ x - rhs)[free]
+                original_norm = np.linalg.norm(original_residual)
+                full_step = np.zeros_like(x)
+                full_step[free] = proposal
+                linear_change = (linear_operator @ full_step)[free]
+                step_velocity = np.column_stack(
+                    (full_step[: self.nv], full_step[self.nv : 2 * self.nv])
+                )
+                nonlinear = self.nonlinear_force(step_velocity)
+                quadratic_change = np.r_[nonlinear[:, 0], nonlinear[:, 1], np.zeros(self.np)][free]
                 for backtrack in range(24):
                     x[free] = original[free] + damping * proposal
-                    trial_velocity = np.column_stack((x[: self.nv], x[self.nv : 2 * self.nv]))
-                    trial_operator = self.operator(trial_velocity, time_step, convection)
-                    trial_norm = np.linalg.norm((trial_operator @ x - rhs)[free])
+                    # The Navier-Stokes residual is quadratic in velocity.
+                    # Reassemble it independently after choosing the step.
+                    trial_norm = np.linalg.norm(
+                        original_residual
+                        + damping * linear_change
+                        + damping * damping * quadratic_change
+                    )
                     if (
                         np.isfinite(trial_norm)
                         and trial_norm <= (1 - 1e-4 * damping) * original_norm
@@ -638,6 +693,7 @@ class AxisymmetricFlow:
             "kinetic_boundary_flux": kinetic_flux,
             "divergence_energy_term": defect,
             "viscous_dissipation": viscous,
+            "grad_div_dissipation": self.grad_div * float(np.sum(self.measure * divergence**2)),
             "integration_identity_defect": convection
             + (defect if self.convection_form == "advective" else 0.0)
             - kinetic_flux,

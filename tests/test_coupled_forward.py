@@ -9,7 +9,7 @@ from deflation_example.meshes import ThermalMesh, assemble_thermal, triangle_qua
 from test_axisymmetric_flow import annular_rectangle
 
 
-def manufactured(transient=False, feedback=True):
+def manufactured(transient=False, feedback=True, grad_div=0.0):
     base = annular_rectangle(4)
     x = base.nodes
     pins = np.flatnonzero(
@@ -19,7 +19,7 @@ def manufactured(transient=False, feedback=True):
         | np.isclose(x[:, 1], 1)
     )
     mesh = ThermalMesh(x, base.cells, base.materials, pins, True)
-    flow = AxisymmetricFlow(mesh, 0.3)
+    flow = AxisymmetricFlow(mesh, 0.3, grad_div=grad_div)
     r, z = flow.points.T
     velocity = np.column_stack((0.02 * r, -0.04 * z))
     temperature = 0.5 * x[:, 1] + (0.01 if transient else 0)
@@ -75,8 +75,11 @@ def manufactured(transient=False, feedback=True):
 @pytest.mark.parametrize("feedback", [False, True])
 @pytest.mark.parametrize("method", ["picard", "newton"])
 @pytest.mark.parametrize("convection_form", ["advective", "skew"])
-def test_complete_coupled_manufactured_solution(transient, feedback, method, convection_form):
-    model, temperature, velocity, initial, args = manufactured(transient, feedback)
+@pytest.mark.parametrize("grad_div", [0.0, 1.0])
+def test_complete_coupled_manufactured_solution(
+    transient, feedback, method, convection_form, grad_div
+):
+    model, temperature, velocity, initial, args = manufactured(transient, feedback, grad_div)
     model.flow_method = method
     model.flow.convection_form = convection_form
     control = np.full_like(temperature, 2.0)

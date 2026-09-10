@@ -21,6 +21,7 @@ relaxation: 0.5
 baseline_only: false
 flow_method: newton
 convection_form: advective
+grad_div_scale: 0.0
 baseline_continuation: true
 baseline_strategy: viscosity
 baseline_directory: null

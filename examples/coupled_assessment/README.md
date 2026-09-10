@@ -108,7 +108,7 @@ thermal capacities, sources and thermal boundary conditions.
 This experiment assesses buoyancy and viscosity sensitivity using published
 parameters. The original oil identity remains unspecified. The new citation
 applies to the assessment parameters; the earlier thermal coefficients retain
-their original definitions. Application temperatures outside the published
+their original definitions. Fluid temperatures outside the published
 domain receive an explicit termination label.
 
 The original Stokes calculation uses a simplified weighted scalar Laplacian
@@ -151,6 +151,18 @@ is discussed by [Charnyi et al. (2017)](https://doi.org/10.1016/j.jcp.2017.02.03
 `convection_form=skew` selects this form. The diagnostic script
 `diagnose_flow.py` reports the divergence contribution, viscous dissipation
 and an independently integrated boundary kinetic-energy flux.
+
+The grad-div control adds
+\(\gamma(\nabla_{\mathrm{axi}}\cdot\mathbf v,
+\nabla_{\mathrm{axi}}\cdot\mathbf w)\) to the momentum weak form.
+The coefficient is `grad_div_scale` times the inlet velocity and radial domain
+width. The declared pilot uses scales zero and one; scale one gives
+\(\gamma=0.003402\) m²/s. This consistent stabilization penalizes the local
+divergence error. Its connection with divergence-free finite-element
+approximations is studied by [Case et al. (2011)](https://doi.org/10.1137/100794250).
+The numerical choice will be assessed before the control comparisons.
+Newton backtracking evaluates the exact quadratic residual along the search
+direction. The acceptance check independently assembles the complete equations.
 
 Small density variation supports the density approximation in buoyancy.
 The frozen viscosity and other transport coefficients require their own

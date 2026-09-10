@@ -32,7 +32,7 @@ def environment():
             ).strip()
             source_tree_clean = not bool(
                 subprocess.check_output(
-                    ["git", "status", "--porcelain", "--", "src"],
+                    ["git", "--no-optional-locks", "status", "--porcelain", "--", "src"],
                     cwd=candidate,
                     text=True,
                     stderr=subprocess.DEVNULL,

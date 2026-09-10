@@ -316,8 +316,14 @@ def _execute(c, output):
     times, steps = assessment_times(inputs.ends, c["time_step_s"])
     p = inputs.parameters["physical"]
     published = momentum_reference(VISCOSITY_TEMPERATURES[c["viscosity"]])
+    grad_div = (
+        float(c["grad_div_scale"]) * p["inlet_velocity_m_s"] * np.ptp(inputs.mesh.nodes[:, 0])
+    )
     flow = AxisymmetricFlow(
-        inputs.mesh, published["kinematic_viscosity_m2_s"], convection_form=c["convection_form"]
+        inputs.mesh,
+        published["kinematic_viscosity_m2_s"],
+        convection_form=c["convection_form"],
+        grad_div=grad_div,
     )
     fixed, values = transformer_boundaries(flow, p["inlet_velocity_m_s"])
     prescribed = import_velocity(flow, inputs.velocity)
@@ -336,7 +342,7 @@ def _execute(c, output):
     )
     initial_flow = FlowResult(prescribed, np.zeros(flow.np), "prescribed", [])
     report = {
-        "schema": "cht-forward-published-oil-v2-pilot",
+        "schema": "cht-forward-published-oil-v3-pilot",
         "status": "running",
         "configuration": {
             k: v
@@ -352,6 +358,7 @@ def _execute(c, output):
         "selection": inputs.selection,
         "optimization_population": inputs.manifest["population"],
         "momentum_properties": published,
+        "grad_div_coefficient_m2_s": grad_div,
         "thermal_properties": p,
         "mesh": {
             "nodes": len(inputs.mesh.nodes),
@@ -542,10 +549,11 @@ def _execute(c, output):
         constrained = inputs.mesh.free
         hottest = constrained[np.argmax(temperature[constrained])]
         raw_violation = float(temperature[hottest] - inputs.manifest["bound_K"])
+        oil_temperature = temperature[flow.vertices]
         in_range = bool(
             np.isfinite(temperature).all()
-            and temperature.min() >= 273.15
-            and temperature.max() <= 373.15
+            and oil_temperature.min() >= 273.15
+            and oil_temperature.max() <= 373.15
         )
         row = {
             "time_index": n,
@@ -559,6 +567,8 @@ def _execute(c, output):
             "signed_bound_excess_K": raw_violation,
             "maximum_location_rz_m": inputs.mesh.nodes[hottest].tolist(),
             "published_temperature_domain_satisfied": in_range,
+            "oil_temperature_min_K": float(oil_temperature.min()),
+            "oil_temperature_max_K": float(oil_temperature.max()),
             "sampled_max_velocity_m_s": float(np.linalg.norm(current_flow.velocity, axis=1).max()),
             "buoyancy_density_variation_parameter": float(
                 published["expansion_coefficient_K_inverse"]
