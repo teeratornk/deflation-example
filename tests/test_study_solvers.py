@@ -10,7 +10,7 @@ from deflation_example.spectral import analytical_reference
 from deflation_example.study_solvers import ArrayReference, StudySolver
 
 
-def run_small_sequence(method, device="cpu", torch=None, api=None):
+def run_small_sequence(method, device="cpu", torch=None, api=None, residual_policy="terminal"):
     problem = build_problem("cht", 4)
     basis, _ = analytical_reference(4, 3, 5)
     adapter = StudySolver(
@@ -23,6 +23,7 @@ def run_small_sequence(method, device="cpu", torch=None, api=None):
         cg_factor=0.1,
         torch=torch,
         api=api,
+        residual_policy=residual_policy,
     )
     previous = None
     calls = []
@@ -60,7 +61,7 @@ def run_small_sequence(method, device="cpu", torch=None, api=None):
         assert timing["acceptance_rtol"] == pytest.approx(1e-10, rel=1e-12, abs=0)
         if method == "jacobi":
             assert result.rank == 0 and timing["input_basis_columns"] == 0
-        if method == "recycling":
+        if method == "recycling" and not timing.get("initial_guess_accepted", False):
             assert timing["completion"]["policy"].endswith("jacobi-ritz-v1")
     if method == "recycling":
         assert calls[0][0].rank == 0
@@ -68,8 +69,35 @@ def run_small_sequence(method, device="cpu", torch=None, api=None):
 
 
 @pytest.mark.parametrize("method", ["jacobi", "reference", "recycling"])
-def test_complete_cpu_sequence_and_history_costs(method):
-    run_small_sequence(method)
+@pytest.mark.parametrize("residual_policy", ["terminal", "refine"])
+def test_complete_cpu_sequence_and_history_costs(method, residual_policy):
+    run_small_sequence(method, residual_policy=residual_policy)
+
+
+@pytest.mark.parametrize("method", ["jacobi", "reference", "recycling"])
+def test_refinement_guard_skips_basis_work_and_tracks_masks(method, monkeypatch):
+    adapter = StudySolver(
+        method,
+        rank=1,
+        reference=ArrayReference(np.ones((4, 1)), "test"),
+        residual_policy="refine",
+        cg_factor=0.1,
+    )
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("An accepted warm start requires no restricted basis")
+
+    monkeypatch.setattr(adapter, "_solve_once", forbidden)
+    adapter.previous = np.array([0, 1, 2])
+    initial = np.array([1.0, 2.0])
+    result, timing = adapter.solve(np.eye(2), initial.copy(), np.array([1, 3]), initial)
+    assert result.status == "converged" and result.iterations == 0
+    assert timing["newly_inactive"] == 1 and timing["newly_active"] == 2
+    np.testing.assert_array_equal(adapter.previous, [1, 3])
+    assert timing["iteration_rtol"] == pytest.approx(1e-11, rel=1e-12, abs=0)
+    assert timing["restricted_basis_bytes"] == 0
+    assert sum(timing["components_seconds"].values()) == pytest.approx(timing["callback_seconds"])
+    adapter.close()
 
 
 @pytest.mark.gpu

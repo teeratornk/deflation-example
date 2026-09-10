@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 from scipy import sparse
 
-from deflation_example.refinement import verified_refinement
-from deflation_example.solvers import LinearResult
+from deflation_example.refinement import REFINEMENT_POLICY, verified_refinement
+from deflation_example.solvers import LinearResult, independent_residual
 from deflation_example.timing import PHASES
 
 
@@ -115,6 +115,75 @@ def test_final_acceptance_precedes_scalar_failure_and_continuation():
     result, _ = verified_refinement(solve, sparse.eye(3), np.ones(3), None, 1e-10, 10)
     assert len(calls) == 1
     assert result.status == "converged" and result.residual == 0
+
+
+@pytest.mark.parametrize("rhs", [np.ones(3), np.zeros(3)])
+def test_already_converged_initial_state_returns_without_a_kernel(rhs):
+    initial = rhs.copy()
+
+    def forbidden(*args):
+        raise AssertionError("An accepted initial state requires no kernel solve")
+
+    result, metrics = verified_refinement(forbidden, sparse.eye(3), rhs, initial, 1e-10, 10)
+    assert result.status == "converged" and result.iterations == 0
+    assert result.residual == independent_residual(sparse.eye(3), result.x, rhs) == 0
+    np.testing.assert_array_equal(result.x, initial)
+    assert result.x is not initial
+    assert metrics["initial_guess_accepted"]
+    assert metrics["refinement_attempts"] == []
+    assert metrics["best_candidate_attempt"] is None
+    assert metrics["refinement_policy"] == REFINEMENT_POLICY
+    assert metrics["restricted_basis_bytes"] == 0
+    assert metrics["components_seconds"]["iteration"] == 0
+    assert sum(metrics["components_seconds"].values()) == pytest.approx(metrics["callback_seconds"])
+
+
+def test_zero_rhs_and_default_initial_state_return_without_a_kernel():
+    solve, calls = controlled_solver()
+    result, _ = verified_refinement(solve, sparse.eye(3), np.zeros(3), None, 1e-10, 10)
+    assert calls == [] and result.status == "converged"
+    np.testing.assert_array_equal(result.x, np.zeros(3))
+
+
+def test_first_worse_candidate_preserves_initial_state_and_its_residual():
+    solve, calls = controlled_solver()
+    initial = np.full(3, 0.95)
+    result, metrics = verified_refinement(solve, sparse.eye(3), np.ones(3), initial, 1e-10, 10)
+    assert len(calls) == 1 and result.status == "residual_stagnation"
+    np.testing.assert_array_equal(result.x, initial)
+    assert result.residual == independent_residual(sparse.eye(3), result.x, np.ones(3))
+    assert result.residual == pytest.approx(0.05)
+    assert metrics["refinement_attempts"][0]["original_residual"] == pytest.approx(0.1)
+    assert metrics["best_candidate_attempt"] is None
+    assert metrics["last_kernel_rank"] == 1 and result.rank == 0
+
+
+def test_rejected_later_candidate_preserves_best_state_and_basis_metadata():
+    kernel, calls = controlled_solver()
+
+    def solve(*args):
+        result, metrics = kernel(*args)
+        result.rank = len(calls)
+        if len(calls) == 2:
+            result.x[:] = -1.0
+        return result, metrics
+
+    result, metrics = verified_refinement(solve, sparse.eye(3), np.ones(3), None, 1e-10, 10)
+    assert result.status == "residual_stagnation" and len(calls) == 2
+    np.testing.assert_allclose(result.x, 0.9)
+    assert result.residual == independent_residual(sparse.eye(3), result.x, np.ones(3))
+    assert result.rank == 1 and metrics["last_kernel_rank"] == 2
+    assert metrics["best_candidate_attempt"] == 0
+
+
+def test_zero_rhs_uses_absolute_residual_for_a_nonzero_initial_guess():
+    solve, calls = controlled_solver()
+    result, metrics = verified_refinement(
+        solve, sparse.eye(3), np.zeros(3), np.full(3, 0.5), 1e-10, 10
+    )
+    assert len(calls) == 1 and result.status == "converged"
+    assert metrics["initial_residual"] == pytest.approx(np.sqrt(3) / 2)
+    assert result.residual == independent_residual(sparse.eye(3), result.x, np.zeros(3)) == 0
 
 
 def test_projected_scalar_can_be_negative_after_coarse_orthogonality_is_lost():

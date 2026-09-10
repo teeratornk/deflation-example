@@ -135,6 +135,24 @@ the six original sixteen-target benchmark cases. Their `terminal` policy and
 frozen timings remain available. The `refine` policy changes the finite-precision
 stopping procedure and retains the original discrete equations and final checks.
 
+The subsequent guard revision identifies itself as
+`initial-guard-original-residual-error-equations-v2` in every callback report.
+It first evaluates the original residual of the supplied initial state and
+returns immediately if that state meets final accuracy. Otherwise, that state
+and its residual initialize the retained candidate. A worse first candidate
+therefore leaves the initial state intact. Returned residual and basis metadata
+describe the retained state; attempted work and the last kernel rank remain
+separate fields. The guard uses the same correction cap, shared iteration
+budget, local targets and final accuracy requirements described above.
+Its verification cost enters the complete callback time.
+
+The guard has separate regression coverage for solved warm starts, zero
+right-hand sides, worse first or later candidates, and complete small CPU
+optimization sequences. These checks establish implementation behavior; they
+do not retime the frozen comparisons. Tag `v0.6.2` preserves the published
+implementation before this guard. Use that tag to reproduce the reported
+timings, and record the source commit when running the guarded recommendation.
+
 Run `mesh_breakdown` with a saved protocol to reconstruct the diagnostic:
 
 ```bash

@@ -103,7 +103,8 @@ class StudySolver:
         if self.residual_policy == "refine":
             from .refinement import verified_refinement
 
-            return verified_refinement(
+            start = time.perf_counter()
+            result, metrics = verified_refinement(
                 lambda rhs, guess, target, cap: self._solve_once(
                     B,
                     rhs,
@@ -119,6 +120,26 @@ class StudySolver:
                 self.rtol,
                 self.maxiter,
             )
+            if metrics["initial_guess_accepted"]:
+                indices = inactive_indices(indices)
+                if self.previous is not None:
+                    metrics["newly_inactive"] = len(
+                        np.setdiff1d(indices, self.previous, assume_unique=True)
+                    )
+                    metrics["newly_active"] = len(
+                        np.setdiff1d(self.previous, indices, assume_unique=True)
+                    )
+                self.previous = indices.copy()
+                metrics["iteration_rtol"] = self.rtol * (
+                    self.amgx_factor if self.method == "amgx" else self.cg_factor
+                )
+                elapsed = time.perf_counter() - start
+                metrics["components_seconds"]["host_bookkeeping"] += max(
+                    0.0, elapsed - metrics["callback_seconds"]
+                )
+                metrics["callback_seconds"] = elapsed
+                metrics["total_seconds"] = sum(metrics["components_seconds"].values())
+            return result, metrics
         return self._solve_once(B, b, indices, initial)
 
     def _solve_once(
