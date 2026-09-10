@@ -41,10 +41,12 @@ vectors on the same device. Its candidate pool includes the existing coarse
 vectors and new projected search directions.
 
 The GPU comparison requires the existing optional PyTorch and native AmgX
-installation described in the companion's GPU instructions:
+installation described in the companion's GPU instructions. Install the
+Python extras first, then install the native binding. Use `--no-sync` after
+that installation to preserve the binding:
 
 ```bash
-uv run --locked --extra gpu --extra study python -m deflation_example.benchmark_mesh \
+uv run --no-sync python -m deflation_example.benchmark_mesh \
   --config-name mesh_final \
   output=runs/engine-gpu
 ```
@@ -156,10 +158,12 @@ physical-coordinate functions across refinement.
 Run the six configurations in separate output directories:
 
 ```bash
-uv run --locked --extra gpu --extra study python -m deflation_example.benchmark_mesh \
-  --config-name mesh_final -m level=1,2 transient=false,true
-uv run --locked --extra gpu --extra study python -m deflation_example.benchmark_mesh \
-  --config-name mesh_final_transformer -m transient=false,true
+uv run --no-sync python -m deflation_example.benchmark_mesh --config-name mesh_final level=1 transient=false
+uv run --no-sync python -m deflation_example.benchmark_mesh --config-name mesh_final level=1 transient=true
+uv run --no-sync python -m deflation_example.benchmark_mesh --config-name mesh_final level=2 transient=false
+uv run --no-sync python -m deflation_example.benchmark_mesh --config-name mesh_final level=2 transient=true
+uv run --no-sync python -m deflation_example.benchmark_mesh --config-name mesh_final_transformer transient=false
+uv run --no-sync python -m deflation_example.benchmark_mesh --config-name mesh_final_transformer transient=true
 ```
 
 The temporal construction was selected after a four-target pilot compared
@@ -173,3 +177,22 @@ Each worker records actual elapsed cumulative time after each target and the
 complete time after cleanup. Cumulative plots use these timestamps from each
 independent repetition. `recycle_rank` permits an explicitly declared
 alternative recycling budget; its default equals the reference rank.
+
+The matched transfer replay reconstructs the recorded inactive matrices and
+right-hand sides. It checks their hashes, the input bundle, and numerical
+source files before comparison. Both policies start from the same reference
+restriction. Later steps use either full-reference restriction or sequential
+zero extension, with no added directions. The following small CPU example
+also measures the remaining deflated spectrum:
+
+```bash
+uv run --locked python -m deflation_example.benchmark_mesh \
+  'methods=[reference]' spatial_reference=scaled_schur output=runs/mesh-trace
+uv run --locked python -m deflation_example.mesh_transfer \
+  --record runs/mesh-trace/reference-0/record.json --output runs/mesh-transfer
+```
+
+The replay reports independent energy-error diagnostics, actual numerical
+ranks, constraint activations and releases, and alternating repeated kernel
+measurements. Its transfer-inclusive times are distinct from complete
+optimization timings.

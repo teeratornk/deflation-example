@@ -31,6 +31,10 @@ def run(record_path, output, device="cpu", samples=8, repeats=3):
     if not source["success"] or not source.get("cases"):
         raise ValueError("Replay requires an accepted complete optimization sequence")
     c = source["controls"]
+    for name in ("mesh_reference.py", "mesh_showcases.py", "mesh_control.py", "meshes.py", "mesh_refinement.py"):
+        current = hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
+        if source["environment"]["source_sha256"].get(name) != current:
+            raise ValueError(f"Replay requires the recorded numerical source: {name}")
     output.mkdir(parents=True, exist_ok=False)
     showcase, model = build_model(c)
     model.H.assembled_restriction = True
@@ -41,6 +45,8 @@ def run(record_path, output, device="cpu", samples=8, repeats=3):
                                      c.get("temporal_metric", "euclidean"))
     trace = [(case["query"], j, row) for case in source["cases"]
              for j, row in enumerate(case["inner"])]
+    if not trace:
+        raise ValueError("The accepted source contains no inactive solves to replay")
     selected = set(np.linspace(0, len(trace)-1, min(samples, len(trace)), dtype=int).tolist())
     if device == "cuda":
         from .gpu import gpu_deflated_cg, require_cuda
@@ -65,13 +71,16 @@ def run(record_path, output, device="cpu", samples=8, repeats=3):
               "source_record_sha256": hashlib.sha256(record_path.read_bytes()).hexdigest(),
               "source_controls": c, "device": device,
               "initial_guess": "zero for both specified transfers",
-              "scope": "fixed-inactive-system replay; kernel intervals exclude shared reconstruction and independent direct diagnostics",
+              "scope": "fixed-inactive-system replay with CPU basis transfer and matched GPU-QR or CPU-SVD solves; totals include basis restriction/transfer and kernel, while shared reconstruction and independent diagnostics are separate",
               "selection": sorted(selected), "rows": [], "success": False,
               "transfer": "Sequential transfer starts with the same restricted reference and then zero-extends only its surviving values. No replacement directions are introduced."}
     previous = previous_full = sequential = None
     for index, (query, outer, row) in enumerate(trace):
+        if row["status"] != "converged" or row["original_residual"] > c["rtol"]:
+            raise ValueError("The source inactive solve fails its declared acceptance")
         I = np.flatnonzero(unpack_mask(row["inactive_mask_bits"], model.size))
         full = reference.restrict(I)
+        carried = sequential
         if previous is None:
             sequential = full.copy()
             released, activated, identity_error = 0, 0, 0.
@@ -84,10 +93,11 @@ def run(record_path, output, device="cpu", samples=8, repeats=3):
             predicted = np.zeros_like(full)
             predicted[released_rows] = full[released_rows]
             identity_error = float(np.linalg.norm(one_step-predicted))
-        previous, previous_full = I, full
         entry = {"trace_index": index, "query": query, "outer_step": outer,
                  "inactive_count": len(I), "newly_inactive": released, "newly_active": activated,
-                 "transfer_identity_error": identity_error, "methods": {}}
+                 "transfer_identity_error": identity_error,
+                 "accumulated_transfer_difference_frobenius": float(np.linalg.norm(full-sequential)),
+                 "methods": {}}
         if index in selected:
             desired = desired_temperature(model, query, c["targets"])
             if hashlib.sha256(np.ascontiguousarray(desired).tobytes()).hexdigest() != source["cases"][query]["target_sha256"]:
@@ -98,23 +108,35 @@ def run(record_path, output, device="cpu", samples=8, repeats=3):
             if hashlib.sha256(np.ascontiguousarray(b).tobytes()).hexdigest() != row["rhs_sha256"]:
                 raise ValueError("Replay right-hand side differs from its source trace")
             B = model.H.restrict(I)
+            tick = time.perf_counter()
             exact = spsolve(B, b)
             error = independent_residual(B, exact, b)
+            entry["independent_solution_seconds"] = time.perf_counter()-tick
             if error > c["rtol"]:
                 raise ValueError("The independent diagnostic solution failed residual acceptance")
             entry["independent_original_residual"] = error
-            for name, basis in (("full_reference", full), ("sequential_transfer", sequential)):
-                records = []
-                for _ in range(repeats):
+            entries = {name: [] for name in ("full_reference", "sequential_transfer")}
+            for repetition in range(repeats):
+                order = list(entries) if repetition % 2 == 0 else list(reversed(entries))
+                for name in order:
                     start = time.perf_counter()
+                    basis = (reference.restrict(I) if name == "full_reference" or previous is None
+                             else transfer_basis(carried, previous, I))
+                    prepared = time.perf_counter()
                     solved = solve(B, b, basis)
-                    records.append({"seconds": time.perf_counter()-start,
+                    finish = time.perf_counter()
+                    entries[name].append({"seconds": finish-start,
+                                    "basis_transfer_seconds": prepared-start,
+                                    "kernel_seconds": finish-prepared,
                                     "status": solved.status, "original_residual": solved.residual,
                                     "iterations": solved.iterations, "deployed_rank": solved.rank,
                                     "coarse_condition": solved.coarse_condition,
                                     "fallback_reason": solved.fallback_reason})
+            for name, basis in (("full_reference", full), ("sequential_transfer", sequential)):
+                records = entries[name]
                 entry["methods"][name] = {"repetitions": records,
-                    "correction": correction_diagnostics(B, b, basis, solved.rank, exact)}
+                    "correction": correction_diagnostics(B, b, basis, records[-1]["deployed_rank"], exact)}
+        previous, previous_full = I, full
         result["rows"].append(entry)
         write_report(output / "transfer.json", result)
     result["success"] = all(

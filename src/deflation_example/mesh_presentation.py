@@ -10,22 +10,25 @@ import numpy as np
 from .reporting import write_report
 
 
-def tetrahedral_slice(nodes, cells, values, coordinate=.5):
-    """Intersect P1 tetrahedra with x2=coordinate and interpolate nodal values."""
+def tetrahedral_slice(nodes, cells, values, coordinate=.5, axis=1):
+    """Intersect P1 tetrahedra with a coordinate plane and interpolate nodal values."""
+    if axis not in (0, 1, 2) or not np.isfinite(coordinate):
+        raise ValueError("Choose a finite coordinate and a spatial axis from 0 to 2")
+    remaining = [i for i in range(3) if i != axis]
     points, triangles, samples, owners = [], [], [], []
     for owner, cell in enumerate(cells):
         xyz = nodes[cell]
-        delta = xyz[:, 1] - coordinate
+        delta = xyz[:, axis] - coordinate
         if delta.min() > 1e-12 or delta.max() < -1e-12:
             continue
         vertices = []
         for i in range(4):
             if abs(delta[i]) <= 1e-12:
-                vertices.append((xyz[i, [0, 2]], values[cell[i]]))
+                vertices.append((xyz[i, remaining], values[cell[i]]))
         for i, j in combinations(range(4), 2):
             if delta[i]*delta[j] < -1e-24:
                 t = delta[i]/(delta[i]-delta[j])
-                vertices.append(((1-t)*xyz[i, [0, 2]]+t*xyz[j, [0, 2]],
+                vertices.append(((1-t)*xyz[i, remaining]+t*xyz[j, remaining],
                                  (1-t)*values[cell[i]]+t*values[cell[j]]))
         unique = {}
         for point, value in vertices:
@@ -116,29 +119,60 @@ def summarize(directory):
     directory = Path(directory)
     controls = json.loads((directory / "protocol.json").read_text())
     attempts = json.loads((directory / "attempts.json").read_text())
+    indexed = {}
+    for attempt in attempts:
+        key = (attempt["method"], attempt["repetition"])
+        if key in indexed or key[0] not in controls["methods"] or key[1] not in range(controls["repeats"]):
+            raise ValueError("Attempts contain a duplicate or undeclared method/repetition")
+        indexed[key] = attempt
+    target_hashes = None
     rows = []
     for method in controls["methods"]:
         records = []
         failures = []
-        for attempt in attempts:
-            if attempt["method"] != method:
+        for repetition in range(controls["repeats"]):
+            attempt = indexed.get((method, repetition))
+            if attempt is None:
+                failures.append("not_recorded")
                 continue
-            path = directory / attempt["record"]
+            path = (directory / attempt["record"]).resolve()
+            if not path.is_relative_to(directory.resolve()):
+                raise ValueError("An attempt record must stay inside its comparison directory")
             if not path.exists():
                 failures.append(attempt["status"])
                 continue
             record = json.loads(path.read_text())
+            if record["method"] != method or record["repetition"] != repetition or record["controls"] != controls:
+                raise ValueError("Sequence labels or controls differ from the declared comparison")
             if record["success"]:
+                if attempt["status"] != "completed":
+                    failures.append(attempt["status"])
+                    continue
                 if len(record["cases"]) != controls["targets"]:
                     raise ValueError("An accepted sequence has an incorrect population")
                 if len({c["target_sha256"] for c in record["cases"]}) != controls["targets"]:
                     raise ValueError("A sequence repeats a desired-temperature field")
+                hashes = [c["target_sha256"] for c in record["cases"]]
+                if target_hashes is not None and hashes != target_hashes:
+                    raise ValueError("Methods or repetitions use different target sequences")
+                target_hashes = hashes
+                if [c["query"] for c in record["cases"]] != list(range(controls["targets"])):
+                    raise ValueError("Query indices do not match the declared sequence")
+                if any(not np.isfinite(t) or t < -1e-9 for t in record["components_seconds"].values()):
+                    raise ValueError("Timing components must be finite and nonnegative")
                 if not np.isclose(sum(record["components_seconds"].values()), record["seconds"], rtol=1e-12):
                     raise ValueError("Timing components do not sum to complete time")
                 for case in record["cases"]:
-                    if (case["status"] != "converged" or max(case["kkt"].values()) > controls["kkt_tolerance"]
-                        or any(row["original_residual"] > controls["rtol"] for row in case["inner"])):
+                    if (case["status"] != "converged"
+                        or any(v is None or not np.isfinite(v) or v > controls["kkt_tolerance"] for v in case["kkt"].values())
+                        or any(row["status"] != "converged" or row["original_residual"] is None
+                               or not np.isfinite(row["original_residual"]) or row["original_residual"] > controls["rtol"]
+                               for row in case["inner"])):
                         raise ValueError("A reported success fails the declared accuracy checks")
+                if record.get("initial_setup_seconds") is not None:
+                    timestamps = [record["initial_setup_seconds"]] + [c["cumulative_seconds"] for c in record["cases"]] + [record["seconds"]]
+                    if not np.isfinite(timestamps).all() or np.any(np.diff(timestamps) < 0):
+                        raise ValueError("Cumulative sequence timestamps must be finite and increasing")
                 records.append(record)
             else:
                 failures.append(record.get("failure") or [c["status"] for c in record.get("cases", [])])
@@ -148,8 +182,9 @@ def summarize(directory):
                      "median_seconds": float(np.median(times)) if times else None,
                      "inner_iterations": [sum(c["inner_iterations"] for c in r["cases"]) for r in records],
                      "outer_iterations": [sum(c["outer_iterations"] for c in r["cases"]) for r in records],
-                     "peak_host_bytes": [r["memory"]["peak_host_rss_bytes"] for r in records if r.get("memory")],
-                     "peak_gpu_bytes": [r["memory"]["peak_gpu_process_bytes"] for r in records if r.get("memory")],
+                     "peak_host_bytes": [r["memory"]["peak_host_rss_bytes"] for r in records if (r.get("memory") or {}).get("complete")],
+                     "peak_gpu_bytes": [r["memory"]["peak_gpu_process_bytes"] for r in records if (r.get("memory") or {}).get("complete")],
+                     "complete_memory_measurements": sum(bool((r.get("memory") or {}).get("complete")) for r in records),
                      "reference_seconds": [r["components_seconds"]["reference_construction"] for r in records]})
     return {"protocol": "mesh-cht-summary-v1", "controls": controls, "methods": rows,
             "interpretation": "Each timing is an independently executed complete sequence. Accepted times and failed outcomes are reported separately."}
