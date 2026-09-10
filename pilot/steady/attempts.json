@@ -1,0 +1,30 @@
+[
+  {
+    "method": "jacobi",
+    "repetition": 0,
+    "status": "completed",
+    "process_wall_seconds": 68.53017853759229,
+    "record": "jacobi-0/record.json"
+  },
+  {
+    "method": "reference",
+    "repetition": 0,
+    "status": "completed",
+    "process_wall_seconds": 45.13857188820839,
+    "record": "reference-0/record.json"
+  },
+  {
+    "method": "recycling",
+    "repetition": 0,
+    "status": "completed",
+    "process_wall_seconds": 86.64317346550524,
+    "record": "recycling-0/record.json"
+  },
+  {
+    "method": "amgx",
+    "repetition": 0,
+    "status": "completed",
+    "process_wall_seconds": 40.92764165252447,
+    "record": "amgx-0/record.json"
+  }
+]
