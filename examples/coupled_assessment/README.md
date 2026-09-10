@@ -4,7 +4,12 @@ This example prepares a forward assessment of saved transformer controls.
 The prescribed-flow optimization and its published solver comparisons remain
 unchanged. The implementation freezes the control selection, verifies the
 original forward equations, and solves coupled axisymmetric momentum and
-thermal equations. Application assessment and resolution checks are in progress.
+thermal equations. Application assessment remains subject to the resolution
+checks below.
+
+The [verification results](#verification-results) currently pause the application
+comparison at its spatial and temporal resolution checks. The original controls
+and prescribed-flow optimization results remain unchanged.
 
 ## Freeze the controls
 
@@ -231,6 +236,60 @@ complete. Forward timings remain separate from the optimization comparisons.
 The main manuscript will receive an assessment subsection after the matched
 calculations and resolution studies establish the accuracy and scope of the
 results.
+
+## Verification results
+
+[Checks v1](checks-v1.json) contains all 14 prescribed-flow forward attempts,
+their stopping outcomes and source identifiers, and both steady refinement
+diagnostics. Original-grid forward substitution reproduces all six selected
+optimization states within 4 × 10⁻¹³ K.
+
+Spatial refinement changes the temperatures produced by the saved steady
+controls. The computed maximum bound excesses are:
+
+| Control | 10,849 nodes | 42,217 nodes | 166,513 nodes |
+| --- | ---: | ---: | ---: |
+| Nominal | < 10⁻¹² K | 38.77 K | 71.39 K |
+| Demanding | < 10⁻¹² K | 41.47 K | 372.21 K |
+
+These are discretization diagnostics. The refined fluid temperatures extend
+beyond the published property range, and the successive solutions have yet to
+meet the declared resolution criteria. Their extrema therefore have unresolved
+physical accuracy. The prescribed P2 velocity and interpolated P1 source remain
+fixed; the source-integral differences are below 1.2 × 10⁻⁹ W.
+
+The projected diffusion and transport matrices agree under refinement to about
+3 × 10⁻¹⁴ in relative Frobenius norm. Streamline stabilization and nodal source
+loading change substantially. For the nominal control at the first refinement,
+their projected residual contributions have norms 0.595 and 0.301 relative to
+the original load norm. The verified decomposition separates these contributions;
+it does not assign the temperature difference to either contribution alone.
+
+On the original spatial mesh, evaluating the three saved four-slab trajectories
+at 16 backward-Euler steps gives maximum bound excesses of 2.03 K, 3.38 K and
+3.08 K for the nominal, active and demanding controls. This calculation retains
+each source value throughout its original 150 s slab. It exposes sensitivity
+to temporal resolution before flow feedback is introduced.
+
+The momentum pilots retain their viscosity-continuation, pseudo-time and direct
+Newton outcomes. The completed attempts have yet to establish a steady baseline
+at the physical viscosity. Further initialization runs were paused after the
+thermal resolution checks, with their intermediate fields preserved. A separate
+mesh- and time-converged control study requires a new optimization protocol.
+The current assessment adds no physical-feasibility claim to the manuscript.
+
+To regenerate the collected report from saved forward and diagnostic records:
+
+```bash
+uv run --locked python examples/coupled_assessment/collect_checks.py \
+  --forward-records FORWARD_RUNS/*/record.json \
+  --thermal-diagnostics THERMAL_DIAGNOSTICS/*.json \
+  --output runs/checks.json
+```
+
+`FORWARD_RUNS` contains the 14 declared prescribed-flow checks and
+`THERMAL_DIAGNOSTICS` contains the nominal and demanding steady diagnostics.
+The collector preserves every supplied outcome and rejects duplicate records.
 
 ## Inspect spatial discretization changes
 

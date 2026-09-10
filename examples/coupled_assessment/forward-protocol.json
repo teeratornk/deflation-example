@@ -1,7 +1,7 @@
 {
   "schema": "cht-forward-published-oil-v3-pilot",
   "selection_protocol": "cht-forward-assessment-v1",
-  "status": "Published parameters and control populations declared; flow initialization under verification before application comparisons.",
+  "status": "Published parameters and control populations declared. Application comparisons are paused after the spatial and temporal verification checks in checks-v1.json; a separate converged-control population requires a new optimization protocol.",
   "material_source": "10.1049/hve2.12345, equations (5)-(8)",
   "source_temperature_domain_K": [
     273.15,

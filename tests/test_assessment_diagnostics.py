@@ -1,6 +1,7 @@
 """Formula-based checks for fixed-source refinement diagnostics."""
 
 import importlib.util
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -59,3 +60,31 @@ def test_projected_thermal_residual_decomposition():
         assert row["galerkin_matrix_relative_changes"]["transport"] < 1e-13
     assert rows[1]["galerkin_matrix_relative_changes"]["stabilization"] > 0.1
     assert rows[1]["projected_residual_components_relative_norm"]["source_loading"] > 0.01
+
+
+def test_collected_checks_keep_populations_outcomes_and_derived_values():
+    path = Path(__file__).parents[1] / "examples/coupled_assessment/checks-v1.json"
+    data = json.loads(path.read_text())
+    records = data["forward_records"]
+    assert len(records) == 14
+    assert len({r["record_sha256"] for r in records}) == 14
+    assert sum(r["trajectory_completed"] for r in records) == 6
+    assert sum(r["status"] == "property_temperature_domain_exceeded" for r in records) == 8
+    for record in records:
+        assert record["configuration"]["mode"] == "prescribed"
+        assert record["source_tree_clean"]
+        assert record["recorded_time_steps"] == len(record["steps"])
+        assert record["observed_peak_temperature_K"] == max(
+            s["peak_temperature_K"] for s in record["steps"]
+        )
+        assert record["observed_bound_violation_K"] == max(
+            max(0, s["peak_temperature_K"] - record["bound_K"]) for s in record["steps"]
+        )
+        if not record["trajectory_completed"]:
+            assert record["metrics"] is None
+    assert len(data["thermal_refinement_diagnostics"]) == 2
+    for item in data["thermal_refinement_diagnostics"]:
+        for row in item["rows"]:
+            assert row["decomposition_identity_relative_error"] < 1e-12
+            assert row["galerkin_matrix_relative_changes"]["diffusion"] < 1e-12
+            assert row["galerkin_matrix_relative_changes"]["transport"] < 1e-12
