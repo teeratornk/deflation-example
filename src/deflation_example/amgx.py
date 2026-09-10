@@ -105,8 +105,13 @@ def amgx_cg(
     x0=None,
     rhs_relative=False,
     acceptance_rtol=None,
+    session_solver_override=False,
 ):
     timer = PhaseTimer()
+    if not isinstance(session_solver_override, bool) or (
+        session_solver_override and not rhs_relative
+    ):
+        raise ValueError("Session solver overrides require RHS-relative absolute stopping")
     timer.synchronize(synchronize)
     A = sparse.csr_matrix(matrix(A), dtype=np.float64).copy()
     b, initial, _ = validate_linear_inputs(A, b, None, None, x0, rtol, maxiter, 1000, 1e10)
@@ -134,8 +139,9 @@ def amgx_cg(
             session = AmgxSession(api, rtol, maxiter, rhs_relative).open()
         if (
             session.resources is None
-            or session.rtol != rtol
-            or session.maxiter != maxiter
+            or (
+                (session.rtol != rtol or session.maxiter != maxiter) and not session_solver_override
+            )
             or session.rhs_relative != rhs_relative
         ):
             raise ValueError("AmgX session is closed or has different solver controls")
@@ -145,6 +151,7 @@ def amgx_cg(
         if rhs_relative:
             configuration = deepcopy(session.configuration)
             configuration["solver"]["tolerance"] = absolute_tolerance
+            configuration["solver"]["max_iters"] = maxiter
             solver_config = api.Config().create_from_dict(configuration)
             objects.append(solver_config)
         gpu_matrix = api.Matrix().create(session.resources, "dDDI")

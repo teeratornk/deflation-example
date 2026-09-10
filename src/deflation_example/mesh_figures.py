@@ -26,7 +26,7 @@ def plot_showcases(transformer, engine, output, queries=(0, 7, 15), slab=1):
 
     if not queries or len(set(queries)) != len(queries):
         raise ValueError("Choose distinct target indices")
-    fig = plt.figure(figsize=(3 * (len(queries) + 1), 9.0), constrained_layout=True)
+    fig = plt.figure(figsize=(1.9 * (len(queries) + 1), 6.2), constrained_layout=True)
     grid = fig.add_gridspec(4, len(queries) + 1, width_ratios=[1.35] + [1] * len(queries))
     materials_cmap = ListedColormap(["#66c2a5", "#c5c5c5", "#8da0cb"])
     for row, directory in enumerate((transformer, engine)):

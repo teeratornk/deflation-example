@@ -56,6 +56,7 @@ class MeshStudyConfig:
     kkt_tolerance: float = 1e-8
     cg_factor: float = 0.1
     amgx_factor: float = 0.1
+    residual_policy: str = "terminal"
     matrix_free_inner: bool = False
     monitor_memory: bool = False
     save_fields: bool = True
@@ -103,6 +104,8 @@ def controls(config):
         raise ValueError("The upper bound must include the zero-excess Dirichlet temperature")
     if max(c["cg_factor"], c["amgx_factor"]) > 1:
         raise ValueError("Internal tolerance factors must not exceed one")
+    if c["residual_policy"] not in {"terminal", "refine"}:
+        raise ValueError("Residual policy must be terminal or refine")
     if c["geometry"] not in {"transformer_2d", "engine_3d"}:
         raise ValueError("Unknown geometry")
     if c["phase"] not in {"pilot", "final"} or c["device"] not in {"cpu", "cuda"}:
@@ -226,6 +229,7 @@ def sequence(c, method, torch=None, api=None):
                 torch=torch,
                 api=api,
                 resident_recycling=c["reference_device"] == "cuda",
+                residual_policy=c.get("residual_policy", "terminal"),
             )
         components["solver_resources"] = time.perf_counter() - tick
         initial_setup_seconds = time.perf_counter() - start

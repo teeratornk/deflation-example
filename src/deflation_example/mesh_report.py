@@ -255,7 +255,7 @@ def plot_sequences(loaded, output):
 
     rows = (len(loaded) + 1) // 2
     fig, axes = plt.subplots(
-        rows, 2, figsize=(10, 2.7 * rows), squeeze=False, constrained_layout=True
+        rows, 2, figsize=(8, 2.7 * rows), squeeze=False, constrained_layout=True
     )
     for ax, (report, records) in zip(axes.flat, loaded):
         for method, data in records.items():
@@ -290,7 +290,7 @@ def plot_sequences(loaded, output):
                 f"Fastest alternative: {NAMES[method]}\nAlternative / reference: {ratio:.2f}×",
                 va="top",
                 transform=ax.transAxes,
-                fontsize=8,
+                fontsize=9,
             )
         ax.set(
             title=_label(report),

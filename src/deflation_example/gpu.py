@@ -53,6 +53,7 @@ def _gpu_deflated_cg(
     cache_operator_product,
     device_basis=None,
     diagnostics=False,
+    verify_candidates=False,
 ):
     """Return (LinearResult, timing/memory metrics), verified with the CPU matrix.
 
@@ -253,6 +254,12 @@ def _gpu_deflated_cg(
                 restart = iterations % refresh == 0 or small_residual(r)
                 if restart:
                     diagnose("residual_refresh", r, p, rz, curvature)
+                    if verify_candidates:
+                        # Return for the independent CPU check before replacing
+                        # the residual in the projected recurrence. The caller
+                        # may solve a fresh error equation if this candidate fails.
+                        status = "residual_gap"
+                        break
                     r = rhs - apply(x)
                     if small_residual(r):
                         status = "converged"
@@ -324,6 +331,7 @@ def gpu_deflated_cg(
     cache_operator_product=False,
     device_basis=None,
     diagnostics=False,
+    verify_candidates=False,
 ):
     """Verified CUDA solve, including conversion, transfers and temporary cleanup.
 
@@ -344,6 +352,8 @@ def gpu_deflated_cg(
         raise ValueError("Operator-product caching must be Boolean")
     if not isinstance(diagnostics, bool):
         raise ValueError("Diagnostics must be Boolean")
+    if not isinstance(verify_candidates, bool):
+        raise ValueError("Candidate verification must be Boolean")
     for callback in (direction_callback, completion_callback):
         if callback is not None and not callable(callback):
             raise ValueError("Solver callbacks must be callable")
@@ -373,6 +383,7 @@ def gpu_deflated_cg(
         cache_operator_product=cache_operator_product,
         device_basis=device_basis,
         diagnostics=diagnostics,
+        verify_candidates=verify_candidates,
     )
     # Returning from the helper releases its temporary GPU tensors. The
     # returned solution owns CPU storage only. No empty_cache() is charged.

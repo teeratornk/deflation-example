@@ -54,6 +54,7 @@ class StudySolver:
         torch=None,
         api=None,
         resident_recycling=False,
+        residual_policy="terminal",
     ):
         if method not in METHODS or device not in {"cpu", "cuda"}:
             raise ValueError("Unknown study solver or device")
@@ -74,6 +75,9 @@ class StudySolver:
         if max(self.amgx_factor, self.cg_factor) > 1:
             raise ValueError("Internal stopping factors must not exceed one")
         self.method, self.device = method, device
+        if residual_policy not in {"terminal", "refine"}:
+            raise ValueError("Residual policy must be terminal or refine")
+        self.residual_policy = residual_policy
         self.reference, self.torch, self.api = reference, torch, api
         self.history = (
             RecycleSpace(rank, window, device, resident=resident_recycling)
@@ -96,7 +100,33 @@ class StudySolver:
         self.reset_history()
 
     def solve(self, B, b, indices, initial=None):
+        if self.residual_policy == "refine":
+            from .refinement import verified_refinement
+
+            return verified_refinement(
+                lambda rhs, guess, target, cap: self._solve_once(
+                    B,
+                    rhs,
+                    indices,
+                    guess,
+                    target=target,
+                    cap=cap,
+                    verify_candidates=True,
+                ),
+                B,
+                b,
+                initial,
+                self.rtol,
+                self.maxiter,
+            )
+        return self._solve_once(B, b, indices, initial)
+
+    def _solve_once(
+        self, B, b, indices, initial=None, *, target=None, cap=None, verify_candidates=False
+    ):
         start = time.perf_counter()
+        target = self.rtol if target is None else target
+        cap = self.maxiter if cap is None else cap
         indices = inactive_indices(indices)
         if self.previous is None:
             newly_inactive, newly_active = None, None
@@ -129,11 +159,12 @@ class StudySolver:
                 api=self.api,
                 synchronize=self.torch.cuda.synchronize,
                 session=self.session,
-                rtol=self.rtol * self.amgx_factor,
-                acceptance_rtol=self.rtol,
-                maxiter=self.maxiter,
+                rtol=target * self.amgx_factor,
+                acceptance_rtol=target,
+                maxiter=cap,
                 x0=initial,
                 rhs_relative=True,
+                session_solver_override=verify_candidates,
             )
         elif self.device == "cuda":
             from .gpu import gpu_deflated_cg
@@ -144,15 +175,16 @@ class StudySolver:
                 None if device_basis else basis,
                 diagonal,
                 x0=initial,
-                rtol=self.rtol * self.cg_factor,
-                acceptance_rtol=self.rtol,
-                maxiter=self.maxiter,
+                rtol=target * self.cg_factor,
+                acceptance_rtol=target,
+                maxiter=cap,
                 basis_backend="gpu_qr",
                 refresh=self.refresh,
                 cache_operator_product=self.cache_operator_product,
                 direction_callback=None if self.history is None else self.history.capture,
                 completion_callback=None if self.history is None else self.history.finish,
                 device_basis=basis if device_basis else None,
+                verify_candidates=verify_candidates,
             )
         else:
             tick = time.perf_counter()
@@ -162,14 +194,14 @@ class StudySolver:
                 basis,
                 diagonal,
                 x0=initial,
-                rtol=self.rtol * self.cg_factor,
-                maxiter=self.maxiter,
+                rtol=target * self.cg_factor,
+                maxiter=cap,
                 refresh=self.refresh,
                 cache_operator_product=self.cache_operator_product,
                 direction_callback=None if self.history is None else self.history.capture,
             )
             kernel_seconds = time.perf_counter() - tick
-            if result.status in {"maxiter", "residual_failed"} and result.residual <= self.rtol:
+            if result.status in {"maxiter", "residual_failed"} and result.residual <= target:
                 result.status = "converged"
             tick = time.perf_counter()
             selection = None
@@ -186,8 +218,8 @@ class StudySolver:
                 "total_seconds": kernel_seconds + selection_seconds,
                 "components_seconds": parts,
                 "completion": selection,
-                "iteration_rtol": self.rtol * self.cg_factor,
-                "acceptance_rtol": self.rtol,
+                "iteration_rtol": target * self.cg_factor,
+                "acceptance_rtol": target,
                 "operator_product_cached": bool(self.cache_operator_product and result.rank),
                 "cached_operator_product_bytes": B.shape[0] * result.rank * 8
                 if self.cache_operator_product
