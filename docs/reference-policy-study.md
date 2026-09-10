@@ -131,6 +131,7 @@ sequential zero-extension transfer:
 ```bash
 uv run --locked python -m deflation_example.benchmark_transfer --records-root runs/transient-cpu-pilot --output runs/transfer --repeats 3
 uv run --locked python -m deflation_example.benchmark_cht_conditioning --output runs/cht-conditioning
+uv run --locked python -m deflation_example.benchmark_cht_validation --output runs/independent-validation
 uv run --locked python -m deflation_example.benchmark_cht_report --records-roots runs/transient-cpu-pilot --output runs/trajectory-summary
 ```
 
@@ -197,3 +198,53 @@ the same timing and memory boundary. The rank-zero Jacobi path allocates no such
 product. The underlying CPU and GPU kernels expose this as an explicit option;
 their legacy default remains uncached. Tests compare both implementations with
 independent solutions and verify rank-zero and conditioning-fallback behavior.
+
+The independent validation report contains nine distinct small steady and
+transient problems. A bounded-variable least-squares optimizer supplies a separate
+solution and KKT check for each problem. Jacobi-CG, reference deflation and
+recycling then solve the complete PDAS problems. Uniform and unequal time steps
+use nonzero initial temperature. The report records forward and adjoint action
+checks, recovered trajectories, objective agreement, state differences and every
+inner residual. These cases validate the discretization and optimizer; their
+execution times do not support performance claims.
+
+## Frozen complete-optimization campaign
+
+`benchmark_cht_campaign` declares the final populations before execution. Each
+primary comparison uses 16 distinct targets, five independently timed sequences,
+all four solvers and fully matched warm starts. Steady grids have 24, 32, 48 and
+64 interior nodes per axis. Transient grids have 12, 16, 24 and 32 nodes per axis
+with eight time slabs. Temporal refinement uses 4, 8, 16 and 32 slabs at fixed
+grid 16 and horizon 0.1. The physical bound stays fixed within each family.
+
+The rank study uses 20, 100 and 200 directions at steady grid 32 and transient
+grid 24. The Jacobi method supplies the rank-zero comparison. Cold-start controls
+use those same two grids. Both CG and AmgX use an internal margin of 0.1 relative
+to the independent final tolerance of `1e-10`; PDAS requires every KKT component
+to be at most `1e-8`. Every first target starts with the full active set. The
+residual-refresh interval is 10000 iterations. These choices follow the recorded
+stopping and initialization pilots, whose failed attempts remain available.
+
+The mode-dependent temporal reference is fixed for the final study. It satisfies
+the declared homogeneous reference eigenproblem. Its measured construction pilot
+costs were similar to the tensor alternative. Both candidate constructions and
+their outcomes remain part of the study records.
+
+The campaign also declares common GPU memory screens of 8, 16 and 64 GiB and a
+16 GiB host screen. Numerical acceptance and memory feasibility remain separate.
+Reports first compare equal requested ranks, then show the measured time of
+feasible rank choices under each common screen. Those comparisons account for
+the full process allocation, including numerical-library caches. Sampling can
+miss shorter peaks, so these screens do not certify a hard allocation limit.
+
+After reproducing the calibration pilots, run any subset from a clean checkout:
+
+```bash
+uv run --no-sync python -m deflation_example.benchmark_cht_campaign --selected steady24 steady32 --steady-calibration runs/steady-calibration/results.json --transient-calibration runs/transient-calibration/results.json --output runs/final-steady-small
+```
+
+The command's help lists all declared populations. Separate invocations can run
+disjoint populations concurrently on separate GPUs. Each output directory retains
+the complete campaign declaration, source identifier, calibrated protocols and
+every sequence outcome. A failed solve does not prevent the remaining declared
+comparisons from running.
