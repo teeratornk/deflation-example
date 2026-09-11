@@ -3,6 +3,8 @@ defaults:
   - override hydra/hydra_logging: disabled
   - _self_
 
+seed_directory: null
+
 output: runs/coupled-baseline
 level: 0
 inlet_factor: 1.0

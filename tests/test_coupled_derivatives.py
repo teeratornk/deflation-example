@@ -6,11 +6,34 @@ import pytest
 from deflation_example.axisymmetric_flow import AxisymmetricFlow
 from deflation_example.coupled_control import CoupledControlProblem, FlowEvaluationError
 from deflation_example.coupled_derivatives import (
+    ControlJacobian,
     GaussNewtonOperator,
     buoyancy_jacobian,
     thermal_velocity_jacobian,
 )
 from test_axisymmetric_flow import annular_rectangle
+
+
+def test_zero_velocity_sensitivity_never_invokes_momentum_tangent_solves():
+    from scipy import sparse
+
+    class ForbiddenSolve:
+        def solve(self, *args, **kwargs):
+            raise AssertionError("Zero thermal sensitivity must bypass momentum solves")
+
+    T = sparse.diags([np.full(3, -0.4), np.arange(1, 5)], [-1, 0], shape=(4, 4), format="csr")
+    zero = sparse.csr_matrix((2, 3))
+    J = ControlJacobian(
+        T,
+        [zero, zero],
+        sparse.csr_matrix(np.ones((3, 2))),
+        [ForbiddenSolve(), ForbiddenSolve()],
+        [sparse.eye(3), sparse.eye(3)],
+    )
+    vectors = np.arange(12, dtype=float).reshape(4, 3)
+    np.testing.assert_array_equal(J @ vectors, T @ vectors)
+    np.testing.assert_array_equal(J.T @ vectors, T.T @ vectors)
+    assert J.thermal_only
 
 
 def small_coupled_problem(steps=None, feedback=0.003, uniform_capacity=False):

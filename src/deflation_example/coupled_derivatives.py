@@ -98,7 +98,10 @@ class ControlJacobian(LinearOperator):
 
     def __init__(self, thermal, velocity_actions, buoyancy, factors, history):
         self.thermal = sparse.csr_matrix(thermal)
-        self.velocity_actions = tuple(velocity_actions)
+        self.velocity_actions = tuple(sparse.csr_matrix(A, copy=True) for A in velocity_actions)
+        for action in self.velocity_actions:
+            action.eliminate_zeros()
+        self.thermal_only = not any(A.nnz for A in self.velocity_actions)
         self.buoyancy = sparse.csr_matrix(buoyancy)
         self.factors, self.history = tuple(factors), tuple(history)
         self.slabs = len(self.factors)
@@ -116,6 +119,8 @@ class ControlJacobian(LinearOperator):
         columns = directions.shape[1]
         if not columns:
             return np.empty_like(directions)
+        if self.thermal_only:
+            return self.thermal @ directions
         dy = np.asarray(directions).reshape(self.slabs, self.spatial_size, columns)
         result = (self.thermal @ directions).reshape(dy.shape)
         previous = np.zeros((self.buoyancy.shape[0], columns))
@@ -131,6 +136,8 @@ class ControlJacobian(LinearOperator):
         columns = vectors.shape[1]
         if not columns:
             return np.empty_like(vectors)
+        if self.thermal_only:
+            return self.thermal.T @ vectors
         z = np.asarray(vectors).reshape(self.slabs, self.spatial_size, columns)
         result = (self.thermal.T @ vectors).reshape(z.shape)
         following = np.zeros((self.buoyancy.shape[0], columns))

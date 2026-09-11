@@ -24,10 +24,15 @@ class CudaControlJacobian:
         self.shape = jacobian.shape
         self.slabs, self.spatial_size = jacobian.slabs, jacobian.spatial_size
         self.thermal = sparse.csr_matrix(jacobian.thermal)
+        self.thermal_only = jacobian.thermal_only
         self.buoyancy = sparse.csr_matrix(jacobian.buoyancy)
         self.velocity_actions = tuple(sparse.csr_matrix(A) for A in jacobian.velocity_actions)
         self.history = tuple(sparse.csr_matrix(A) for A in jacobian.history)
-        self.factors = tuple(PersistentSuperLU(factor) for factor in jacobian.factors)
+        self.factors = (
+            ()
+            if self.thermal_only
+            else tuple(PersistentSuperLU(factor) for factor in jacobian.factors)
+        )
         cp.cuda.get_current_stream().synchronize()
 
     def apply(self, vectors, *, transpose=False):
@@ -42,6 +47,8 @@ class CudaControlJacobian:
             return cp.empty_like(x)
         blocks = x.reshape(self.slabs, self.spatial_size, columns)
         result = ((self.thermal.T if transpose else self.thermal) @ x).reshape(blocks.shape)
+        if self.thermal_only:
+            return result.ravel() if vector else result.reshape(self.shape[0], columns)
         adjacent = cp.zeros((self.buoyancy.shape[0], columns))
         if transpose:
             for n in range(self.slabs - 1, -1, -1):

@@ -73,6 +73,23 @@ def test_cuda_secant_curvature_matches_cpu_full_and_inactive_products():
 
 
 @pytest.mark.gpu
+def test_cuda_isothermal_derivative_avoids_factor_upload():
+    cp = pytest.importorskip("cupy")
+    problem = small_coupled_problem([0.2, 0.35])
+    problem.thermal_boundary[:] = 0
+    ev = problem.evaluate(np.zeros(problem.size))
+    assert ev.jacobian.thermal_only
+    device = CudaControlJacobian(ev.jacobian)
+    assert not device.factors
+    x = np.arange(problem.size, dtype=float)
+    np.testing.assert_allclose(cp.asnumpy(device.apply(x)), ev.jacobian @ x, atol=1e-11)
+    np.testing.assert_allclose(
+        cp.asnumpy(device.apply(x, transpose=True)), ev.jacobian.T @ x, atol=1e-11
+    )
+    device.close()
+
+
+@pytest.mark.gpu
 def test_persistent_triangular_factors_reuse_and_release_block_plans():
     cp = pytest.importorskip("cupy")
     from scipy import sparse

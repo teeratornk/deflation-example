@@ -68,6 +68,12 @@ failed stage remains visible. `grad_div_scale` in the baseline pilot defines a
 separate momentum discretization and must be included in comparisons and source
 identification.
 
+For a separate nested-initialization check, `level=1
+seed_directory=runs/coarse-baseline` prolongs a verified matching coarse P2
+velocity and P1 pressure before solving the original fine-mesh momentum
+equations. Its physical coefficients and inlet speed must match the seed.
+The seed changes the initial iterate, not the final equations or tolerance.
+
 ## Numerical-policy pilots
 
 The default nonlinear policy remains damped Gauss--Newton with halving
@@ -106,3 +112,49 @@ The diagnostic scripts in this directory have `--help` interfaces:
 
 Operator timings exclude complete optimization and must remain separate from
 its cost comparisons. All pilot failures and iteration caps remain recorded.
+
+## Complete sequences
+
+After freezing a verified operating point, discretization and nonlinear policy,
+run each method and repetition in a fresh process:
+
+```bash
+uv sync --frozen --extra study
+uv run --extra study python -m deflation_example.coupled_sequence baseline_directory=runs/inlet-1 method=reference repetition=0 output=runs/sequence-reference-0
+```
+
+The configuration declares five target/bound pairs over the complete 600 s
+trajectory. Its current defaults are a development starting point, not a frozen
+performance protocol. `method=jacobi` and `method=recycling` select the matched
+alternatives. The three methods must use identical nonlinear-policy settings,
+accuracy, discretization and start policy. Add `--extra coupled-gpu` and
+`device=cuda` for a separate CUDA comparison.
+
+The wall interval includes assembly, reference construction, all optimization
+steps, verification and cleanup. Calibration and process preparation are
+reported separately. Output serialization follows the timer. All requested
+targets appear, including numerical failures and targets skipped after an
+unrecoverable error. Only verified solutions supply outer warm starts; recycling
+history persists across successful queries under both outer-start policies.
+The memory sampler observes host resident memory and the same process's GPU
+allocation through NVML. Peaks include retained output arrays and allocator
+caches, and sampling can miss short-lived peaks. Repetition numbers identify
+independently launched sequences; the runner never substitutes sums of
+per-instance medians for complete timings.
+
+## Fixed-control resolution checks
+
+```bash
+uv run python -m deflation_example.coupled_resolution --baseline runs/inlet-1 --optimization runs/transient-control --method reference --subdivision 1 --output runs/replay-original
+uv run python -m deflation_example.coupled_resolution --baseline runs/inlet-1 --optimization runs/transient-control --method reference --subdivision 2 --output runs/replay-refined
+```
+
+The first command checks agreement with a verified discrete optimizer result.
+The second divides every original physical time interval into two substeps.
+Both apply the saved source unchanged, using a piecewise-constant temporal
+representation and zero source values at prescribed-temperature nodes.
+The forward solver enforces both momentum and thermal equations at every
+substep. It neither reoptimizes the source nor clips the temperature. Endpoint
+differences and bound violations are resolution diagnostics; refined forward
+responses are not new constrained optima. Spatial refinement and tracking-error
+resolution are additional requirements of the declared final protocol.

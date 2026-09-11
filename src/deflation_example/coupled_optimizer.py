@@ -154,6 +154,7 @@ def minimize_coupled(
     solver,
     *,
     initial=None,
+    initial_evaluation=None,
     tolerance=1e-8,
     max_iterations=100,
     qp_tolerance=1e-10,
@@ -189,7 +190,7 @@ def minimize_coupled(
     if y.shape != (problem.size,) or not np.isfinite(y).all():
         raise ValueError("Initial temperature must match the complete trajectory")
     y = np.clip(y, lower, upper)
-    evaluation = problem.evaluate(y)
+    evaluation = problem.evaluate(y, initial=initial_evaluation)
     objective, gradient = problem.objective_gradient(evaluation, desired)
     history, status = [], "nonlinear_iteration_cap"
     damping = float(initial_damping)
