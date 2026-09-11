@@ -7,6 +7,10 @@ optimizes the complete trajectory, with an upper temperature bound at every
 positive time level. Velocity and material properties remain fixed during
 optimization.
 
+The [detailed supplementary tables](supplementary-tables.md) provide the
+per-case accuracy, cost, preparation, memory and refinement diagnostics.
+All tables can be read on GitHub and regenerated without a GPU.
+
 A separate [forward-assessment example](../examples/coupled_assessment/README.md)
 prepares fixed optimized controls and verifies axisymmetric momentum
 components for a proposed two-way flow–temperature assessment. Coupled

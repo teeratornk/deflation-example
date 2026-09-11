@@ -1,0 +1,301 @@
+{
+  "format": "supplementary-tables-v1",
+  "manuscript_source": "c2d10a54727c5fa9e681d2491ec663c2ba2d0381",
+  "repository": "https://github.com/teeratornk/opt_control",
+  "numerical_sources": {
+    "body_fitted": "dc89ae8518ff6a975eadf2f6f3bae1acbd17b83b",
+    "correction": "926b37c40935fbbe7134a3ab5f87ebdfddb68837",
+    "guard": "0b3b3f06a535f515256932c0dbf27537c242744d",
+    "cartesian": "cc611292f66025f4d0f96a406c6aeb67799b7d34"
+  },
+  "data_versions": [
+    "mesh-cht-data-v1",
+    "mesh-cht-refinement-data-v1",
+    "reference-policy-data-v1"
+  ],
+  "procedures_guide": "mesh-showcases.md#choose-the-numerical-procedure",
+  "tables": [
+    {
+      "id": "body-fitted-accuracy",
+      "title": "Body-fitted accuracy",
+      "previous_table": "S6",
+      "columns": [
+        "Geometry",
+        "Form",
+        "Method",
+        "Original residual",
+        "KKT",
+        "Deployed rank",
+        "Fallbacks"
+      ],
+      "description": "Maxima over five complete 16-target repetitions. The original linear residual is relative; primal feasibility is absolute and the other KKT components follow the manuscript normalization. Recycling starts with rank zero. Fallbacks count conditioning-safeguard rejections.",
+      "guide": "mesh-showcases.md#rebuild-the-comparison-artifacts",
+      "files": [
+        {
+          "path": "sources/mesh_primary_accuracy_rows.tex",
+          "sha256": "68d5fb0a3cc74eefd6386d37a67551dd413e9c81dac6a09d658fb10491c2e362",
+          "source_path": "sections/generated/mesh/primary_accuracy_rows.tex",
+          "rows": 24
+        },
+        {
+          "path": "sources/mesh_controls_accuracy_rows.tex",
+          "sha256": "02983e0b9b53db3858255ec9fd496a0e8ae49e36ec3ccc83691d770985a55b1e",
+          "source_path": "sections/generated/mesh/controls_accuracy_rows.tex",
+          "rows": 16
+        }
+      ]
+    },
+    {
+      "id": "body-fitted-cost-components",
+      "title": "Body-fitted cost components",
+      "previous_table": "S7",
+      "columns": [
+        "Geometry",
+        "Form",
+        "Method",
+        "Setup (s)",
+        "Iteration (s)",
+        "Transfer (s)",
+        "Verification (s)",
+        "Other (s)",
+        "Total (s)"
+      ],
+      "description": "Disjoint components of the actual median-time repetition. Setup includes assembly, reference construction, inactive extraction, basis processing, and coarse or hierarchy setup. Verification includes independent residuals and KKT checks. Rows sum to complete time before rounding.",
+      "guide": "mesh-showcases.md#rebuild-the-comparison-artifacts",
+      "files": [
+        {
+          "path": "sources/mesh_primary_component_rows.tex",
+          "sha256": "6f561764173c3151f3316cfab8742f1caeab948ae9bcfaf26cb47be277d0ccd5",
+          "source_path": "sections/generated/mesh/primary_component_rows.tex",
+          "rows": 24
+        },
+        {
+          "path": "sources/mesh_controls_component_rows.tex",
+          "sha256": "2f6990137538d983087236893dd29f462899bfd5d1572c968f3e6d1b4f135565",
+          "source_path": "sections/generated/mesh/controls_component_rows.tex",
+          "rows": 16
+        }
+      ]
+    },
+    {
+      "id": "body-fitted-preparation",
+      "title": "Body-fitted preparation",
+      "previous_table": "S8",
+      "columns": [
+        "Geometry",
+        "Form",
+        "Method",
+        "Complete (s)",
+        "Initialize (s)",
+        "Finalize (s)",
+        "Library total (s)",
+        "Process (s)"
+      ],
+      "description": "Medians of five independently timed sequences. Library total adds initialization and finalization to complete time. Process time also includes imports, monitoring, serialization, and field output. Medians of separate intervals need not sum to the median of their sum. These fixed-bound cases require no calibration.",
+      "guide": "mesh-showcases.md#rebuild-the-comparison-artifacts",
+      "files": [
+        {
+          "path": "sources/mesh_primary_preparation_rows.tex",
+          "sha256": "5adb027c1fa35ac0244c968dfffee21e2572dca19bdf6670d2c5954a1a5a65be",
+          "source_path": "sections/generated/mesh/primary_preparation_rows.tex",
+          "rows": 24
+        },
+        {
+          "path": "sources/mesh_controls_preparation_rows.tex",
+          "sha256": "53a93729a9ee8e38d81a87fcde523b5787bb72eaef55d54768e140e4c78db226",
+          "source_path": "sections/generated/mesh/controls_preparation_rows.tex",
+          "rows": 16
+        }
+      ]
+    },
+    {
+      "id": "body-fitted-memory-budgets",
+      "title": "Body-fitted memory budgets",
+      "previous_table": "S9",
+      "columns": [
+        "GPU budget (GiB)",
+        "Method",
+        "Selected rank",
+        "Complete time (s)",
+        "GPU peak (GiB)"
+      ],
+      "description": "Retrospective screens of the larger steady bore-in-block mesh at ranks 20, 100, and 200. Eligible choices satisfy the budget in every repetition; the selected choice has the lowest median complete time. A dash means no measured choice fits. Execution imposed no allocation cap.",
+      "guide": "mesh-showcases.md#rebuild-the-comparison-artifacts",
+      "files": [
+        {
+          "path": "sources/mesh_memory_rows.tex",
+          "sha256": "fe2eabe0eba27c7cc604b1067d75d7628a6387c5834e19270d3786569daa55b1",
+          "source_path": "sections/generated/mesh/memory_rows.tex",
+          "rows": 12
+        }
+      ]
+    },
+    {
+      "id": "finer-transformer-diagnostics",
+      "title": "Finer-transformer diagnostics",
+      "previous_table": "S12",
+      "columns": [
+        "Form",
+        "Query",
+        "PDAS step",
+        "Inactive degrees of freedom",
+        "CG iterations",
+        "Coarse condition number",
+        "Original residual",
+        "r^T z",
+        "p^T B p"
+      ],
+      "description": "All seven scalar-check breakdowns from the two original four-target reference sequences. Query and PDAS step are one-based. Every basis retains rank 100. Residual is independently recomputed relative to the original inactive equations. Positive curvature and negative projected scalars support the residual-gap diagnosis. These are the original attempts, separate from the corrected timing comparisons.",
+      "guide": "mesh-showcases.md#finer-transformer-residual-correction",
+      "files": [
+        {
+          "path": "sources/mesh_refinement_diagnostic_rows.tex",
+          "sha256": "417fe18312637b0b9fc5fcf8866bc800eecf0094a275420d6db9e20197242875",
+          "source_path": "sections/generated/mesh_refinement/diagnostic_rows.tex",
+          "rows": 7
+        }
+      ]
+    },
+    {
+      "id": "cartesian-deployed-ranks",
+      "title": "Cartesian deployed ranks",
+      "previous_table": "S20",
+      "columns": [
+        "Grid and slabs",
+        "Start",
+        "Method",
+        "Requested rank",
+        "Deployed range",
+        "Fallbacks"
+      ],
+      "description": "Every inner solve from five complete repetitions contributes to the deployed-rank range. Recycling begins with empty history. Fallback counts refer to conditioning-safeguard rejections.",
+      "guide": "reference-policy-study.md#regenerate-the-submitted-figures-and-tables",
+      "files": [
+        {
+          "path": "sources/cht_rank_status_rows.tex",
+          "sha256": "db29a2d558576d004eda02377a4a1a3ae81f3afaf3ad3fcbc3a9ba7ff4c40375",
+          "source_path": "sections/generated/cht/rank_status_rows.tex",
+          "rows": 34
+        }
+      ]
+    },
+    {
+      "id": "cartesian-steady-preparation",
+      "title": "Cartesian steady preparation",
+      "previous_table": "S23",
+      "columns": [
+        "Grid",
+        "Start",
+        "Method",
+        "Rank",
+        "Complete (s)",
+        "With preparation (s)"
+      ],
+      "description": "Preparation-inclusive medians add the common steady calibration once to the full process lifetime. The process interval already contains optimization time; complete time is not added again. Each comparison has five 16-target repetitions.",
+      "guide": "reference-policy-study.md#regenerate-the-submitted-figures-and-tables",
+      "files": [
+        {
+          "path": "sources/cht_preparation_rows_steady.tex",
+          "sha256": "f10ca74d0ec073220d8a28e97a21d9701bd4eec244ca715c96af8c18599626e9",
+          "source_path": "sections/generated/cht/preparation_rows_steady.tex",
+          "rows": 24
+        }
+      ]
+    },
+    {
+      "id": "cartesian-transient-preparation",
+      "title": "Cartesian transient preparation",
+      "previous_table": "S24",
+      "columns": [
+        "Grid and slabs",
+        "Start",
+        "Method",
+        "Rank",
+        "Complete (s)",
+        "With preparation (s)"
+      ],
+      "description": "Preparation-inclusive medians add the common transient calibration once to the full process lifetime. Every query optimizes a complete trajectory. The physical horizon and bound remain fixed during refinement.",
+      "guide": "reference-policy-study.md#regenerate-the-submitted-figures-and-tables",
+      "files": [
+        {
+          "path": "sources/cht_preparation_rows_transient.tex",
+          "sha256": "26d0516325d472d781c533522c4006c342850b856cbf2ff33dc2d5a5c7533d14",
+          "source_path": "sections/generated/cht/preparation_rows_transient.tex",
+          "rows": 36
+        }
+      ]
+    },
+    {
+      "id": "cartesian-steady-memory",
+      "title": "Cartesian steady memory",
+      "previous_table": "S25",
+      "columns": [
+        "Grid",
+        "Slabs",
+        "Start",
+        "Method",
+        "Rank",
+        "Host peak (GiB)",
+        "GPU peak (GiB)",
+        "Maximum sampling gap (s)"
+      ],
+      "description": "Largest sampled full-process allocations across all five repetitions. Both host and GPU values include numerical-library allocation and caches. The final column restores the sampling diagnostics from the original data. These sampled peaks are lower bounds on instantaneous peaks.",
+      "guide": "reference-policy-study.md#regenerate-the-submitted-figures-and-tables",
+      "files": [
+        {
+          "path": "sources/cht_memory_rows_steady.tex",
+          "sha256": "5cccb83d38b81946e34e791eb610e8a1ef5ce9b4ec81d46f7a2f0538ade82f4e",
+          "source_path": "sections/generated/cht/memory_rows_steady.tex",
+          "rows": 24
+        }
+      ]
+    },
+    {
+      "id": "cartesian-transient-memory",
+      "title": "Cartesian transient memory",
+      "previous_table": "S26",
+      "columns": [
+        "Grid",
+        "Slabs",
+        "Start",
+        "Method",
+        "Rank",
+        "Host peak (GiB)",
+        "GPU peak (GiB)",
+        "Maximum sampling gap (s)"
+      ],
+      "description": "The same process-level measurement covers the coupled space-time operator, compact reference factors, deployed bases, cached products, and recycling candidates. Each row includes all five repetitions, including rank and cold-start controls.",
+      "guide": "reference-policy-study.md#regenerate-the-submitted-figures-and-tables",
+      "files": [
+        {
+          "path": "sources/cht_memory_rows_transient.tex",
+          "sha256": "fc7cbfaab4396693dac1d3e7c40ec80775cc565d10b204e3d89d505b9a2306ba",
+          "source_path": "sections/generated/cht/memory_rows_transient.tex",
+          "rows": 36
+        }
+      ]
+    },
+    {
+      "id": "cartesian-memory-budgets",
+      "title": "Cartesian memory budgets",
+      "previous_table": "S27",
+      "columns": [
+        "Problem",
+        "GPU budget (GiB)",
+        "Method",
+        "Selected rank",
+        "Complete time (s)"
+      ],
+      "description": "Retrospective rank choices at steady 32^3 and transient 24^3 with eight slabs. The host budget is 16 GiB. Choices must meet the residual and KKT criteria and fit the sampled-memory budget in all repetitions. A dash means no measured rank qualifies; no allocator cap was enforced.",
+      "guide": "reference-policy-study.md#regenerate-the-submitted-figures-and-tables",
+      "files": [
+        {
+          "path": "sources/cht_memory_budget_rows.tex",
+          "sha256": "dd020297dc1dc1677a443cc26d035372471ac7b19514505cfe0b809f2231e801",
+          "source_path": "sections/generated/cht/memory_budget_rows.tex",
+          "rows": 24
+        }
+      ]
+    }
+  ]
+}

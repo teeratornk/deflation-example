@@ -7,6 +7,10 @@ optimization traces. Earlier benchmark records retain their original scope.
 
 ## Claims and measurements
 
+The [detailed supplementary tables](supplementary-tables.md#cartesian-deployed-ranks)
+provide the full rank, preparation-time and memory listings, with reproduction
+commands and unchanged source data.
+
 | Claim | Comparison or verification | Required quantities |
 |---|---|---|
 | Full-domain storage supplies reference values at released constraints | Replay identical optimization traces with direct restriction and sequential zero-extension transfer | Newly active and newly inactive nodes, actual rank, transferred-space difference, coarse energy-error reduction, accepted iterations and total kernel cost |
