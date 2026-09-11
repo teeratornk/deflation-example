@@ -240,7 +240,7 @@ the checks. A single-repetition summary remains a pilot comparison.
 Plot stored temperature, source and velocity fields with:
 
 ```bash
-uv run --extra plot python -m deflation_example.coupled_figures --baseline runs/stabilized-baseline --optimization runs/transient-control --method reference --output runs/coupled-fields
+uv run --extra plot python -m deflation_example.coupled_figures --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --method reference --output runs/coupled-fields
 ```
 
 For sequence data, add `--target-position 0`. The default time levels are the
@@ -252,7 +252,7 @@ physical times, units, field checksum and interpolation conventions.
 ```bash
 uv run python -m deflation_example.coupled_resolution --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --method reference --subdivision 1 --output runs/replay-original
 uv run python -m deflation_example.coupled_resolution --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --method reference --subdivision 2 --output runs/replay-refined
-uv run python -m deflation_example.coupled_spatial_resolution --baseline runs/stabilized-baseline --fine-baseline runs/refined-baseline --optimization runs/transient-control --method reference --output runs/replay-fine-mesh
+uv run python -m deflation_example.coupled_spatial_resolution --baseline runs/stabilized-baseline --fine-baseline runs/refined-baseline --optimization runs/startup60-reference-pilot --method reference --output runs/replay-fine-mesh
 ```
 
 The first command checks agreement with a verified discrete optimizer result.
