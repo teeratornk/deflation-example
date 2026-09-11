@@ -161,6 +161,8 @@ def minimize_coupled(
     initial_damping=0.0,
     max_regularizations=8,
     max_backtracks=24,
+    backtracking="halving",
+    secant_memory=0,
     callback=None,
 ):
     """Damped Gauss--Newton with feasible Armijo steps and exact nonlinear KKT.
@@ -174,6 +176,9 @@ def minimize_coupled(
     max_iterations = integer(max_iterations, "Nonlinear iteration cap", 1)
     max_regularizations = integer(max_regularizations, "Regularization attempts", 1)
     max_backtracks = integer(max_backtracks, "Backtracking cap", 1)
+    secant_memory = integer(secant_memory, "Secant memory", 0)
+    if backtracking not in {"halving", "quadratic"}:
+        raise ValueError("Choose halving or safeguarded quadratic backtracking")
     if not np.isfinite(initial_damping) or initial_damping < 0:
         raise ValueError("Initial damping must be finite and nonnegative")
     lower = np.broadcast_to(lower, (problem.size,)).astype(float, copy=True)
@@ -188,6 +193,7 @@ def minimize_coupled(
     objective, gradient = problem.objective_gradient(evaluation, desired)
     history, status = [], "nonlinear_iteration_cap"
     damping = float(initial_damping)
+    secants = []
     for iteration in range(max_iterations + 1):
         # Normalize each weighted optimality equation by its positive tracking weight.
         scaled_gradient = gradient / problem.weights
@@ -212,6 +218,10 @@ def minimize_coupled(
         moved = False
         for regularization in range(max_regularizations):
             H = GaussNewtonOperator(evaluation.jacobian, problem.weights, problem.alpha, damping)
+            if secants:
+                from .coupled_secant import SecantGaussNewton
+
+                H = SecantGaussNewton(H, secants)
             qp = box_quadratic(
                 H,
                 gradient,
@@ -228,9 +238,11 @@ def minimize_coupled(
                 "qp_kkt": qp.kkt,
                 "qp_history": qp.history,
                 "trials": [],
+                "secants": getattr(H, "secant_diagnostics", []),
             }
             row["attempts"].append(attempt)
             slope = float(gradient @ qp.x)
+            attempt["directional_derivative"] = slope
             if qp.status == "converged" and np.isfinite(slope) and slope < 0:
                 length = 1.0
                 for _ in range(max_backtracks):
@@ -250,21 +262,38 @@ def minimize_coupled(
                         )
                         length *= 0.5
                         continue
-                    accepted = np.isfinite(value) and value <= objective + 1e-4 * length * slope
+                    finite = np.isfinite(value) and np.isfinite(derivative).all()
+                    accepted = finite and value <= objective + 1e-4 * length * slope
                     attempt["trials"].append(
                         {
                             "step": length,
                             "objective": value,
-                            "status": "decrease" if accepted else "insufficient_decrease",
+                            "status": "nonfinite_trial"
+                            if not finite
+                            else "decrease"
+                            if accepted
+                            else "insufficient_decrease",
                             "evaluation_seconds": trial.seconds,
+                            "directional_derivative": float(derivative @ qp.x),
                         }
                     )
                     if accepted:
+                        if secant_memory:
+                            secants.append((trial.state - evaluation.state, derivative - gradient))
+                            secants = secants[-secant_memory:]
                         evaluation, objective, gradient = trial, value, derivative
                         moved = True
                         damping *= 0.25
                         break
-                    length *= 0.5
+                    if backtracking == "quadratic" and np.isfinite(value):
+                        # Minimize the quadratic matching f(0), f'(0), and f(length).
+                        denominator = 2 * (value - objective - length * slope)
+                        proposal = (
+                            -slope * length**2 / denominator if denominator > 0 else 0.5 * length
+                        )
+                        length = float(np.clip(proposal, 0.1 * length, 0.5 * length))
+                    else:
+                        length *= 0.5
             if moved:
                 break
             damping = max(1e-4, 10 * damping)

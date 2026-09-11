@@ -99,6 +99,7 @@ def derivative_report(problem, desired):
     direction /= np.linalg.norm(direction)
     dual /= np.linalg.norm(dual)
     J = evaluation.jacobian
+    tangent = J @ direction
     a, b = float(dual @ (J @ direction)), float(direction @ (J.T @ dual))
     steps = [0.01, 0.005, 0.0025, 0.00125]
     rows = []
@@ -111,7 +112,11 @@ def derivative_report(problem, desired):
                 "objective": trial_value,
                 "taylor_remainder": abs(trial_value - value - step * (gradient @ direction)),
                 "control_linearization_error": float(
-                    np.linalg.norm(trial.control - evaluation.control - step * (J @ direction))
+                    np.linalg.norm(trial.control - evaluation.control - step * tangent)
+                ),
+                "relative_control_linearization_error": float(
+                    np.linalg.norm(trial.control - evaluation.control - step * tangent)
+                    / max(step * np.linalg.norm(tangent), np.finfo(float).tiny)
                 ),
             }
         )
@@ -127,12 +132,38 @@ def derivative_report(problem, desired):
     }
 
 
+def equations_verified(rows):
+    """Common independent equation and conservation criteria for every mode."""
+    return bool(rows) and all(
+        np.isfinite(
+            [
+                r["momentum_relative_residual"],
+                r["continuity_relative_residual"],
+                r["thermal_relative_residual"],
+                r["mass_relative_imbalance"],
+                r["energy"]["relative_defect"],
+            ]
+        ).all()
+        and max(
+            r["momentum_relative_residual"],
+            r["continuity_relative_residual"],
+            r["thermal_relative_residual"],
+        )
+        <= 1e-8
+        and r["mass_relative_imbalance"] <= 1e-6
+        and r["energy"]["relative_defect"] <= 1e-6
+        for r in rows
+    )
+
+
 def run(config):
     cfg = OmegaConf.to_container(config, resolve=True)
     if not cfg["baseline_directory"]:
         raise ValueError("A verified baseline_directory is required")
     if cfg["mode"] not in {"derivatives", "optimize"}:
         raise ValueError("Choose derivatives or optimize")
+    if cfg["device"] not in {"cpu", "cuda"}:
+        raise ValueError("Choose cpu or cuda")
     output = Path(cfg["output"])
     output.mkdir(parents=True, exist_ok=False)
     with threadpool_limits(integer(cfg["threads"], "Threads", 1)):
@@ -160,6 +191,8 @@ def run(config):
                 passed = (
                     report["relative_dot_product_error"] <= 1e-9
                     and min(report["taylor_orders"]) > 1.9
+                    and np.isfinite(report["taylor_orders"]).all()
+                    and equations_verified(report["equations"])
                 )
                 write_report(
                     output / "record.json",
@@ -194,7 +227,12 @@ def run(config):
                         temporal_metric="jacobi",
                     )
                 setup = time.perf_counter() - tick
-                solver = StudySolver(
+                solver_class = StudySolver
+                if cfg["device"] == "cuda":
+                    from .coupled_cuda_solver import CudaCoupledSolver
+
+                    solver_class = CudaCoupledSolver
+                solver = solver_class(
                     method,
                     rank=cfg["rank"],
                     window=cfg["recycle_window"],
@@ -213,6 +251,8 @@ def run(config):
                         solver,
                         tolerance=cfg["nonlinear_tolerance"],
                         max_iterations=cfg["nonlinear_cap"],
+                        backtracking=cfg["backtracking"],
+                        secant_memory=cfg["secant_memory"],
                         qp_tolerance=cfg["qp_tolerance"],
                         qp_cap=cfg["qp_cap"],
                         callback=lambda row, ev: write_report(
@@ -220,17 +260,7 @@ def run(config):
                         ),
                     )
                     checks = problem.verify(result.evaluation)
-                    equations_pass = all(
-                        max(
-                            r["momentum_relative_residual"],
-                            r["continuity_relative_residual"],
-                            r["thermal_relative_residual"],
-                        )
-                        <= 1e-8
-                        and r["mass_relative_imbalance"] <= 1e-6
-                        and r["energy"]["relative_defect"] <= 1e-6
-                        for r in checks
-                    )
+                    equations_pass = equations_verified(checks)
                     row = {
                         "method": method,
                         "optimizer_status": result.status,

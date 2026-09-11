@@ -67,3 +67,42 @@ verified stages. Its final test uses the original momentum equations. Every
 failed stage remains visible. `grad_div_scale` in the baseline pilot defines a
 separate momentum discretization and must be included in comparisons and source
 identification.
+
+## Numerical-policy pilots
+
+The default nonlinear policy remains damped Gauss--Newton with halving
+backtracking. `backtracking=quadratic` uses safeguarded quadratic interpolation
+after an unsuccessful trial. The separate `secant_memory=10` pilot augments the
+current Gauss--Newton operator with ten damped BFGS secants. Powell damping
+maintains positive curvature in exact arithmetic. These settings change the
+nonlinear model or line search and must be stated alongside their measurements.
+They retain the original-residual and nonlinear KKT criteria. They have not been
+selected for the final comparison.
+
+The optional CUDA backend uses the same CPU-factored momentum derivatives and
+independently verifies the original system on the CPU:
+
+```bash
+uv sync --frozen --extra coupled-gpu
+uv run --extra coupled-gpu pytest tests/test_coupled_cuda.py -q
+uv run --extra coupled-gpu python -m deflation_example.coupled_optimize baseline_directory=runs/inlet-1 device=cuda output=runs/cuda-pilot
+```
+
+It requires Linux, a CUDA-compatible GPU and the pinned CuPy dependency.
+Triangular analyses are retained while the momentum Jacobian is unchanged;
+vector solves use cuSPARSE SpSV and column blocks use SpSM. Each plan retains
+its descriptors and analysis workspace. The vector binding uses the cuSPARSE
+library already loaded by CuPy, avoiding incompatible opaque descriptors from
+different library versions. Plans are confined to their original CUDA stream.
+The basis and coarse factorization are rebuilt for each inactive system.
+
+The diagnostic scripts in this directory have `--help` interfaces:
+
+- `check_saved_gradient.py` tests an objective gradient at a saved nonlinear iterate.
+- `momentum_spectrum.py` examines selected linearized momentum eigenvalues. It
+  does not certify the stability of the complete spectrum or the physical flow.
+- `benchmark_actions.py` compares CPU and CUDA applications of the same fixed
+  normal operator, with two warmups and five timings at each block size.
+
+Operator timings exclude complete optimization and must remain separate from
+its cost comparisons. All pilot failures and iteration caps remain recorded.

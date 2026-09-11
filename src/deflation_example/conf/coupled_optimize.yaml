@@ -15,6 +15,7 @@ target_count: 16
 lower_K: 337.3
 upper_K: 357.3
 methods: [jacobi, reference, recycling]
+device: cpu
 rank: 20
 recycle_window: 20
 flow_tolerance: 1.0e-9
@@ -22,6 +23,8 @@ flow_cap: 100
 flow_continuation: false
 nonlinear_tolerance: 1.0e-8
 nonlinear_cap: 100
+backtracking: halving
+secant_memory: 0
 qp_tolerance: 1.0e-10
 qp_cap: 100
 inner_tolerance: 1.0e-10

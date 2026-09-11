@@ -16,6 +16,7 @@
   "control": "Unbounded signed distributed source with quadratic penalty; temperature has finite lower and upper bounds.",
   "unknown": "Complete temperature trajectory; momentum is solved at each nonlinear evaluation and the source is recovered from all coupled thermal equations.",
   "gauss_newton": "W + alpha J_U^T W J_U + damping W; exact reduced objective gradient for final KKT tests.",
+  "additional_numerical_pilots": "Safeguarded quadratic backtracking and a separate ten-secant Powell-damped BFGS correction address slow nonlinear convergence. Apply each policy identically across the three linear solvers; retain the unchanged Gauss--Newton attempts. Neither policy is frozen for final timings.",
   "candidate_ranks": [20, 100, 200],
   "rank_selection": "Use setup-inclusive verified pilot cost, then freeze before final repeated comparisons.",
   "methods": ["positive-diagonal CG", "fixed-reference deflated CG", "scaled recycling retaining existing coarse vectors and new directions"],

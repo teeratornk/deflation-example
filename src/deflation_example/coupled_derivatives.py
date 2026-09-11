@@ -199,7 +199,7 @@ class GaussNewtonOperator(LinearOperator):
             full[indices] = x
             return (self @ full)[indices]
 
-        return LinearOperator(
+        operator = LinearOperator(
             (len(indices),) * 2,
             matvec=action,
             rmatvec=action,
@@ -207,3 +207,6 @@ class GaussNewtonOperator(LinearOperator):
             rmatmat=block,
             dtype=float,
         )
+        operator.coupled_parent = self
+        operator.inactive_indices = indices.copy()
+        return operator

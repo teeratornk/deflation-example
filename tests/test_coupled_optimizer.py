@@ -152,3 +152,47 @@ def test_qp_verifies_candidate_on_last_allowed_active_set_step():
     )
     assert result.status == "converged"
     np.testing.assert_array_equal(result.x, [1.0, -1.0])
+
+
+@pytest.mark.parametrize("backtracking", ["halving", "quadratic"])
+def test_safeguarded_backtracking_reaches_the_same_nonlinear_stationary_point(backtracking):
+    from types import SimpleNamespace
+    from scipy.sparse.linalg import aslinearoperator
+
+    class ScalarLeastSquares:
+        size, alpha, weights = 1, 1.0, np.ones(1)
+
+        def evaluate(self, x, initial=None):
+            return SimpleNamespace(
+                state=x.copy(),
+                control=2 + x**2,
+                jacobian=aslinearoperator(np.diag(2 * x)),
+                seconds=0.0,
+            )
+
+        def objective_gradient(self, ev, desired):
+            return (
+                float(0.5 * np.sum((ev.state - desired) ** 2 + ev.control**2)),
+                ev.state - desired + 2 * ev.state * ev.control,
+            )
+
+        def preconditioning_diagonal(self, ev, damping=0):
+            return 1 + 4 * ev.state**2 + damping
+
+    problem = ScalarLeastSquares()
+    result = minimize_coupled(
+        problem,
+        np.ones(1),
+        -0.5,
+        1.0,
+        solver(),
+        backtracking=backtracking,
+        tolerance=1e-9,
+        max_iterations=100,
+        qp_tolerance=1e-12,
+    )
+    assert result.status == "converged"
+    assert abs(2 * result.evaluation.state[0] ** 3 + 5 * result.evaluation.state[0] - 1) < 1e-8
+    first_trials = result.history[0]["attempts"][0]["trials"]
+    if backtracking == "quadratic":
+        assert first_trials[1]["step"] == pytest.approx(1 / 6)
