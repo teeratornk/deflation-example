@@ -72,6 +72,7 @@ def test_memory_envelopes_keep_failed_or_over_budget_choices_separate(tmp_path):
 
 
 def test_complete_record_to_figures_and_tables(tmp_path, monkeypatch):
+    pytest.importorskip("matplotlib", reason="Install the plot extra for figure generation")
     monkeypatch.setattr(
         benchmark_cht,
         "ProcessMemory",

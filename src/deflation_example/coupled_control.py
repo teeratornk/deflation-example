@@ -179,6 +179,7 @@ class CoupledControlProblem:
         if state.shape != (self.size,) or not np.isfinite(state).all():
             raise ValueError("State must be a finite complete temperature trajectory")
         Y = state.reshape(self.slabs, self.spatial_size)
+        zero_trajectory = not np.any(state) and not np.any(self.thermal_boundary)
         previous_flow, previous_temperature = self.initial_flow, self.initial
         factors, history, velocity_actions, diagonals, lower = [], [], [], [], []
         controls, flows, metrics = [], [], []
@@ -240,10 +241,16 @@ class CoupledControlProblem:
             velocity_actions.append(
                 (inverse_mass @ derivative[self.free][:, self.flow_free]).tocsr()
             )
-            J = self.flow.operator(result.velocity, time_step=dt) + self.flow.convection_derivative(
-                result.velocity
-            )
-            factors.append(splu(J[self.flow_free][:, self.flow_free].tocsc()))
+            if zero_trajectory:
+                # Every thermal velocity sensitivity is exactly zero. No
+                # momentum derivative factor is needed for this evaluation.
+                # All original momentum equations are still solved and checked.
+                factors.append(None)
+            else:
+                J = self.flow.operator(result.velocity, time_step=dt) + self.flow.convection_derivative(
+                    result.velocity
+                )
+                factors.append(splu(J[self.flow_free][:, self.flow_free].tocsc()))
             if self.evaluation_callback is not None:
                 self.evaluation_callback(
                     {
@@ -335,7 +342,7 @@ class CoupledControlProblem:
             rhs = J.velocity_actions[n].T @ blocks[n]
             if n + 1 < self.slabs:
                 rhs = rhs + J.history[n + 1].T @ following
-            adjoint = J.factors[n].solve(rhs, trans="T")
+            adjoint = J.factors[n].solve(rhs, trans="T") if np.any(rhs) else np.zeros_like(rhs)
             dt = float(self.physical_steps[n]) if len(self.physical_steps) else None
             velocity = evaluation.flows[n].velocity
             actual = self.flow.operator(velocity, time_step=dt) + self.flow.convection_derivative(

@@ -7,7 +7,6 @@ recovered from the new response. This assesses resolution, not new optimality.
 
 import argparse
 import hashlib
-import json
 from pathlib import Path
 import time
 from types import SimpleNamespace
@@ -17,6 +16,7 @@ from threadpoolctl import threadpool_limits
 
 from .coupled_forward import CoupledForward
 from .coupled_optimize import load_problem
+from .coupled_saved import load_saved_solution, require_matching_baseline
 from .meshes import assemble_thermal
 from .mesh_showcases import desired_temperature
 from .reporting import environment, write_fields, write_report
@@ -131,29 +131,35 @@ def main():
         "--method", default="reference", choices=("jacobi", "reference", "recycling")
     )
     parser.add_argument("--subdivision", type=int, default=2)
+    parser.add_argument(
+        "--target-position", type=int, help="Position in a complete-sequence record"
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--threads", type=int, default=4)
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
     with threadpool_limits(integer(args.threads, "Threads", 1)):
-        record = json.loads((args.optimization / "record.json").read_text())
-        results = [r for r in record.get("results", []) if r["method"] == args.method]
-        if len(results) != 1 or results[0]["status"] != "converged":
-            raise ValueError("Resolution checks require a verified optimized source")
-        cfg = {**record["configuration"], "baseline_directory": str(args.baseline)}
-        problem, _ = load_problem(cfg)
-        field = args.optimization / (args.method + "-fields.npz")
-        with np.load(field, allow_pickle=False) as data:
-            source = data["control"].copy()
-            optimized = data["state"].reshape(problem.slabs, problem.spatial_size).copy()
+        record, cfg, fields, field_hash = load_saved_solution(
+            args.optimization, args.method, args.target_position
+        )
+        cfg["baseline_directory"] = str(args.baseline)
+        problem, baseline = load_problem(cfg)
+        require_matching_baseline(record, baseline)
+        source = fields["control"]
+        optimized = fields["state"].reshape(problem.slabs, problem.spatial_size)
         args.output.mkdir(parents=True, exist_ok=False)
         metadata = {
             "schema": "coupled-fixed-control-temporal-resolution-v1",
             "environment": environment(),
-            "optimization_field_sha256": hashlib.sha256(field.read_bytes()).hexdigest(),
+            "optimization_field_sha256": field_hash,
+            "target_position": args.target_position,
             "subdivision": args.subdivision,
-            "configuration": record["configuration"],
+            "configuration": {
+                k: v
+                for k, v in cfg.items()
+                if k not in {"baseline_directory", "reference_baseline_directory", "output"}
+            },
             "control_representation": "Piecewise constant on each original physical time interval; source at prescribed-temperature nodes is zero.",
             "scope": "Forward temporal-resolution assessment of the same source; temperature remains unconstrained during replay.",
         }

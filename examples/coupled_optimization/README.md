@@ -129,6 +129,12 @@ directions and constructs temporal factors from the fine frozen thermal
 operator. Construction and baseline loading enter the sequence timer; the
 additional coarse calibration enters the preparation-inclusive total.
 
+For an exactly zero temperature-rise trajectory with zero thermal boundary
+values, the source derivative reduces to the thermal operator. The evaluator
+then skips momentum derivative factorizations while still solving and verifying
+every original momentum equation. Nonzero trajectories construct the full
+coupled derivative factors.
+
 The optional CUDA backend uses the same CPU-factored momentum derivatives and
 independently verifies the original system on the CPU:
 
@@ -194,12 +200,19 @@ per-instance medians for complete timings.
 ```bash
 uv run python -m deflation_example.coupled_resolution --baseline runs/inlet-1 --optimization runs/transient-control --method reference --subdivision 1 --output runs/replay-original
 uv run python -m deflation_example.coupled_resolution --baseline runs/inlet-1 --optimization runs/transient-control --method reference --subdivision 2 --output runs/replay-refined
+uv run python -m deflation_example.coupled_spatial_resolution --baseline runs/stabilized-baseline --fine-baseline runs/refined-baseline --optimization runs/transient-control --method reference --output runs/replay-fine-mesh
 ```
 
 The first command checks agreement with a verified discrete optimizer result.
 The second divides every original physical time interval into two substeps.
 Both apply the saved source unchanged, using a piecewise-constant temporal
 representation and zero source values at prescribed-temperature nodes.
+The spatial command uses the immediate nested refinement with the same physical
+time steps. It evaluates the original piecewise-linear source on the refined
+mesh. Both baselines must use identical physical inputs and momentum forms.
+The original baseline must match the checksum stored with the optimized source.
+For a complete-sequence output, add `--target-position 0` (or another verified
+position); the selected target and bound then come from that sequence record.
 The forward solver enforces both momentum and thermal equations at every
 substep. It neither reoptimizes the source nor clips the temperature. Endpoint
 differences and bound violations are resolution diagnostics; refined forward
