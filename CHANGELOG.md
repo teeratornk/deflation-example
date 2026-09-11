@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased coupled-optimization verification
+
+- Add temperature-based elimination with exact discrete buoyancy, transport and stabilization derivatives.
+- Verify coupled steady and nonuniform-step transient tangents, adjoints and recovered controls.
+- Add two-sided active-set Gauss--Newton optimization with independent nonlinear optimality checks.
+- Compare the three existing CG policies on small nonlinear verification problems.
+- Provide operating-point and derivative pilots with retained flow failures and optional residual-load continuation.
+- Keep application speedup claims pending coupled convergence and resolution studies; preserve all prescribed-flow numerical sources and timings.
+
 ## 0.6.2
 
 - Enlarge transformer panels, share spatial axes and separate target labels from physical time.
@@ -42,7 +51,7 @@
 
 ## 0.4.0
 
-- Add complete coupled steady and transient CHT optimization with independent trajectory verification.
+- Add complete prescribed-flow steady and transient CHT optimization with independent trajectory verification.
 - Compare rank-zero Jacobi-CG, fixed-reference deflation, Jacobi-scaled recycling that retains existing coarse vectors, and persistent-resource AmgX.
 - Construct compact mode-dependent space–time references and retain the tensor-product construction control.
 - Replay identical optimization traces to compare full-reference restriction with sequential zero-extension transfer.

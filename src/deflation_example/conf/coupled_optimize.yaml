@@ -1,0 +1,35 @@
+defaults:
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+  - _self_
+
+baseline_directory: null
+output: runs/coupled-optimization
+mode: derivatives
+transient: false
+slabs: 16
+horizon_s: 600.0
+alpha: 1.0e-14
+query: 7
+target_count: 16
+lower_K: 337.3
+upper_K: 357.3
+methods: [jacobi, reference, recycling]
+rank: 20
+recycle_window: 20
+flow_tolerance: 1.0e-9
+flow_cap: 100
+flow_continuation: false
+nonlinear_tolerance: 1.0e-8
+nonlinear_cap: 100
+qp_tolerance: 1.0e-10
+qp_cap: 100
+inner_tolerance: 1.0e-10
+inner_cap: 50000
+threads: 4
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job:
+    chdir: false

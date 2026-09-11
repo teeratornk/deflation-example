@@ -136,6 +136,12 @@ download. Start with the small CPU bore-in-block example:
 uv run --locked python -m deflation_example.benchmark_mesh
 ```
 
+The [coupled-optimization example](examples/coupled_optimization/README.md) adds
+temperature-dependent buoyancy and nonlinear optimization. Its discrete
+derivatives and optimizer have small-problem verification tests. Transformer
+application and resolution pilots are in progress; the prescribed-flow timing
+records above remain separate.
+
 ## Diagnostic tutorials
 
 Three CPU-only tutorials reproduce the mathematical and verification examples

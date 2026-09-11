@@ -1,0 +1,19 @@
+defaults:
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+  - _self_
+
+output: runs/coupled-baseline
+level: 0
+inlet_factor: 1.0
+convection_form: advective
+grad_div_scale: 0.0
+flow_tolerance: 1.0e-11
+flow_cap: 100
+threads: 4
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job:
+    chdir: false
