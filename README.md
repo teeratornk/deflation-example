@@ -155,6 +155,11 @@ the published v0.3.0 distributions retain their original contents.
 
 ## Python use and verification
 
+The [temperature-bound example](examples/temperature_bounds/README.md)
+compares optimized steady and transient fields at three upper limits on
+the same bore-in-block problem. It includes the source, saved fields,
+sparse-direct checks and a common-scale figure generator.
+
 See [the short Python example](examples/basic.py) and
 [the review checklist](docs/review.md). The [design notes](docs/design.md) explain
 module responsibilities and the tested kernel extension point. To run the CPU tests and style checks:

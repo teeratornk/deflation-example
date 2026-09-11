@@ -52,7 +52,7 @@ MAX_MEMBERS = 2000
 
 
 def inspect_mesh_bundle(name, content):
-    """Allow only the three reviewed numeric mesh bundles, without loading arrays."""
+    """Inspect whitelisted numeric mesh and temperature bundles without loading arrays."""
     suffix = str(PurePosixPath(name))
     expected = None
     if suffix.endswith(
@@ -64,6 +64,18 @@ def inspect_mesh_bundle(name, content):
         expected = {"nodes", "cells", "materials", "dirichlet", "axisymmetric"}
     elif suffix.endswith("deflation_example/data/transformer_2d/inputs.npz"):
         expected = {"velocity_P2_m_s", "source_W_m3", "boundary_outlet", "boundary_wall"}
+    elif re.search(
+        r"(?:^|/)examples/temperature_bounds/(?:results|upper-bound-stress)/"
+        r"(?:steady|transient)-problem\.npz$",
+        suffix,
+    ):
+        expected = {"nodes", "cells", "free", "materials", "desired", "weights", "initial", "steps"}
+    elif re.search(
+        r"(?:^|/)examples/temperature_bounds/(?:results|upper-bound-stress)/"
+        r"(?:steady|transient)-bound-[0-2]-(?:reference|direct)\.npz$",
+        suffix,
+    ):
+        expected = {"state", "active", "multiplier", "control", "adjoint"}
     if expected is None:
         return ["unexpected binary content"]
     try:

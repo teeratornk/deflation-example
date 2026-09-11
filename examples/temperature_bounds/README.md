@@ -6,7 +6,7 @@ the upper bound within each steady or transient comparison. The primary
 16-target timing sequences retain their original fixed bounds and records.
 
 The declared comparison uses Bore 1 (3958 spatial state degrees of freedom),
-target 8 of the original 16-target definition, and bounds 0.1, 0.2 and 0.3.
+target 8 of the original 16-target definition, and bounds 0.2, 0.25 and 0.3.
 The transient problem has four backward-Euler steps over horizon 0.1;
 all four states satisfy the same bound. Temperatures, source control and
 time use the dimensionless bore-in-block conventions. The initial and
@@ -19,6 +19,18 @@ Each optimization starts independently with all state variables active;
 inner solves use the current state as their initial guess. Sparse-direct
 PDAS provides a separate linear-solver check with the same initial mask.
 This comparison verifies fields and supplies no solver timing claim.
+
+An initial comparison used bounds 0.1, 0.2 and 0.3. The 0.1 steady
+solution meets discrete optimality but reaches a dimensionless temperature
+below -1.1. With the declared conversion `T = 360 + (500000*0.1/55)*y`
+in kelvin, this lies below absolute zero. The mathematical model constrains
+temperature only from above and allows unrestricted distributed heating
+and cooling. This result identifies a physical limitation of that model.
+The application illustration uses 0.2, 0.25 and 0.3, selected to keep the
+temperature within a physically admissible range. Every initial result,
+including the strong-cooling case, remains in `upper-bound-stress/`.
+Both populations use the same target and accuracy criteria. No solver
+performance criterion enters this selection.
 
 ## Reproduce the solutions
 
@@ -37,6 +49,8 @@ The configuration is `src/deflation_example/conf/temperature_bounds.yaml`.
 The solver source and numerical-library versions are recorded in `report.json`.
 Both commands require new output directories. A small verification run uses
 `level=0 rank=20 slabs=2`; it has a separate scope from the published illustration.
+The initial population is reproduced with `bounds='[0.1,0.2,0.3]'` and a
+separate output directory.
 
 The original inactive-system relative residual must be at most `1e-10`,
 and all five KKT components must meet `1e-8`. Primal feasibility is absolute;
