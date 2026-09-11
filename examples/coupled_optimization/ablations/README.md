@@ -95,7 +95,13 @@ also need not add independently when several settings change together.
 
 ## Summaries and figures
 
+Use `coupled-ablations-report-v1` for the reporting commands below. It preserves
+an explicit launcher error when an interrupted sequence still has a running
+record. The numerical source and declared configurations remain those of
+`coupled-ablations-source-v1`.
+
 ```bash
+git checkout coupled-ablations-report-v1
 uv run --extra plot python -m deflation_example.coupled_ablations report --root runs/ablations-cpu --output runs/ablation-summary-cpu --plot
 uv run --extra plot python -m deflation_example.coupled_ablations report --device cuda --root runs/ablations-gpu --output runs/ablation-summary-gpu --plot
 ```

@@ -249,7 +249,11 @@ def summarize(protocol, root, device="cpu"):
                         sort_keys=True,
                     )
                 )
-                row["status"] = report["status"]
+                row["record_status"] = report["status"]
+                if report["status"] != "running" or manifest["status"] != "run_error":
+                    row["status"] = report["status"]
+                else:
+                    row["error_type"] = manifest.get("error_type")
                 if "sequence_seconds" in report:
                     total = report["sequence_seconds"]
                     components = list(report["components_seconds"].values())

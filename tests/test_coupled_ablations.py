@@ -149,3 +149,19 @@ def test_early_runtime_failure_is_not_relabelled_as_a_completed_solve(tmp_path):
     assert not row["verified"]
     assert row["error_type"] == "MemoryError"
     assert row["status"] == "sequence_error"
+
+
+def test_launcher_error_overrides_an_unfinished_sequence_record(tmp_path):
+    data = record("jacobi", 0, 3)
+    data["status"] = "running"
+    del data["sequence_seconds"]
+    path = save_case(tmp_path, protocol(), 0, data)
+    manifest_path = path.parent.parent / "case.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest.update(status="run_error", error_type="RuntimeError")
+    manifest_path.write_text(json.dumps(manifest))
+    row = ablations.summarize(protocol(), tmp_path)["rows"][0]
+    assert row["status"] == "run_error"
+    assert row["record_status"] == "running"
+    assert row["error_type"] == "RuntimeError"
+    assert not row["verified"]
