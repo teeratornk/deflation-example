@@ -154,6 +154,64 @@ def test_qp_verifies_candidate_on_last_allowed_active_set_step():
     np.testing.assert_array_equal(result.x, [1.0, -1.0])
 
 
+@pytest.mark.parametrize("correction_factor", [1.0, 0.0, -1.0])
+def test_fixed_mask_error_solve_resolves_norm_mismatch_and_retains_best_state(correction_factor):
+    from deflation_example.solvers import LinearResult
+
+    class InexactSolver:
+        rtol = 1e-6
+
+        def __init__(self):
+            self.calls = []
+
+        def solve(self, B, rhs, indices, initial=None):
+            self.calls.append((rhs.copy(), initial.copy()))
+            value = rhs * (1 - 1e-8) if len(self.calls) == 1 else correction_factor * rhs
+            return LinearResult(value, 1, 0.0, "converged"), {}
+
+    inner = InexactSolver()
+    H = sparse.eye(3, format="csr")
+    g = np.array([-1.0, 4.0, -4.0])
+    result = box_quadratic(H, g, np.ones(3), -2, 2, inner, tolerance=1e-10)
+    assert len(inner.calls) == 2
+    assert inner.calls[1][0][0] == pytest.approx(1e-8, abs=1e-15)
+    np.testing.assert_array_equal(inner.calls[1][1], [0.0])
+    assert result.history[1]["linear_equation"] == "correction"
+    assert result.history[1]["linear_residual"] <= inner.rtol
+    if correction_factor == 1:
+        assert result.status == "converged"
+        np.testing.assert_array_equal(result.x, [1.0, -2.0, 2.0])
+    else:
+        assert result.status == "fixed_mask_correction_stagnation"
+        assert not result.history[-1]["candidate_retained"]
+        np.testing.assert_array_equal(result.x, [1 - 1e-8, -2.0, 2.0])
+    assert result.kkt == box_kkt(result.x, H @ result.x + g, -2, 2, 4.0)
+
+
+def test_fixed_mask_correction_cap_keeps_unsatisfied_qp_visible():
+    from deflation_example.solvers import LinearResult
+
+    class InexactSolver:
+        rtol = 1e-6
+
+        def solve(self, B, rhs, indices, initial=None):
+            return LinearResult(rhs * (1 - 1e-8), 1, 1e-8, "converged"), {}
+
+    result = box_quadratic(
+        sparse.eye(1, format="csr"),
+        np.array([-1.0]),
+        np.ones(1),
+        -2,
+        2,
+        InexactSolver(),
+        tolerance=1e-10,
+        fixed_mask_corrections=0,
+    )
+    assert result.status == "fixed_mask_correction_cap"
+    assert len(result.history) == 1
+    assert result.kkt["stationarity"] > 1e-10
+
+
 def test_line_search_retains_and_backtracks_a_stabilization_branch_switch(monkeypatch):
     from deflation_example.coupled_derivatives import StabilizationBranchError
 
@@ -176,7 +234,10 @@ def test_line_search_retains_and_backtracks_a_stabilization_branch_switch(monkey
 
 
 @pytest.mark.parametrize("backtracking", ["halving", "quadratic"])
-def test_safeguarded_backtracking_reaches_the_same_nonlinear_stationary_point(backtracking):
+@pytest.mark.parametrize("objective_offset", [0.0, 1e16])
+def test_safeguarded_backtracking_reaches_the_same_nonlinear_stationary_point(
+    backtracking, objective_offset
+):
     from types import SimpleNamespace
     from scipy.sparse.linalg import aslinearoperator
 
@@ -193,12 +254,23 @@ def test_safeguarded_backtracking_reaches_the_same_nonlinear_stationary_point(ba
 
         def objective_gradient(self, ev, desired):
             return (
-                float(0.5 * np.sum((ev.state - desired) ** 2 + ev.control**2)),
+                float(0.5 * np.sum((ev.state - desired) ** 2 + ev.control**2)) + objective_offset,
                 ev.state - desired + 2 * ev.state * ev.control,
             )
 
         def preconditioning_diagonal(self, ev, damping=0):
             return 1 + 4 * ev.state**2 + damping
+
+        def objective_difference(self, candidate, reference, desired):
+            return float(
+                np.sum(
+                    (candidate.state - reference.state)
+                    * (0.5 * (candidate.state + reference.state) - desired)
+                    + 0.5
+                    * (candidate.control - reference.control)
+                    * (candidate.control + reference.control)
+                )
+            )
 
     problem = ScalarLeastSquares()
     result = minimize_coupled(
@@ -217,3 +289,14 @@ def test_safeguarded_backtracking_reaches_the_same_nonlinear_stationary_point(ba
     first_trials = result.history[0]["attempts"][0]["trials"]
     if backtracking == "quadratic":
         assert first_trials[1]["step"] == pytest.approx(1 / 6)
+    for outer in result.history:
+        for attempt in outer["attempts"]:
+            for trial in attempt["trials"]:
+                if trial["status"] == "roundoff_kkt_decrease":
+                    assert max(outer["kkt"].values()) <= 1e-4
+                    assert trial["maximum_kkt"] <= 0.9 * max(outer["kkt"].values())
+                    assert trial["objective_change"] <= trial["roundoff_allowance"]
+                    assert (
+                        abs(trial["step"] * attempt["directional_derivative"])
+                        <= trial["roundoff_allowance"]
+                    )

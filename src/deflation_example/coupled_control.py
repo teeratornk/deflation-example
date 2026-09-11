@@ -302,6 +302,21 @@ class CoupledControlProblem:
             + damping * self.weights
         )
 
+    def objective_difference(self, candidate, reference, desired):
+        """Evaluate the quadratic objective change without subtracting totals.
+
+        The source remains a nonlinear function of temperature. This algebraic
+        difference uses both fully evaluated sources and introduces no model
+        approximation or relaxation of the line-search condition.
+        """
+        dy = candidate.state - reference.state
+        du = candidate.control - reference.control
+        return float(
+            np.sum(self.weights * dy * (0.5 * (candidate.state + reference.state) - desired))
+            + self.alpha
+            * np.sum(self.weights * du * (0.5 * (candidate.control + reference.control)))
+        )
+
     def verify_adjoint(self, evaluation, desired):
         """Reassemble momentum transpose equations at the retained trajectory.
 

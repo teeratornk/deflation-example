@@ -12,35 +12,17 @@ import time
 import hydra
 import numpy as np
 from omegaconf import OmegaConf
-from scipy import sparse
 from threadpoolctl import threadpool_limits
 
 from .coupled_control import FlowEvaluationError
 from .coupled_optimize import equations_verified, load_problem
-from .coupled_optimizer import minimize_coupled
+from .coupled_optimizer import NUMERICAL_POLICY, minimize_coupled
 from .memory import ProcessMemory
-from .mesh_control import build_mesh_control
-from .mesh_reference import build_mesh_reference
+from .coupled_reference import configured_reference
 from .mesh_showcases import desired_temperature
 from .reporting import environment, write_fields, write_report
 from .study_solvers import StudySolver
 from .validation import integer
-
-
-def build_reference(problem, rank):
-    frozen = build_mesh_control(
-        problem.assembly,
-        alpha=problem.alpha,
-        time_steps=problem.steps if len(problem.steps) else None,
-    )
-    return build_mesh_reference(
-        frozen,
-        problem.assembly,
-        sparse.eye(problem.spatial_size, format="csr"),
-        rank,
-        spatial_policy="scaled_schur",
-        temporal_metric="jacobi",
-    )
 
 
 def prepare_device(device, interval):
@@ -207,11 +189,21 @@ def run(config):
         process_start = time.perf_counter()
         metadata = {
             "schema": "coupled-complete-sequence-v1",
+            "numerical_policy": NUMERICAL_POLICY,
             "environment": environment(),
             "configuration": {
                 k: v
                 for k, v in cfg.items()
-                if k not in {"output", "baseline_directory", "methods", "query", "upper_K", "mode"}
+                if k
+                not in {
+                    "output",
+                    "baseline_directory",
+                    "reference_baseline_directory",
+                    "methods",
+                    "query",
+                    "upper_K",
+                    "mode",
+                }
             },
             "timing_boundary": "Reference construction, model assembly, all nonlinear and active-set solves, transfers, independent verification and cleanup. Array serialization follows the timer. Common isothermal calibration and process preparation are separate.",
             "scope": "Coupled nonlinear stationary solutions; final physical-resolution and performance populations require their declared gates.",
@@ -239,8 +231,12 @@ def run(config):
             parts["model_assembly_and_baseline_verification"] = time.perf_counter() - tick
             tick = time.perf_counter()
             if cfg["method"] == "reference":
-                reference = build_reference(problem, cfg["rank"])
+                reference = configured_reference(problem, cfg, baseline)
                 storage = reference.storage()
+                metadata["reference_description"] = reference.description
+                metadata["calibration_seconds"] += reference.description.get(
+                    "additional_coarse_calibration_seconds", 0.0
+                )
             parts["reference_construction"] = time.perf_counter() - tick
             tick = time.perf_counter()
             solver = solver_class(

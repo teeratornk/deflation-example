@@ -91,11 +91,43 @@ The seed changes the initial iterate, not the final equations or tolerance.
 The default nonlinear policy remains damped Gauss--Newton with halving
 backtracking. `backtracking=quadratic` uses safeguarded quadratic interpolation
 after an unsuccessful trial. The separate `secant_memory=10` pilot augments the
-current Gauss--Newton operator with ten damped BFGS secants. Powell damping
+current Gauss--Newton operator with ten damped Broyden--Fletcher--Goldfarb--Shanno
+(BFGS) secants. Powell damping
 maintains positive curvature in exact arithmetic. These settings change the
 nonlinear model or line search and must be stated alongside their measurements.
 They retain the original-residual and nonlinear KKT criteria. They have not been
 selected for the final comparison.
+
+The current quadratic subproblem solver also checks for an unchanged active
+set before repeating a linear solve. If its Karush--Kuhn--Tucker (KKT) test still
+fails, it solves an error equation and verifies the updated original system.
+At most four consecutive fixed-mask corrections are allowed. A correction that
+does not improve the quadratic KKT residual terminates with the preceding state
+retained. This addresses a measured norm mismatch in the initial 64-slab
+subproblem: the original linear residual satisfied its relative tolerance while
+the quadratic stationarity test remained above its threshold. The original
+attempts remain separate from computations using this correction.
+
+`initial_quadratic.py` reproduces that initial, isothermal quadratic subproblem
+from a saved configuration. It measures the quadratic solve alone; it excludes
+the subsequent coupled flow evaluations and complete optimization cost.
+
+The coupled line search evaluates the change in the quadratic tracking and
+source penalties directly from the two trajectories. This avoids subtracting
+nearly equal objective totals. Armijo backtracking supplies ordinary steps. A
+separately recorded roundoff safeguard applies when the current normalized KKT
+residual is at most `1e-4`, the predicted decrease is below `64 * eps` times the
+larger of one and the least-squares objective, and the measured increase stays
+within that allowance. It requires a further 10% KKT reduction. The final
+`1e-8` KKT check is unchanged. Saved-state diagnostics separately test the effect
+of momentum-solve accuracy on objective reproducibility near stationarity.
+
+For a one-level refinement, `reference_baseline_directory` selects a verified
+coarse computed-flow baseline. The code checks the material labels, boundary
+nodes, spatial measure and nested mesh transfer. It prolongs coarse spatial
+directions and constructs temporal factors from the fine frozen thermal
+operator. Construction and baseline loading enter the sequence timer; the
+additional coarse calibration enters the preparation-inclusive total.
 
 The optional CUDA backend uses the same CPU-factored momentum derivatives and
 independently verifies the original system on the CPU:

@@ -12,16 +12,14 @@ import time
 import hydra
 import numpy as np
 from omegaconf import OmegaConf
-from scipy import sparse
 from threadpoolctl import threadpool_limits
 
 from .assess_transformer import transformer_boundaries
 from .axisymmetric_flow import AxisymmetricFlow, FlowResult
 from .coupled_control import CoupledControlProblem, FlowEvaluationError
-from .coupled_optimizer import minimize_coupled
+from .coupled_optimizer import NUMERICAL_POLICY, minimize_coupled
 from .coupled_pilot import transformer_inputs
-from .mesh_control import build_mesh_control
-from .mesh_reference import build_mesh_reference
+from .coupled_reference import configured_reference
 from .mesh_showcases import desired_temperature
 from .oil_properties import momentum_reference
 from .reporting import environment, write_fields, write_report
@@ -205,9 +203,12 @@ def run(config):
         desired = desired_temperature(problem, cfg["query"], cfg["target_count"])
         metadata = {
             "schema": "coupled-optimization-pilot-v1",
+            "numerical_policy": NUMERICAL_POLICY,
             "environment": environment(),
             "configuration": {
-                k: v for k, v in cfg.items() if k not in {"output", "baseline_directory"}
+                k: v
+                for k, v in cfg.items()
+                if k not in {"output", "baseline_directory", "reference_baseline_directory"}
             },
             "baseline_sha256": baseline_record["baseline_sha256"],
             "baseline_configuration": baseline_record["configuration"],
@@ -239,26 +240,12 @@ def run(config):
                 return
             lower = (cfg["lower_K"] - problem.temperature_offset) / problem.temperature_scale
             upper = (cfg["upper_K"] - problem.temperature_offset) / problem.temperature_scale
-            # This pilot uses the current mesh as its reference mesh. Refinement
-            # studies must declare and charge a nested coarse construction.
-            frozen = build_mesh_control(
-                problem.assembly,
-                alpha=problem.alpha,
-                time_steps=problem.steps if len(problem.steps) else None,
-            )
             results = []
             for method in cfg["methods"]:
                 tick = time.perf_counter()
                 reference = None
                 if method == "reference":
-                    reference = build_mesh_reference(
-                        frozen,
-                        problem.assembly,
-                        sparse.eye(problem.spatial_size, format="csr"),
-                        cfg["rank"],
-                        spatial_policy="scaled_schur",
-                        temporal_metric="jacobi",
-                    )
+                    reference = configured_reference(problem, cfg, baseline_record)
                 setup = time.perf_counter() - tick
                 solver_class = StudySolver
                 if cfg["device"] == "cuda":
@@ -310,6 +297,9 @@ def run(config):
                         if equations_pass
                         else "equation_verification_failed",
                         "reference_seconds": setup,
+                        "reference_description": None
+                        if reference is None
+                        else reference.description,
                         "optimization_seconds": result.seconds,
                         "objective": result.objective * problem.objective_scale,
                         "kkt": result.kkt,
@@ -362,4 +352,10 @@ def run(config):
             raise
 
 
-@hydra.main(version_base="1.3", config_path="conf", config_name="coupled_optimize"
+@hydra.main(version_base="1.3", config_path="conf", config_name="coupled_optimize")
+def main(config):
+    run(config)
+
+
+if __name__ == "__main__":
+    main()

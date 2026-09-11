@@ -4,6 +4,7 @@ defaults:
   - _self_
 
 baseline_directory: null
+reference_baseline_directory: null
 output: runs/coupled-optimization
 mode: derivatives
 transient: false

@@ -172,6 +172,34 @@ def test_feedback_disabled_control_jacobian_matches_frozen_operator():
     )
 
 
+def test_objective_difference_matches_quadratic_change_with_large_constant_penalty():
+    from types import SimpleNamespace
+
+    problem = small_coupled_problem()
+    n = problem.size
+    reference = SimpleNamespace(state=np.zeros(n), control=np.full(n, 1e10))
+    candidate = SimpleNamespace(state=np.full(n, 1e-6), control=reference.control.copy())
+    target = np.ones(n)
+    expected = np.sum(problem.weights * (0.5e-12 - 1e-6))
+    assert problem.objective_difference(candidate, reference, target) == pytest.approx(expected)
+    assert problem.objective_difference(reference, candidate, target) == pytest.approx(-expected)
+    assert problem.objective_difference(reference, reference, target) == 0
+
+
+def test_objective_difference_matches_evaluated_coupled_objectives():
+    problem = small_coupled_problem([0.2, 0.35])
+    initial = problem.evaluate(np.linspace(0.04, 0.1, problem.size))
+    trial = problem.evaluate(initial.state + 0.002, initial=initial)
+    target = np.full(problem.size, 0.15)
+    expected = (
+        problem.objective_gradient(trial, target)[0]
+        - problem.objective_gradient(initial, target)[0]
+    )
+    assert problem.objective_difference(trial, initial, target) == pytest.approx(
+        expected, abs=1e-13
+    )
+
+
 def test_failed_flow_evaluation_retains_termination_details():
     problem = small_coupled_problem()
     problem.flow_cap = 1

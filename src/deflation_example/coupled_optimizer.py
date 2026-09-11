@@ -8,7 +8,18 @@ from scipy.sparse.linalg import LinearOperator
 
 from .coupled_control import FlowEvaluationError
 from .coupled_derivatives import GaussNewtonOperator, StabilizationBranchError
+from .solvers import independent_residual
 from .validation import integer, positive_real
+
+
+NUMERICAL_POLICY = {
+    "identifier": "coupled-fixed-mask-correction-and-roundoff-globalization-v2",
+    "default_fixed_mask_correction_cap": 4,
+    "objective_change": "difference of tracking and source quadratics",
+    "roundoff_kkt_threshold": 1e-4,
+    "roundoff_epsilon_factor": 64,
+    "roundoff_kkt_contraction": 0.9,
+}
 
 
 def box_kkt(state, gradient, lower, upper, scale=1.0):
@@ -51,16 +62,32 @@ class BoxQPResult:
     history: list
 
 
-def box_quadratic(H, gradient, diagonal, lower, upper, solver, *, tolerance=1e-9, max_steps=100):
+def box_quadratic(
+    H,
+    gradient,
+    diagonal,
+    lower,
+    upper,
+    solver,
+    *,
+    tolerance=1e-9,
+    max_steps=100,
+    fixed_mask_corrections=4,
+):
     """Solve min 0.5*x.T H x + gradient.T x under two-sided finite bounds.
 
     The gradient determines activation and release at each bound. Inactive
     operators zero-extend into the full space before applying H, retaining all
     rows of the source Jacobian. The supplied diagonal is a positive approximate
-    preconditioner and active-set scale, not a replacement for H.
+    preconditioner and active-set scale, not a replacement for H. If the mask
+    repeats before quadratic optimality is reached, solve an error equation
+    normalized by its own right-hand side. This avoids accepting the same inner
+    initial guess indefinitely when the linear and quadratic tests use different
+    norms. Verify the updated original system and retain every correction cost.
     """
     tolerance = positive_real(tolerance, "Quadratic KKT tolerance")
     max_steps = integer(max_steps, "Active-set iteration cap", 1)
+    fixed_mask_corrections = integer(fixed_mask_corrections, "Fixed-mask correction cap", 0)
     g = np.asarray(gradient, dtype=float)
     d = np.asarray(diagonal, dtype=float)
     lo, hi = np.broadcast_arrays(np.asarray(lower, dtype=float), np.asarray(upper, dtype=float), g)[
@@ -81,6 +108,8 @@ def box_quadratic(H, gradient, diagonal, lower, upper, solver, *, tolerance=1e-9
     history = []
     scale = max(1.0, np.linalg.norm(g, np.inf))
     status = "active_set_cap"
+    previous_partition = None
+    corrections = 0
     for step in range(max_steps):
         current_gradient = H @ x + g
         kkt = box_kkt(x, current_gradient, lo, hi, scale)
@@ -88,6 +117,14 @@ def box_quadratic(H, gradient, diagonal, lower, upper, solver, *, tolerance=1e-9
             return BoxQPResult(x, "converged", kkt, history)
         projected = x - current_gradient / d
         low_active, high_active = projected <= lo, projected >= hi
+        partition = high_active.astype(np.int8) - low_active.astype(np.int8)
+        correction = previous_partition is not None and np.array_equal(
+            partition, previous_partition
+        )
+        corrections = corrections + 1 if correction else 0
+        if correction and corrections > fixed_mask_corrections:
+            status = "fixed_mask_correction_cap"
+            break
         inactive = np.flatnonzero(~(low_active | high_active))
         fixed = np.zeros_like(x)
         fixed[low_active], fixed[high_active] = lo[low_active], hi[high_active]
@@ -96,6 +133,7 @@ def box_quadratic(H, gradient, diagonal, lower, upper, solver, *, tolerance=1e-9
             "lower_active": int(low_active.sum()),
             "upper_active": int(high_active.sum()),
             "inactive": len(inactive),
+            "linear_equation": "correction" if correction else "state",
         }
         if len(inactive):
             if hasattr(H, "restrict"):
@@ -110,10 +148,15 @@ def box_quadratic(H, gradient, diagonal, lower, upper, solver, *, tolerance=1e-9
                 B = LinearOperator((len(inactive),) * 2, matvec=action, rmatvec=action, dtype=float)
             B.diagonal = lambda: d[inactive].copy()
             rhs = -(g + H @ fixed)[inactive]
-            result, timing = solver.solve(B, rhs, inactive, initial=x[inactive])
+            linear_rhs = rhs - B @ x[inactive] if correction else rhs
+            initial = np.zeros_like(linear_rhs) if correction else x[inactive]
+            result, timing = solver.solve(B, linear_rhs, inactive, initial=initial)
+            candidate = x[inactive] + result.x if correction else result.x
+            original_residual = independent_residual(B, candidate, rhs)
             row.update(
                 linear_status=result.status,
-                linear_residual=result.residual,
+                linear_residual=original_residual,
+                solved_equation_residual=result.residual,
                 linear_iterations=result.iterations,
                 deployed_rank=result.rank,
                 coarse_condition=result.coarse_condition,
@@ -124,10 +167,23 @@ def box_quadratic(H, gradient, diagonal, lower, upper, solver, *, tolerance=1e-9
                 history.append(row)
                 status = "linear_" + result.status
                 break
-            fixed[inactive] = result.x
+            if original_residual > solver.rtol:
+                history.append(row)
+                status = "linear_original_residual_failed"
+                break
+            fixed[inactive] = candidate
         else:
             row.update(linear_status="empty", linear_iterations=0, deployed_rank=0)
+        if correction:
+            candidate_kkt = box_kkt(fixed, H @ fixed + g, lo, hi, scale)
+            if max(candidate_kkt.values()) >= max(kkt.values()):
+                row["candidate_retained"] = False
+                history.append(row)
+                status = "fixed_mask_correction_stagnation"
+                break
+        row["candidate_retained"] = True
         x = fixed
+        previous_partition = partition
         history.append(row)
     kkt = box_kkt(x, H @ x + g, lo, hi, scale)
     if status == "active_set_cap" and max(kkt.values()) <= tolerance:
@@ -269,14 +325,64 @@ def minimize_coupled(
                         )
                         length *= 0.5
                         continue
-                    finite = np.isfinite(value) and np.isfinite(derivative).all()
-                    accepted = finite and value <= objective + 1e-4 * length * slope
+                    change = (
+                        problem.objective_difference(trial, evaluation, desired)
+                        if hasattr(problem, "objective_difference")
+                        else value - objective
+                    )
+                    finite = np.isfinite([value, change]).all() and np.isfinite(derivative).all()
+                    accepted = finite and change <= 1e-4 * length * slope
+                    trial_scaled_gradient = derivative / problem.weights
+                    trial_kkt = box_kkt(
+                        trial.state,
+                        trial_scaled_gradient,
+                        lower,
+                        upper,
+                        max(
+                            1.0,
+                            np.max(np.abs(trial.state - desired)),
+                            np.max(np.abs(trial_scaled_gradient - (trial.state - desired))),
+                        ),
+                    )
+                    # Near stationarity, an objective decrease may fall below
+                    # floating-point resolution. A separate, recorded safeguard
+                    # requires KKT reduction and bounds any objective increase.
+                    # The final KKT tolerance remains unchanged.
+                    physical_objective = 0.5 * float(
+                        np.sum(
+                            problem.weights
+                            * (
+                                (evaluation.state - desired) ** 2
+                                + problem.alpha * evaluation.control**2
+                            )
+                        )
+                    )
+                    roundoff_allowance = (
+                        NUMERICAL_POLICY["roundoff_epsilon_factor"]
+                        * np.finfo(float).eps
+                        * max(1.0, abs(physical_objective))
+                    )
+                    roundoff_step = (
+                        finite
+                        and not accepted
+                        and max(kkt.values()) <= NUMERICAL_POLICY["roundoff_kkt_threshold"]
+                        and abs(length * slope) <= roundoff_allowance
+                        and change <= roundoff_allowance
+                        and max(trial_kkt.values())
+                        <= NUMERICAL_POLICY["roundoff_kkt_contraction"] * max(kkt.values())
+                    )
+                    accepted = accepted or roundoff_step
                     attempt["trials"].append(
                         {
                             "step": length,
                             "objective": value,
+                            "objective_change": change,
+                            "maximum_kkt": max(trial_kkt.values()),
+                            "roundoff_allowance": roundoff_allowance,
                             "status": "nonfinite_trial"
                             if not finite
+                            else "roundoff_kkt_decrease"
+                            if roundoff_step
                             else "decrease"
                             if accepted
                             else "insufficient_decrease",
@@ -294,7 +400,7 @@ def minimize_coupled(
                         break
                     if backtracking == "quadratic" and np.isfinite(value):
                         # Minimize the quadratic matching f(0), f'(0), and f(length).
-                        denominator = 2 * (value - objective - length * slope)
+                        denominator = 2 * (change - length * slope)
                         proposal = (
                             -slope * length**2 / denominator if denominator > 0 else 0.5 * length
                         )
