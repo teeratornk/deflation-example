@@ -1,0 +1,34 @@
+defaults:
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+  - _self_
+
+# Six field illustrations, separate from the frozen timing populations.
+action: solve
+level: 1
+query: 7
+query_population: 16
+bounds: [0.1, 0.2, 0.3]
+forms: [steady, transient]
+slabs: 4
+horizon: 0.1
+alpha: 1.0e-6
+rank: 100
+threads: 4
+inner_cap: 50000
+outer_cap: 100
+residual_refresh: 10000
+rtol: 1.0e-10
+kkt_tolerance: 1.0e-8
+cg_factor: 0.1
+state_comparison_tolerance: 1.0e-7
+forward_tolerance: 1.0e-7
+data: null
+output: runs/temperature-bounds
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job:
+    chdir: false
