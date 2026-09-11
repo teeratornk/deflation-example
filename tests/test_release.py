@@ -124,6 +124,23 @@ def test_history_finds_a_removed_credential(tmp_path):
     assert any(guard.inspect_content(name, data) for name, data in guard.history_records(tmp_path))
 
 
+def test_temperature_field_bundles_require_exact_numeric_arrays():
+    import numpy as np
+
+    name = "examples/temperature_bounds/results/steady-bound-0-reference.npz"
+    arrays = {key: np.zeros(3) for key in ("state", "active", "multiplier", "control", "adjoint")}
+    stream = io.BytesIO()
+    np.savez_compressed(stream, **arrays)
+    assert not guard.inspect_content(name, stream.getvalue())
+    assert guard.inspect_content(name.replace("bound-0", "bound-3"), stream.getvalue())
+    stream = io.BytesIO()
+    np.savez_compressed(stream, **{**arrays, "control": np.array(["hidden text"])})
+    assert "nonnumeric mesh array" in guard.inspect_content(name, stream.getvalue())
+    stream = io.BytesIO()
+    np.savez_compressed(stream, **{**arrays, "extra": np.zeros(1)})
+    assert "unexpected mesh arrays" in guard.inspect_content(name, stream.getvalue())
+
+
 def test_archive_duplicates_and_size_limits(tmp_path, monkeypatch):
     archive = tmp_path / "duplicate.whl"
     with zipfile.ZipFile(archive, "w") as stream:

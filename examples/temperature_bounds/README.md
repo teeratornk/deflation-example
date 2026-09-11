@@ -26,17 +26,25 @@ below -1.1. With the declared conversion `T = 360 + (500000*0.1/55)*y`
 in kelvin, this lies below absolute zero. The mathematical model constrains
 temperature only from above and allows unrestricted distributed heating
 and cooling. This result identifies a physical limitation of that model.
-The application illustration uses 0.2, 0.25 and 0.3, selected to keep the
-temperature within a physically admissible range. Every initial result,
+The application illustration uses 0.2, 0.25 and 0.3, selected to keep all
+absolute temperatures positive under the same conversion. This necessary
+physical check does not validate the frozen-property model. Every initial result,
 including the strong-cooling case, remains in `upper-bound-stress/`.
 Both populations use the same target and accuracy criteria. No solver
 performance criterion enters this selection.
 
 ## Reproduce the solutions
 
-From a checkout containing this example:
+The `temperature-bounds-v1` tag freezes the example, both complete data
+populations and the plotting procedure. The illustrated solutions were
+computed with numerical source `447ada1`; the initial population used
+`bdc28a2`. Both use the subsequent guarded solver and leave the primary
+GPU timing sources unchanged.
 
 ```bash
+git clone https://github.com/teeratornk/deflation-example.git
+cd deflation-example
+git checkout temperature-bounds-v1
 uv sync --locked --extra plot
 uv run --locked --extra plot python -m deflation_example.temperature_bounds \
   output=runs/temperature-bounds
@@ -51,6 +59,13 @@ Both commands require new output directories. A small verification run uses
 `level=0 rank=20 slabs=2`; it has a separate scope from the published illustration.
 The initial population is reproduced with `bounds='[0.1,0.2,0.3]'` and a
 separate output directory.
+
+To verify and plot the saved illustration without repeating optimization:
+
+```bash
+uv run --locked --extra plot python -m deflation_example.temperature_bounds \
+  action=plot data=examples/temperature_bounds/results output=runs/saved-bound-figure
+```
 
 The original inactive-system relative residual must be at most `1e-10`,
 and all five KKT components must meet `1e-8`. Primal feasibility is absolute;
