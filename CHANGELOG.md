@@ -9,6 +9,8 @@
 - Provide operating-point and derivative pilots with retained flow failures and optional residual-load continuation.
 - Add a smooth 60-second target startup for the new 600-second trajectory study, with unchanged later targets and separate original-target pilots.
 - Preserve the selected target in spatial and temporal replays; validate matched complete-sequence summaries and plot saved physical fields.
+- Plot matched nonlinear optimality and cumulative inner work, retaining unsuccessful attempts.
+- Expose forward-replay relaxation and iteration limits while recording unchanged coupled and conservation thresholds.
 - Keep application speedup claims pending coupled convergence and resolution studies; preserve all prescribed-flow numerical sources and timings.
 
 ## 0.6.2

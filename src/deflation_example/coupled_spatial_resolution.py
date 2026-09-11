@@ -8,7 +8,12 @@ from threadpoolctl import threadpool_limits
 
 from .coupled_optimize import load_problem
 from .coupled_reference import nested_prolongation
-from .coupled_resolution import replay_controls
+from .coupled_resolution import (
+    add_forward_options,
+    forward_options,
+    forward_protocol,
+    replay_controls,
+)
 from .coupled_saved import load_saved_solution, require_matching_baseline
 from .coupled_targets import desired_temperature
 from .reporting import environment, write_fields, write_report
@@ -47,7 +52,9 @@ def main():
     parser.add_argument("--target-position", type=int)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--threads", type=int, default=4)
+    add_forward_options(parser)
     args = parser.parse_args()
+    options = forward_options(args)
     if args.output.exists():
         raise FileExistsError(args.output)
     with threadpool_limits(integer(args.threads, "Threads", 1)):
@@ -88,6 +95,7 @@ def main():
             "fine_baseline_sha256": fine_baseline["baseline_sha256"],
             "coarse_state_dofs": coarse.size,
             "fine_state_dofs": fine.size,
+            "forward_solver": forward_protocol(fine, options),
             "control_transfer": "Nested P1 interpolation with zero source at prescribed-temperature nodes; identical piecewise-constant temporal source intervals.",
             "scope": "Fixed-source spatial resolution with unchanged physical time steps; no reoptimization or temperature clipping.",
         }
@@ -96,6 +104,7 @@ def main():
             fine,
             source,
             subdivision=1,
+            **options,
             callback=lambda row: write_report(args.output / "progress.json", row),
         )
         states = result.pop("states")

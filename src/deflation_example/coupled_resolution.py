@@ -19,7 +19,36 @@ from .coupled_saved import load_saved_solution, require_matching_baseline
 from .meshes import assemble_thermal
 from .coupled_targets import refined_desired_temperature
 from .reporting import environment, write_fields, write_report
-from .validation import integer
+from .validation import integer, positive_real
+
+
+def add_forward_options(parser):
+    """Expose iteration controls while retaining the declared accuracy criteria."""
+    parser.add_argument("--relaxation", type=float, default=0.5)
+    parser.add_argument("--coupling-cap", type=int, default=100)
+
+
+def forward_options(args):
+    relaxation = positive_real(args.relaxation, "Coupling relaxation")
+    if relaxation > 1:
+        raise ValueError("Coupling relaxation must not exceed one")
+    return {
+        "tolerance": 1e-8,
+        "coupling_cap": integer(args.coupling_cap, "Coupling iteration cap", 1),
+        "relaxation": relaxation,
+    }
+
+
+def forward_protocol(problem, options):
+    """Document the complete forward acceptance and internal momentum targets."""
+    return {
+        **options,
+        "flow_method": "newton",
+        "flow_cap": problem.flow_cap,
+        "momentum_internal_tolerance": options["tolerance"] * 0.1,
+        "mass_tolerance": 1e-6,
+        "energy_tolerance": 1e-6,
+    }
 
 
 def replay_controls(
@@ -135,7 +164,9 @@ def main():
     )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--threads", type=int, default=4)
+    add_forward_options(parser)
     args = parser.parse_args()
+    options = forward_options(args)
     if args.output.exists():
         raise FileExistsError(args.output)
     with threadpool_limits(integer(args.threads, "Threads", 1)):
@@ -154,6 +185,7 @@ def main():
             "optimization_field_sha256": field_hash,
             "target_position": args.target_position,
             "subdivision": args.subdivision,
+            "forward_solver": forward_protocol(problem, options),
             "configuration": {
                 k: v
                 for k, v in cfg.items()
@@ -167,6 +199,7 @@ def main():
             problem,
             source,
             args.subdivision,
+            **options,
             callback=lambda row: write_report(args.output / "progress.json", row),
         )
         states = result.pop("states")

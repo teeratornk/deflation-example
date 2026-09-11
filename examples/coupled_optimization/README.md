@@ -283,3 +283,12 @@ substep. It neither reoptimizes the source nor clips the temperature. Endpoint
 differences and bound violations are resolution diagnostics; refined forward
 responses are not new constrained optima. Spatial refinement and tracking-error
 resolution are additional requirements of the declared final protocol.
+
+Both replay commands expose `--relaxation` (default 0.5) and `--coupling-cap`
+(default 100) for diagnosing convergence of the segregated forward iteration.
+For example, a separate `--relaxation 0.25` run tests stronger under-relaxation
+with the same saved source and equations. These options leave the coupled
+residual threshold at `1e-8` and the mass and energy thresholds at `1e-6`.
+The records identify the settings, the tighter internal momentum target, and
+every failed or completed time step. Keep such diagnostic runs separate from
+the original attempts and from optimizer timing comparisons.
