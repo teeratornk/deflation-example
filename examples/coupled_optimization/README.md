@@ -247,6 +247,19 @@ For sequence data, add `--target-position 0`. The default time levels are the
 first, middle and last stored levels. The figure metadata records their actual
 physical times, units, field checksum and interpolation conventions.
 
+Compare nonlinear convergence from three matched, single-method pilots with:
+
+```bash
+uv run --extra plot python -m deflation_example.coupled_convergence runs/startup60-jacobi-pilot runs/startup60-reference-pilot runs/startup60-recycling-pilot --output runs/pilot-convergence
+```
+
+The figure shows the declared optimality residual against nonlinear iteration
+and cumulative inner CG iterations. It includes unsuccessful quadratic attempts,
+residual corrections and the returned state's final residual. All three solver
+outcomes remain visible, including runs without a completed optimizer history.
+Pilot convergence plots and iteration counts do not replace complete-sequence
+timings or fixed-source resolution checks.
+
 ## Fixed-control resolution checks
 
 ```bash
