@@ -64,6 +64,7 @@ class VectorTriangularPlan:
         self.descriptor = None
         self.cp, self.matrix, self.library = cp, matrix, _vector_api()
         self.stream = cp.cuda.get_current_stream()
+        self.device_id = cp.cuda.runtime.getDevice()
         self.rhs = cp.empty((matrix.shape[0], 1), dtype=cp.float64)
         self.solution = cp.zeros_like(self.rhs)
         self.mat_a = SpMatDescriptor.create(matrix)
@@ -101,6 +102,8 @@ class VectorTriangularPlan:
     def solve(self, rhs):
         if self.descriptor is None:
             raise RuntimeError("The triangular plan is closed")
+        if self.cp.cuda.runtime.getDevice() != self.device_id:
+            raise RuntimeError("A triangular plan must run on its original CUDA device")
         if self.cp.cuda.get_current_stream().ptr != self.stream.ptr:
             raise RuntimeError("A triangular plan must run on its original CUDA stream")
         if rhs.shape != self.rhs.shape or rhs.dtype != self.rhs.dtype:
@@ -111,9 +114,10 @@ class VectorTriangularPlan:
 
     def close(self):
         if getattr(self, "descriptor", None) is not None:
-            self.stream.synchronize()
-            descriptor, self.descriptor = self.descriptor, None
-            _check_status(self.library.cusparseSpSV_destroyDescr(descriptor))
+            with self.cp.cuda.Device(self.device_id):
+                self.stream.synchronize()
+                descriptor, self.descriptor = self.descriptor, None
+                _check_status(self.library.cusparseSpSV_destroyDescr(descriptor))
 
     def __del__(self):
         self.close()
@@ -136,6 +140,7 @@ class TriangularPlan:
         self.descriptor = None
         self.matrix = matrix
         self.stream = cp.cuda.get_current_stream()
+        self.device_id = cp.cuda.runtime.getDevice()
         self.handle = device.get_cusparse_handle()
         self.rhs = cp.empty((matrix.shape[0], columns), dtype=cp.float64, order="F")
         self.solution = cp.zeros_like(self.rhs, order="F")
@@ -172,6 +177,8 @@ class TriangularPlan:
     def solve(self, rhs):
         if self.descriptor is None:
             raise RuntimeError("The triangular plan is closed")
+        if self.cp.cuda.runtime.getDevice() != self.device_id:
+            raise RuntimeError("A triangular plan must run on its original CUDA device")
         if self.cp.cuda.get_current_stream().ptr != self.stream.ptr:
             raise RuntimeError("A triangular plan must run on its original CUDA stream")
         if rhs.shape != self.rhs.shape or rhs.dtype != self.rhs.dtype:
@@ -184,9 +191,10 @@ class TriangularPlan:
 
     def close(self):
         if getattr(self, "descriptor", None) is not None:
-            self.stream.synchronize()
-            self.api.spSM_destroyDescr(self.descriptor)
-            self.descriptor = None
+            with self.cp.cuda.Device(self.device_id):
+                self.stream.synchronize()
+                self.api.spSM_destroyDescr(self.descriptor)
+                self.descriptor = None
 
     def __del__(self):
         self.close()

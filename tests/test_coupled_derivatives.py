@@ -36,6 +36,26 @@ def test_zero_velocity_sensitivity_never_invokes_momentum_tangent_solves():
     assert J.thermal_only
 
 
+@pytest.mark.parametrize("steps", [None, [0.2, 0.35]])
+def test_independent_momentum_adjoint_checks_detect_an_incorrect_transpose_solve(steps):
+    problem = small_coupled_problem(steps)
+    evaluation = problem.evaluate(np.linspace(0.04, 0.1, problem.size))
+    desired = np.full(problem.size, 0.12)
+    report = problem.verify_adjoint(evaluation, desired)
+    assert report["maximum_momentum_adjoint_relative_residual"] < 1e-11
+    assert report["gradient_relative_difference"] < 1e-11
+    original = evaluation.jacobian.factors[0]
+
+    class IncorrectTranspose:
+        def solve(self, rhs, trans="N"):
+            answer = original.solve(rhs, trans=trans)
+            return 2 * answer if trans == "T" else answer
+
+    evaluation.jacobian.factors = (IncorrectTranspose(), *evaluation.jacobian.factors[1:])
+    failed = problem.verify_adjoint(evaluation, desired)
+    assert failed["maximum_momentum_adjoint_relative_residual"] > 0.9
+
+
 def small_coupled_problem(steps=None, feedback=0.003, uniform_capacity=False):
     mesh = annular_rectangle(3)
     flow = AxisymmetricFlow(mesh, 0.1)

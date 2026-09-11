@@ -4,6 +4,8 @@ This example is under verification. It adds temperature-dependent buoyancy to
 the axisymmetric transformer model and recomputes the distributed heat source.
 The prescribed-flow timing records and their numerical implementations remain
 unchanged. No coupled application speedup has been established.
+These commands use the development source, rather than the frozen v0.6.2
+implementation underlying the earlier timing release.
 
 The trial variable is the complete temperature trajectory. Each evaluation
 solves momentum and continuity, then recovers the source from the thermal
@@ -31,7 +33,7 @@ resolution, nonlinear optimality, and solver timings require separate evidence.
 ## Operating-point pilots
 
 ```bash
-uv run python -m deflation_example.coupled_pilot inlet_factor=1.0 output=runs/inlet-1
+uv run python -m deflation_example.coupled_pilot inlet_factor=1.0 flow_tolerance=1e-9 output=runs/inlet-1
 ```
 
 The declared inlet factors are 1, 0.5, 0.25, and 0.125, in that order. Each run
@@ -39,6 +41,16 @@ retains viscosity-continuation attempts, the physical steady residuals, and mass
 balance. A converged isothermal baseline is a prerequisite for further checks.
 Selection also requires coupled convergence and resolution checks, independently
 of optimizer performance. Output directories must be new.
+
+A verified stabilized baseline and a short nonlinear solver check can be run as
+follows. This short time interval is a discrete verification example; it does
+not meet the final study's physical-resolution requirements.
+
+```bash
+uv run python -m deflation_example.coupled_pilot inlet_factor=0.125 grad_div_scale=1 flow_tolerance=1e-9 output=runs/stabilized-baseline
+uv run python -m deflation_example.coupled_optimize baseline_directory=runs/stabilized-baseline transient=true slabs=1 horizon_s=9.375 mode=derivatives output=runs/short-derivatives
+uv run python -m deflation_example.coupled_optimize baseline_directory=runs/stabilized-baseline transient=true slabs=1 horizon_s=9.375 mode=optimize methods=[reference] rank=100 backtracking=quadratic secant_memory=10 output=runs/short-optimization
+```
 
 Oil momentum properties use the correlations in
 [Li et al., High Voltage 9 (2024), 230–240](https://doi.org/10.1049/hve2.12345).
@@ -101,6 +113,9 @@ its descriptors and analysis workspace. The vector binding uses the cuSPARSE
 library already loaded by CuPy, avoiding incompatible opaque descriptors from
 different library versions. Plans are confined to their original CUDA stream.
 The basis and coarse factorization are rebuilt for each inactive system.
+Final optimization checks also reassemble the momentum transpose equations
+independently. `evaluation_progress=true` writes per-slab progress for development
+pilots; leave it disabled for final timing comparisons.
 
 The diagnostic scripts in this directory have `--help` interfaces:
 

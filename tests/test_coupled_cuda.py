@@ -90,7 +90,7 @@ def test_cuda_isothermal_derivative_avoids_factor_upload():
 
 
 @pytest.mark.gpu
-def test_persistent_triangular_factors_reuse_and_release_block_plans():
+def test_persistent_triangular_factors_reuse_and_release_block_plans(monkeypatch):
     cp = pytest.importorskip("cupy")
     from scipy import sparse
     from scipy.sparse.linalg import splu
@@ -113,6 +113,12 @@ def test_persistent_triangular_factors_reuse_and_release_block_plans():
         prior = gpu.solve(cp.asarray(rhs)).copy()
         gpu.solve(cp.asarray(2 * rhs))
         np.testing.assert_allclose(cp.asnumpy(prior), factor.solve(rhs), atol=1e-11)
+        for key in (("N", 1), ("N", 5)):
+            plan = gpu.plans[key][0]
+            with monkeypatch.context() as patch:
+                patch.setattr(cp.cuda.runtime, "getDevice", lambda: plan.device_id + 1)
+                with pytest.raises(RuntimeError, match="original CUDA device"):
+                    plan.solve(plan.rhs)
     finally:
         gpu.close()
     assert not gpu.plans

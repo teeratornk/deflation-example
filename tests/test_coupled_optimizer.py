@@ -154,6 +154,27 @@ def test_qp_verifies_candidate_on_last_allowed_active_set_step():
     np.testing.assert_array_equal(result.x, [1.0, -1.0])
 
 
+def test_line_search_retains_and_backtracks_a_stabilization_branch_switch(monkeypatch):
+    from deflation_example.coupled_derivatives import StabilizationBranchError
+
+    problem = small_coupled_problem()
+    actual_evaluate = problem.evaluate
+    attempted = []
+
+    def evaluate(state, initial=None):
+        if initial is not None and not attempted:
+            attempted.append(True)
+            raise StabilizationBranchError("test branch switch")
+        return actual_evaluate(state, initial=initial)
+
+    monkeypatch.setattr(problem, "evaluate", evaluate)
+    result = minimize_coupled(problem, np.linspace(-0.1, 0.3, problem.size), -0.05, 0.15, solver())
+    assert result.status == "converged"
+    trials = result.history[0]["attempts"][0]["trials"]
+    assert trials[0]["status"] == "stabilization_branch_switch"
+    assert trials[1]["step"] == 0.5 * trials[0]["step"]
+
+
 @pytest.mark.parametrize("backtracking", ["halving", "quadratic"])
 def test_safeguarded_backtracking_reaches_the_same_nonlinear_stationary_point(backtracking):
     from types import SimpleNamespace

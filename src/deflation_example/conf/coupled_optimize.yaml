@@ -25,6 +25,8 @@ nonlinear_tolerance: 1.0e-8
 nonlinear_cap: 100
 backtracking: halving
 secant_memory: 0
+evaluation_progress: false
+linear_progress: false
 qp_tolerance: 1.0e-10
 qp_cap: 100
 inner_tolerance: 1.0e-10

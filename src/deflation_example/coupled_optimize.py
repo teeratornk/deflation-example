@@ -156,6 +156,35 @@ def equations_verified(rows):
     )
 
 
+def observe_linear_solves(solver, destination):
+    """Optional pilot-only progress; file writes are outside inner timer components."""
+    solve = solver.solve
+    calls = 0
+
+    def observed(B, b, indices, initial=None):
+        nonlocal calls
+        calls += 1
+        metadata = {"call": calls, "inactive_dofs": len(b)}
+        write_report(destination, {**metadata, "status": "running"})
+        result, metrics = solve(B, b, indices, initial=initial)
+        write_report(
+            destination,
+            {
+                **metadata,
+                "status": result.status,
+                "iterations": result.iterations,
+                "residual": result.residual,
+                "rank": result.rank,
+                "coarse_condition": result.coarse_condition,
+                "fallback": result.fallback_reason,
+                "timing": metrics,
+            },
+        )
+        return result, metrics
+
+    solver.solve = observed
+
+
 def run(config):
     cfg = OmegaConf.to_container(config, resolve=True)
     if not cfg["baseline_directory"]:
@@ -169,6 +198,10 @@ def run(config):
     with threadpool_limits(integer(cfg["threads"], "Threads", 1)):
         start = time.perf_counter()
         problem, baseline_record = load_problem(cfg)
+        if cfg["evaluation_progress"]:
+            problem.evaluation_callback = lambda row: write_report(
+                output / "evaluation-progress.json", row
+            )
         desired = desired_temperature(problem, cfg["query"], cfg["target_count"])
         metadata = {
             "schema": "coupled-optimization-pilot-v1",
@@ -242,6 +275,8 @@ def run(config):
                     cg_factor=0.1,
                     residual_policy="refine",
                 )
+                if cfg["linear_progress"]:
+                    observe_linear_solves(solver, output / (method + "-linear-progress.json"))
                 try:
                     result = minimize_coupled(
                         problem,
@@ -260,11 +295,18 @@ def run(config):
                         ),
                     )
                     checks = problem.verify(result.evaluation)
+                    adjoint = problem.verify_adjoint(result.evaluation, desired)
                     equations_pass = equations_verified(checks)
+                    adjoint_pass = (
+                        np.isfinite(adjoint["maximum_momentum_adjoint_relative_residual"])
+                        and adjoint["maximum_momentum_adjoint_relative_residual"] <= 1e-8
+                    )
                     row = {
                         "method": method,
                         "optimizer_status": result.status,
                         "status": result.status
+                        if equations_pass and adjoint_pass
+                        else "adjoint_verification_failed"
                         if equations_pass
                         else "equation_verification_failed",
                         "reference_seconds": setup,
@@ -272,6 +314,7 @@ def run(config):
                         "objective": result.objective * problem.objective_scale,
                         "kkt": result.kkt,
                         "equations": checks,
+                        "adjoint": adjoint,
                         "history": result.history,
                     }
                     results.append(row)
@@ -319,10 +362,4 @@ def run(config):
             raise
 
 
-@hydra.main(version_base="1.3", config_path="conf", config_name="coupled_optimize")
-def main(config):
-    run(config)
-
-
-if __name__ == "__main__":
-    main()
+@hydra.main(version_base="1.3", config_path="conf", config_name="coupled_optimize"

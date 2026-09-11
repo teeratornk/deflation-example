@@ -127,6 +127,8 @@ class CoupledControlProblem:
         if not isinstance(flow_continuation, bool):
             raise ValueError("Flow continuation must be Boolean")
         self.flow_continuation = flow_continuation
+        self.evaluation_callback = None
+        self.evaluation_count = 0
         self.assembly = self.assemble(initial_flow.velocity)
         mass = self.assembly.mass[self.free]
         self.weights = mass / mass.mean()
@@ -163,6 +165,16 @@ class CoupledControlProblem:
 
     def evaluate(self, state, initial=None):
         start = time.perf_counter()
+        self.evaluation_count += 1
+        if self.evaluation_callback is not None:
+            self.evaluation_callback(
+                {
+                    "evaluation": self.evaluation_count,
+                    "completed_slabs": 0,
+                    "total_slabs": self.slabs,
+                    "status": "running",
+                }
+            )
         state = np.asarray(state, dtype=float).copy()
         if state.shape != (self.size,) or not np.isfinite(state).all():
             raise ValueError("State must be a finite complete temperature trajectory")
@@ -232,6 +244,18 @@ class CoupledControlProblem:
                 result.velocity
             )
             factors.append(splu(J[self.flow_free][:, self.flow_free].tocsc()))
+            if self.evaluation_callback is not None:
+                self.evaluation_callback(
+                    {
+                        "evaluation": self.evaluation_count,
+                        "completed_slabs": n + 1,
+                        "total_slabs": self.slabs,
+                        "status": "running" if n + 1 < self.slabs else "complete",
+                        "seconds": time.perf_counter() - start,
+                        "flow_iterations": len(result.history),
+                        "equations": checks,
+                    }
+                )
             history.append(
                 self.momentum_mass / dt if dt else sparse.csr_matrix(self.momentum_mass.shape)
             )
@@ -277,6 +301,49 @@ class CoupledControlProblem:
             WeightedReducedOperator(evaluation.frozen_operator, self.weights, self.alpha).diagonal()
             + damping * self.weights
         )
+
+    def verify_adjoint(self, evaluation, desired):
+        """Reassemble momentum transpose equations at the retained trajectory.
+
+        The source-constraint multiplier is alpha*W*u. The momentum multiplier
+        has the opposite sign to the auxiliary adjoint used here. Each residual
+        uses a freshly assembled momentum Jacobian, including temporal mass.
+        """
+        J = evaluation.jacobian
+        multiplier = self.alpha * self.weights * evaluation.control
+        blocks = multiplier.reshape(self.slabs, self.spatial_size)
+        gradient = self.weights * (evaluation.state - desired) + J.thermal.T @ multiplier
+        gradient = gradient.reshape(self.slabs, self.spatial_size)
+        following = np.zeros(len(self.flow_free))
+        rows = []
+        for n in range(self.slabs - 1, -1, -1):
+            rhs = J.velocity_actions[n].T @ blocks[n]
+            if n + 1 < self.slabs:
+                rhs = rhs + J.history[n + 1].T @ following
+            adjoint = J.factors[n].solve(rhs, trans="T")
+            dt = float(self.physical_steps[n]) if len(self.physical_steps) else None
+            velocity = evaluation.flows[n].velocity
+            actual = self.flow.operator(velocity, time_step=dt) + self.flow.convection_derivative(
+                velocity
+            )
+            actual = actual[self.flow_free][:, self.flow_free]
+            residual = actual.T @ adjoint - rhs
+            norm = np.linalg.norm(rhs)
+            relative = np.linalg.norm(residual) / norm if norm else np.linalg.norm(residual)
+            gradient[n] += self.load_derivative.T @ adjoint
+            rows.append({"slab": n, "momentum_adjoint_relative_residual": float(relative)})
+            following = adjoint
+        reference = self.objective_gradient(evaluation, desired)[1]
+        difference = np.linalg.norm(gradient.ravel() - reference)
+        return {
+            "steps": rows[::-1],
+            "maximum_momentum_adjoint_relative_residual": max(
+                r["momentum_adjoint_relative_residual"] for r in rows
+            ),
+            "gradient_relative_difference": float(
+                difference / max(np.linalg.norm(reference), np.finfo(float).tiny)
+            ),
+        }
 
     def verify(self, evaluation):
         """Rebuild momentum and thermal equations at the same retained fields.

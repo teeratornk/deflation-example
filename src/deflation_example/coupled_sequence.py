@@ -105,14 +105,22 @@ def optimize_targets(problem, solver, cfg):
                 secant_memory=cfg["secant_memory"],
             )
             checks = problem.verify(result.evaluation)
-            verified = result.status == "converged" and equations_verified(checks)
+            adjoint = problem.verify_adjoint(result.evaluation, desired)
+            adjoint_pass = (
+                np.isfinite(adjoint["maximum_momentum_adjoint_relative_residual"])
+                and adjoint["maximum_momentum_adjoint_relative_residual"] <= 1e-8
+            )
+            verified = result.status == "converged" and equations_verified(checks) and adjoint_pass
             row.update(
                 status=result.status
+                if equations_verified(checks) and adjoint_pass
+                else "adjoint_verification_failed"
                 if equations_verified(checks)
                 else "equation_verification_failed",
                 verified=verified,
                 kkt=result.kkt,
                 equations=checks,
+                adjoint=adjoint,
                 objective=result.objective * problem.objective_scale,
                 nonlinear_iterations=len(result.history),
                 history=result.history,

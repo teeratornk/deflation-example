@@ -7,7 +7,7 @@ import numpy as np
 from scipy.sparse.linalg import LinearOperator
 
 from .coupled_control import FlowEvaluationError
-from .coupled_derivatives import GaussNewtonOperator
+from .coupled_derivatives import GaussNewtonOperator, StabilizationBranchError
 from .validation import integer, positive_real
 
 
@@ -260,6 +260,12 @@ def minimize_coupled(
                                 "metrics": failure.metrics,
                                 "flow_history": failure.result.history,
                             }
+                        )
+                        length *= 0.5
+                        continue
+                    except StabilizationBranchError:
+                        attempt["trials"].append(
+                            {"step": length, "status": "stabilization_branch_switch"}
                         )
                         length *= 0.5
                         continue

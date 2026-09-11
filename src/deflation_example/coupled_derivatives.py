@@ -12,6 +12,10 @@ from scipy.sparse.linalg import LinearOperator
 from .meshes import simplex_geometry, triangle_quadrature
 
 
+class StabilizationBranchError(ValueError):
+    """The streamline coefficient is at a nondifferentiable branch switch."""
+
+
 def buoyancy_jacobian(flow, expansion, temperature_scale, gravity=(0.0, -9.81)):
     """Map nodal dimensionless temperature changes to momentum load changes."""
     local = np.einsum("eq,qi,qj->eij", flow.measure, flow.shape, flow.bary)
@@ -66,7 +70,9 @@ def thermal_velocity_jacobian(flow, velocity, state, capacity, conductivity, vel
     advection_tau = np.full_like(norm, np.inf)
     np.divide(h, 2 * c * norm, out=advection_tau, where=norm > 0)
     if np.any(np.isclose(advection_tau, diffusion_tau, rtol=1e-12, atol=0)):
-        raise ValueError("Streamline stabilization is at a nondifferentiable branch switch")
+        raise StabilizationBranchError(
+            "Streamline stabilization is at a nondifferentiable branch switch"
+        )
     tau = np.minimum(advection_tau, diffusion_tau)
     dtau = np.zeros_like(v)
     advective = advection_tau < diffusion_tau
