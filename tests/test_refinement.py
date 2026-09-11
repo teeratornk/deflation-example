@@ -71,6 +71,26 @@ def test_correction_budget_is_bounded():
 
 
 @pytest.mark.parametrize(
+    "quality, status, cap, expected",
+    [
+        (1.0, "residual_gap", 10, "converged"),
+        (0.0, "converged", 10, "residual_stagnation"),
+        (0.5, "residual_gap", 3, "maxiter"),
+        (0.5, "breakdown", 10, "breakdown"),
+        (0.5, "residual_gap", 100, "residual_failed"),
+    ],
+)
+def test_every_termination_reports_the_retained_states_original_residual(
+    quality, status, cap, expected
+):
+    solve, _ = controlled_solver(quality=quality, status=status)
+    operator, rhs = sparse.eye(3), np.ones(3)
+    result, _ = verified_refinement(solve, operator, rhs, None, 1e-10, cap)
+    assert result.status == expected
+    assert result.residual == independent_residual(operator, result.x, rhs)
+
+
+@pytest.mark.parametrize(
     "scalar, expected, calls_expected",
     [
         ("nonpositive_rz", "converged", 2),

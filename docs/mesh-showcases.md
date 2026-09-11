@@ -12,6 +12,56 @@ prepares fixed optimized controls and verifies axisymmetric momentum
 components for a proposed two-way flow–temperature assessment. Coupled
 application results and the material-model check remain pending.
 
+## Choose the numerical procedure
+
+The measured procedures and the recommended guarded solver have separate
+source identifiers. The package version remains 0.6.2; use the commit and
+residual policy to distinguish them.
+
+| Procedure | Numerical source | Evidence |
+| --- | --- | --- |
+| Primary projected CG, `terminal` | `dc89ae8518ff6a975eadf2f6f3bae1acbd17b83b` | Six primary body-fitted comparisons and rank/temporal controls |
+| Residual correction, `refine`, before the initial guard | `926b37c40935fbbe7134a3ab5f87ebdfddb68837` | Finer-transformer study: 40 complete four-target sequences |
+| Residual correction with initial guard, `refine` | `0b3b3f06a535f515256932c0dbf27537c242744d` | Guard regression tests and small CPU sequences; no GPU timing evaluation |
+
+### Reproduce the measured implementations
+
+Release `v0.6.2` preserves the measured correction implementation and the
+primary `terminal` presets. Start in a fresh directory:
+
+```bash
+git clone --branch v0.6.2 --single-branch \
+  https://github.com/teeratornk/deflation-example.git measured-example
+cd measured-example
+uv sync --locked
+```
+
+Use this checkout for the frozen GPU commands and CPU artifact-generation
+commands below. The original numerical sources identify the measured code;
+the release packages the reproduction commands and inputs. Its
+`mesh_refinement_transformer` preset intentionally predates the initial guard.
+
+### Use the recommended guarded solver
+
+Use a separate checkout and select `refine` explicitly:
+
+```bash
+git clone https://github.com/teeratornk/deflation-example.git guarded-example
+cd guarded-example
+git checkout --detach 0b3b3f06a535f515256932c0dbf27537c242744d
+uv sync --locked
+uv run --locked pytest tests/test_refinement.py tests/test_study_solvers.py
+uv run --locked python -m deflation_example.benchmark_mesh \
+  +residual_policy=refine output=runs/guarded-steady
+uv run --locked python -m deflation_example.benchmark_mesh \
+  +residual_policy=refine transient=true output=runs/guarded-transient
+```
+
+These small examples run on a CPU. Their reports record the guarded source
+and policy; they do not reproduce the frozen GPU timings. With a preset that
+already defines `residual_policy`, use `residual_policy=refine` without `+`.
+The `+` adds this key to the small default Hydra configuration.
+
 ## Run the examples
 
 The small engine example runs on a CPU and uses the packaged mesh:
@@ -119,7 +169,8 @@ a per-solve configuration. Recycling selects directions after locally
 converged Krylov solves. The complete clock charges every correction,
 transfer, setup, and independent check.
 
-These commands repeat the original four-target problems five times per method:
+Run these commands in the `v0.6.2` measured checkout to repeat the original
+four-target problems five times per method:
 
 ```bash
 uv run --no-sync python -m deflation_example.benchmark_mesh \
@@ -150,8 +201,8 @@ The guard has separate regression coverage for solved warm starts, zero
 right-hand sides, worse first or later candidates, and complete small CPU
 optimization sequences. These checks establish implementation behavior; they
 do not retime the frozen comparisons. Tag `v0.6.2` preserves the published
-implementation before this guard. Use that tag to reproduce the reported
-timings, and record the source commit when running the guarded recommendation.
+implementation before this guard. The separate checkout commands above pin
+both routes. All new runs record their source and policy.
 
 Run `mesh_breakdown` with a saved protocol to reconstruct the diagnostic:
 
