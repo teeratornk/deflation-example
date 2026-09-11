@@ -92,6 +92,8 @@ def test_complete_sequence_outputs_partition_and_original_state_checks(monkeypat
         inner_tolerance=1e-11,
         inner_cap=1000,
         threads=1,
+        evaluation_progress=True,
+        linear_progress=True,
         output=str(tmp_path / "sequence"),
     )
     monkeypatch.setattr(
@@ -134,5 +136,11 @@ def test_complete_sequence_outputs_partition_and_original_state_checks(monkeypat
     stored = json.loads((tmp_path / "sequence/record.json").read_text())
     assert stored["cases"][1]["warm_start_used"]
     assert (tmp_path / "sequence/target-00.npz").is_file()
+    progress = json.loads((tmp_path / "sequence/optimization-progress.json").read_text())
+    assert progress["position"] == 1
+    assert progress["iteration"] >= 0
+    linear = json.loads((tmp_path / "sequence/linear-progress.json").read_text())
+    assert linear["status"] == "converged"
+    assert linear["residual"] <= config["inner_tolerance"]
     with pytest.raises(FileExistsError):
         sequence.run(OmegaConf.create(config))

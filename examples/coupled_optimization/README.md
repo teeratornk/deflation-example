@@ -198,6 +198,11 @@ its cost comparisons. All pilot failures and iteration caps remain recorded.
 
 ## Complete sequences
 
+The [coupled ablation design](ablations/README.md) separately varies rank,
+temperature bounds, targets, temporal size, nonlinear policy and reference
+construction. It preserves every outcome and uses complete one-target intervals
+for the initial screen.
+
 After freezing a verified operating point, discretization and nonlinear policy,
 run each method and repetition in a fresh process:
 

@@ -125,7 +125,7 @@ def test_persistent_triangular_factors_reuse_and_release_block_plans(monkeypatch
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("method", ["jacobi", "reference", "recycling"])
+@pytest.mark.parametrize("method", ["jacobi", "reference", "recycling", "sequential"])
 def test_cuda_coupled_solvers_and_recycling_match_cpu_residuals(method):
     pytest.importorskip("cupy")
     from deflation_example.coupled_cuda_solver import CudaCoupledSolver
@@ -138,8 +138,12 @@ def test_cuda_coupled_solvers_and_recycling_match_cpu_residuals(method):
     diagonal = problem.preconditioning_diagonal(evaluation)
     rng = np.random.default_rng(98)
     reference = ArrayReference(rng.normal(size=(problem.size, 3)), {"construction": "test"})
+    if method == "sequential":
+        from deflation_example.coupled_reference import SequentialReference
+
+        reference = SequentialReference(reference, problem.size)
     solver = CudaCoupledSolver(
-        method,
+        "reference" if method == "sequential" else method,
         reference=reference,
         rank=3,
         window=6,
@@ -167,6 +171,8 @@ def test_cuda_coupled_solvers_and_recycling_match_cpu_residuals(method):
             )
             if method == "recycling":
                 assert solver.history.basis.shape[1] == 3
+            if method == "sequential":
+                assert timing["reference_transfer_seconds"] >= 0
         # The inherited guard avoids device coarse work for an exact warm start.
         result, timing = solver.solve(B, rhs, indices, initial=exact)
         assert result.iterations == 0

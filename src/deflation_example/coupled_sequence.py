@@ -15,7 +15,7 @@ from omegaconf import OmegaConf
 from threadpoolctl import threadpool_limits
 
 from .coupled_control import FlowEvaluationError
-from .coupled_optimize import equations_verified, load_problem
+from .coupled_optimize import equations_verified, load_problem, observe_linear_solves
 from .coupled_optimizer import NUMERICAL_POLICY, minimize_coupled
 from .memory import ProcessMemory
 from .coupled_reference import configured_reference
@@ -61,7 +61,7 @@ def prepare_device(device, interval):
     return sampler, barrier, solver_class, details
 
 
-def optimize_targets(problem, solver, cfg):
+def optimize_targets(problem, solver, cfg, callback=None):
     """Keep every outcome; equivalent accepted-state warm starts across methods."""
     cases, fields, previous = [], [], None
     lower = (cfg["lower_K"] - problem.temperature_offset) / problem.temperature_scale
@@ -87,6 +87,7 @@ def optimize_targets(problem, solver, cfg):
                 qp_cap=cfg["qp_cap"],
                 backtracking=cfg["backtracking"],
                 secant_memory=cfg["secant_memory"],
+                callback=None if callback is None else lambda row, ev: callback(position, row, ev),
             )
             checks = problem.verify(result.evaluation)
             adjoint = problem.verify_adjoint(result.evaluation, desired)
@@ -223,6 +224,10 @@ def run(config):
         cases, fields, parts, storage = [], [], {}, {}
         try:
             problem, baseline = load_problem(cfg)
+            if cfg.get("evaluation_progress", False):
+                problem.evaluation_callback = lambda row: write_report(
+                    output / "evaluation-progress.json", row
+                )
             metadata.update(
                 baseline_sha256=baseline["baseline_sha256"],
                 baseline_configuration=baseline["configuration"],
@@ -251,9 +256,20 @@ def run(config):
                 cg_factor=0.1,
                 residual_policy="refine",
             )
+            if cfg.get("linear_progress", False):
+                observe_linear_solves(solver, output / "linear-progress.json")
             parts["solver_resources"] = time.perf_counter() - tick
             tick = time.perf_counter()
-            cases, fields = optimize_targets(problem, solver, cfg)
+            callback = (
+                (
+                    lambda position, row, ev: write_report(
+                        output / "optimization-progress.json", {"position": position, **row}
+                    )
+                )
+                if cfg.get("evaluation_progress", False) or cfg.get("linear_progress", False)
+                else None
+            )
+            cases, fields = optimize_targets(problem, solver, cfg, callback=callback)
             barrier()
             parts["target_optimizations_and_verification"] = time.perf_counter() - tick
         except Exception as failure:

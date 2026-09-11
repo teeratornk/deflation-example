@@ -100,6 +100,15 @@ class StudySolver:
         self.reset_history()
 
     def solve(self, B, b, indices, initial=None):
+        # The optional transfer ablation follows every requested inactive system,
+        # including systems accepted by the initial-residual guard. Ordinary
+        # full-domain references have no begin_system hook.
+        begin_reference = getattr(self.reference, "begin_system", None)
+        transfer_seconds = 0.0
+        if callable(begin_reference):
+            transfer_start = time.perf_counter()
+            begin_reference(indices)
+            transfer_seconds = time.perf_counter() - transfer_start
         if self.residual_policy == "refine":
             from .refinement import verified_refinement
 
@@ -139,8 +148,14 @@ class StudySolver:
                 )
                 metrics["callback_seconds"] = elapsed
                 metrics["total_seconds"] = sum(metrics["components_seconds"].values())
-            return result, metrics
-        return self._solve_once(B, b, indices, initial)
+        else:
+            result, metrics = self._solve_once(B, b, indices, initial)
+        if callable(begin_reference):
+            metrics["reference_transfer_seconds"] = transfer_seconds
+            metrics["components_seconds"]["basis_processing"] += transfer_seconds
+            metrics["total_seconds"] += transfer_seconds
+            metrics["callback_seconds"] += transfer_seconds
+        return result, metrics
 
     def _solve_once(
         self, B, b, indices, initial=None, *, target=None, cap=None, verify_candidates=False

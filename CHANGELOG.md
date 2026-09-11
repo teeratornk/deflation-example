@@ -11,6 +11,7 @@
 - Preserve the selected target in spatial and temporal replays; validate matched complete-sequence summaries and plot saved physical fields.
 - Plot matched nonlinear optimality and cumulative inner work, retaining unsuccessful attempts.
 - Expose forward-replay relaxation and iteration limits while recording unchanged coupled and conservation thresholds.
+- Declare matched coupled ablations of rank, bounds, targets, time slabs, nonlinear policy and reference construction/transfer; retain all outcomes in checked summaries.
 - Keep application speedup claims pending coupled convergence and resolution studies; preserve all prescribed-flow numerical sources and timings.
 
 ## 0.6.2
