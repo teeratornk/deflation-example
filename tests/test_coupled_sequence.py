@@ -29,9 +29,11 @@ def configuration(problem):
 
 
 @pytest.mark.parametrize("fail_first", [False, True])
-def test_sequence_uses_only_verified_previous_states(monkeypatch, fail_first):
+@pytest.mark.parametrize("startup", [0.0, 60.0])
+def test_sequence_uses_only_verified_previous_states(monkeypatch, fail_first, startup):
     problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
     config = configuration(problem)
+    config["target_startup_s"] = startup
     original = sequence.minimize_coupled
     initial_guesses = []
 
@@ -56,6 +58,12 @@ def test_sequence_uses_only_verified_previous_states(monkeypatch, fail_first):
         np.testing.assert_array_equal(initial_guesses[1][0], fields[0]["state"])
         np.testing.assert_array_equal(initial_guesses[1][1].state, fields[0]["state"])
     assert cases[1]["warm_start_used"] != fail_first
+    from deflation_example.coupled_targets import desired_temperature
+
+    for query, field in zip(config["queries"], fields, strict=True):
+        np.testing.assert_array_equal(
+            field["desired"], desired_temperature(problem, query["target"], 2, startup)
+        )
 
 
 def test_runtime_failure_keeps_the_remaining_declared_targets(monkeypatch):
@@ -115,6 +123,9 @@ def test_complete_sequence_outputs_partition_and_original_state_checks(monkeypat
     report = sequence.run(OmegaConf.create(config))
     assert report["status"] == "complete"
     assert report["verified_problems"] == 2
+    from deflation_example.coupled_report import validate_record
+
+    assert validate_record(report)
     assert sum(report["components_seconds"].values()) == pytest.approx(report["sequence_seconds"])
     assert report["preparation_inclusive_seconds"] == pytest.approx(
         report["sequence_seconds"] + report["process_preparation_seconds"] + 0.25

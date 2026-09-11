@@ -10,7 +10,7 @@ from .coupled_optimize import load_problem
 from .coupled_reference import nested_prolongation
 from .coupled_resolution import replay_controls
 from .coupled_saved import load_saved_solution, require_matching_baseline
-from .mesh_showcases import desired_temperature
+from .coupled_targets import desired_temperature
 from .reporting import environment, write_fields, write_report
 from .validation import integer
 
@@ -110,9 +110,9 @@ def main():
                 np.max(np.abs(states - interpolated)) * fine.temperature_scale
             )
             coarse_target = fields["desired"].reshape(original.shape)
-            fine_target = desired_temperature(fine, cfg["query"], cfg["target_count"]).reshape(
-                states.shape
-            )
+            fine_target = desired_temperature(
+                fine, cfg["query"], cfg["target_count"], cfg.get("target_startup_s", 0.0)
+            ).reshape(states.shape)
             coarse_tracking = float(
                 np.sum(
                     coarse.physical_steps[:, None]

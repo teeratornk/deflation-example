@@ -19,7 +19,7 @@ from .coupled_optimize import equations_verified, load_problem
 from .coupled_optimizer import NUMERICAL_POLICY, minimize_coupled
 from .memory import ProcessMemory
 from .coupled_reference import configured_reference
-from .mesh_showcases import desired_temperature
+from .coupled_targets import desired_temperature
 from .reporting import environment, write_fields, write_report
 from .study_solvers import StudySolver
 from .validation import integer
@@ -67,7 +67,9 @@ def optimize_targets(problem, solver, cfg):
     lower = (cfg["lower_K"] - problem.temperature_offset) / problem.temperature_scale
     for position, query in enumerate(cfg["queries"]):
         start = time.perf_counter()
-        desired = desired_temperature(problem, query["target"], cfg["target_count"])
+        desired = desired_temperature(
+            problem, query["target"], cfg["target_count"], cfg.get("target_startup_s", 0.0)
+        )
         upper = (query["upper_K"] - problem.temperature_offset) / problem.temperature_scale
         row = {"position": position, **query, "warm_start_used": previous is not None}
         try:

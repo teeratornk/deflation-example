@@ -20,7 +20,7 @@ from deflation_example.coupled_optimize import load_problem, observe_linear_solv
 from deflation_example.coupled_optimizer import box_quadratic
 from deflation_example.mesh_control import build_mesh_control
 from deflation_example.mesh_reference import build_mesh_reference
-from deflation_example.mesh_showcases import desired_temperature
+from deflation_example.coupled_targets import desired_temperature
 from deflation_example.reporting import environment, write_report
 from deflation_example.study_solvers import StudySolver
 
@@ -54,7 +54,9 @@ def main():
             [sparse.csr_matrix((0, 0))] * problem.slabs,
         )
         H = GaussNewtonOperator(J, problem.weights, problem.alpha)
-        desired = desired_temperature(problem, cfg["query"], cfg["target_count"])
+        desired = desired_temperature(
+            problem, cfg["query"], cfg["target_count"], cfg.get("target_startup_s", 0.0)
+        )
         gradient = -frozen.load(desired)
         method = "reference" if args.rank else "jacobi"
         reference = None

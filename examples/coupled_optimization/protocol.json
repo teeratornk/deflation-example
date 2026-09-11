@@ -12,6 +12,8 @@
   "nominal_upper_temperature_K": 357.3,
   "additional_upper_temperatures_K": [353.3, 361.3],
   "horizon_s": 600.0,
+  "target_startup_s": 60.0,
+  "target_startup": "For each query, desired(t) = initial + r(t) * (original_desired(t) - initial), with r(t) = s^2(3-2s), s = min(t/60,1), and physical time t in seconds. The desired field equals the original target from 60 s onward. Apply the same target to every solver. Preserve the original-target pilots with zero startup as a separate population.",
   "alpha": 1e-14,
   "control": "Unbounded signed distributed source with quadratic penalty; temperature has finite lower and upper bounds.",
   "unknown": "Complete temperature trajectory; momentum is solved at each nonlinear evaluation and the source is recovered from all coupled thermal equations.",

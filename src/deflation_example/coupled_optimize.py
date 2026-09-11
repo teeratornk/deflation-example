@@ -20,7 +20,7 @@ from .coupled_control import CoupledControlProblem, FlowEvaluationError
 from .coupled_optimizer import NUMERICAL_POLICY, minimize_coupled
 from .coupled_pilot import transformer_inputs
 from .coupled_reference import configured_reference
-from .mesh_showcases import desired_temperature
+from .coupled_targets import desired_temperature
 from .oil_properties import momentum_reference
 from .reporting import environment, write_fields, write_report
 from .study_solvers import StudySolver
@@ -200,7 +200,9 @@ def run(config):
             problem.evaluation_callback = lambda row: write_report(
                 output / "evaluation-progress.json", row
             )
-        desired = desired_temperature(problem, cfg["query"], cfg["target_count"])
+        desired = desired_temperature(
+            problem, cfg["query"], cfg["target_count"], cfg.get("target_startup_s", 0.0)
+        )
         metadata = {
             "schema": "coupled-optimization-pilot-v1",
             "numerical_policy": NUMERICAL_POLICY,

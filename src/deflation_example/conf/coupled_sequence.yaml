@@ -5,6 +5,7 @@ defaults:
 mode: optimize
 transient: true
 slabs: 64
+target_startup_s: 60.0
 method: reference
 output: runs/coupled-sequence
 rank: 100

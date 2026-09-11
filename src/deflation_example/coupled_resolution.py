@@ -9,7 +9,6 @@ import argparse
 import hashlib
 from pathlib import Path
 import time
-from types import SimpleNamespace
 
 import numpy as np
 from threadpoolctl import threadpool_limits
@@ -18,7 +17,7 @@ from .coupled_forward import CoupledForward
 from .coupled_optimize import load_problem
 from .coupled_saved import load_saved_solution, require_matching_baseline
 from .meshes import assemble_thermal
-from .mesh_showcases import desired_temperature
+from .coupled_targets import refined_desired_temperature
 from .reporting import environment, write_fields, write_report
 from .validation import integer
 
@@ -203,15 +202,14 @@ def main():
             ].tolist()
             report["maximum_upper_violation_time_s"] = result["steps"][step]["time_s"]
             fine_steps = np.repeat(problem.physical_steps / args.subdivision, args.subdivision)
-            fine_view = SimpleNamespace(
-                assembly=problem.assembly, free=problem.free, steps=fine_steps / problem.time_scale
-            )
-            desired_fine = desired_temperature(
-                fine_view, cfg["query"], cfg["target_count"]
+            desired_fine = refined_desired_temperature(
+                problem,
+                cfg["query"],
+                cfg["target_count"],
+                args.subdivision,
+                cfg.get("target_startup_s", 0.0),
             ).reshape(states.shape)
-            desired_original = desired_temperature(
-                problem, cfg["query"], cfg["target_count"]
-            ).reshape(optimized.shape)
+            desired_original = fields["desired"].reshape(optimized.shape)
             mass = problem.assembly.mass[problem.free]
             coarse_tracking = float(
                 np.sum(

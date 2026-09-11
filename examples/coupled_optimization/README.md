@@ -63,15 +63,45 @@ properties apart from the Boussinesq forcing.
 After independent baseline verification:
 
 ```bash
-uv run python -m deflation_example.coupled_optimize baseline_directory=runs/inlet-1 mode=derivatives output=runs/derivatives
-uv run python -m deflation_example.coupled_optimize baseline_directory=runs/inlet-1 mode=optimize output=runs/steady-control
+uv run python -m deflation_example.coupled_optimize baseline_directory=runs/stabilized-baseline mode=derivatives output=runs/derivatives
+uv run python -m deflation_example.coupled_optimize baseline_directory=runs/stabilized-baseline mode=optimize output=runs/steady-control
 ```
 
 The second command requires the application derivative checks to pass first.
-Use `transient=true slabs=16` for a complete 600 s trajectory. These commands
+Use `transient=true slabs=64 horizon_s=600 target_startup_s=60` for the new
+complete 600 s trajectory. These commands
 write pilots, not final repeated timing populations. The
 [declared study](protocol.json) identifies the final targets, temperature bounds,
 comparators, tolerances and resolution checks.
+
+### Smooth target startup
+
+The new coupled study blends the initial field into each desired trajectory
+over the first 60 physical seconds. With `s = min(t / 60, 1)`, the weight is
+`r = s^2 * (3 - 2*s)` and the desired field is
+`initial + r * (original_desired(t) - initial)`. The weight has zero slope at
+both endpoints. Every desired value at and after 60 s is unchanged, including
+the later peaks and the 600 s endpoint. The same rule applies to all solvers
+and temperature bounds.
+
+`coupled_sequence` defaults to `target_startup_s=60`. The pilot command
+`coupled_optimize` retains `target_startup_s=0` for reproduction of the original
+targets; set it explicitly to 60 for a new transient pilot. Steady runs require
+zero startup. Original-target pilots remain separate from ramped pilots.
+Saved configurations record the duration, and replay commands evaluate that
+same desired field on refined spatial and temporal grids. Records predating
+this option retain the original target through a zero-duration default.
+
+For example, verify the derivatives for the new target before optimization:
+
+```bash
+uv run python -m deflation_example.coupled_optimize baseline_directory=runs/stabilized-baseline transient=true slabs=64 horizon_s=600 target_startup_s=60 mode=derivatives flow_tolerance=1e-12 flow_cap=40 output=runs/startup60-derivatives
+uv run python -m deflation_example.coupled_optimize baseline_directory=runs/stabilized-baseline transient=true slabs=64 horizon_s=600 target_startup_s=60 mode=optimize methods=[reference] rank=100 backtracking=quadratic secant_memory=10 flow_tolerance=1e-12 flow_cap=40 output=runs/startup60-reference-pilot
+```
+
+The smooth startup changes the desired field only. It leaves the physical
+equations, source recovery, temperature bounds and accuracy criteria unchanged.
+Resolution and complete-cost comparisons remain separate verification steps.
 
 The optional `flow_continuation=true` setting introduces a residual load that
 makes the initial flow an equilibrium, then removes this artificial load in
@@ -141,7 +171,7 @@ independently verifies the original system on the CPU:
 ```bash
 uv sync --frozen --extra coupled-gpu
 uv run --extra coupled-gpu pytest tests/test_coupled_cuda.py -q
-uv run --extra coupled-gpu python -m deflation_example.coupled_optimize baseline_directory=runs/inlet-1 device=cuda output=runs/cuda-pilot
+uv run --extra coupled-gpu python -m deflation_example.coupled_optimize baseline_directory=runs/stabilized-baseline device=cuda output=runs/cuda-pilot
 ```
 
 It requires Linux, a CUDA-compatible GPU and the pinned CuPy dependency.
@@ -173,7 +203,7 @@ run each method and repetition in a fresh process:
 
 ```bash
 uv sync --frozen --extra study
-uv run --extra study python -m deflation_example.coupled_sequence baseline_directory=runs/inlet-1 method=reference repetition=0 output=runs/sequence-reference-0
+uv run --extra study python -m deflation_example.coupled_sequence baseline_directory=runs/stabilized-baseline method=reference repetition=0 output=runs/sequence-reference-0
 ```
 
 The configuration declares five target/bound pairs over the complete 600 s
@@ -195,11 +225,33 @@ caches, and sampling can miss short-lived peaks. Repetition numbers identify
 independently launched sequences; the runner never substitutes sums of
 per-instance medians for complete timings.
 
+Generate a comparison from complete-sequence records with:
+
+```bash
+uv run python -m deflation_example.coupled_report runs/sequence-jacobi-0 runs/sequence-reference-0 runs/sequence-recycling-0 --repetitions 1 --output runs/comparison-pilot
+```
+
+For final comparisons, supply every method and repetition and use
+`--repetitions 5`. The summary checks source hashes, problem settings, accuracy,
+timing sums and repetition identifiers. It retains unsuccessful outcomes and
+reports a complete-population ratio only when every declared sequence meets
+the checks. A single-repetition summary remains a pilot comparison.
+
+Plot stored temperature, source and velocity fields with:
+
+```bash
+uv run --extra plot python -m deflation_example.coupled_figures --baseline runs/stabilized-baseline --optimization runs/transient-control --method reference --output runs/coupled-fields
+```
+
+For sequence data, add `--target-position 0`. The default time levels are the
+first, middle and last stored levels. The figure metadata records their actual
+physical times, units, field checksum and interpolation conventions.
+
 ## Fixed-control resolution checks
 
 ```bash
-uv run python -m deflation_example.coupled_resolution --baseline runs/inlet-1 --optimization runs/transient-control --method reference --subdivision 1 --output runs/replay-original
-uv run python -m deflation_example.coupled_resolution --baseline runs/inlet-1 --optimization runs/transient-control --method reference --subdivision 2 --output runs/replay-refined
+uv run python -m deflation_example.coupled_resolution --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --method reference --subdivision 1 --output runs/replay-original
+uv run python -m deflation_example.coupled_resolution --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --method reference --subdivision 2 --output runs/replay-refined
 uv run python -m deflation_example.coupled_spatial_resolution --baseline runs/stabilized-baseline --fine-baseline runs/refined-baseline --optimization runs/transient-control --method reference --output runs/replay-fine-mesh
 ```
 

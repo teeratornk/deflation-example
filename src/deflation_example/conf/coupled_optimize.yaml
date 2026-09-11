@@ -10,6 +10,7 @@ mode: derivatives
 transient: false
 slabs: 16
 horizon_s: 600.0
+target_startup_s: 0.0
 alpha: 1.0e-14
 query: 7
 target_count: 16
