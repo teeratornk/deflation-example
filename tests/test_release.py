@@ -157,3 +157,13 @@ def test_archive_duplicates_and_size_limits(tmp_path, monkeypatch):
     monkeypatch.setattr(guard, "MAX_FILE_BYTES", 2)
     with pytest.raises(ValueError, match="size limits"):
         list(guard.members(archive))
+
+
+def test_total_archive_limit_still_applies_to_small_members(tmp_path, monkeypatch):
+    archive = tmp_path / "many-small.whl"
+    with zipfile.ZipFile(archive, "w") as stream:
+        stream.writestr("one", "abcd")
+        stream.writestr("two", "efgh")
+    monkeypatch.setattr(guard, "MAX_ARCHIVE_BYTES", 7)
+    with pytest.raises(ValueError, match="size limits"):
+        list(guard.members(archive))

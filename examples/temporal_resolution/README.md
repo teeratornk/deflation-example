@@ -6,6 +6,13 @@ control, the initial temperature, the upper bound, and the 600-second horizon
 of the manuscript's prescribed-flow model. It is separate from the nonlinear
 flow–temperature optimization examples and supplies no solver timing comparison.
 
+The [complete paired records and figure commands](records.md) retain both
+transport formulations, all twenty optimization attempts and every forward
+refinement stage. All ten corrected-formulation optimizations meet their
+independent residual, optimality and forward-recovery criteria. Finer source
+grids reduce the measured between-level temperature violations; every remaining
+violation is reported separately from the temporal-sensitivity criterion.
+
 Before optimization, `prepare` fixes nominal target 7 of 16 and selects a second
 target with the largest weighted squared desired-temperature exceedance above
 the bound, excluding target 7. It evaluates this criterion on 64 time slabs;

@@ -45,9 +45,10 @@ FORBIDDEN = {
 }
 GENERATED_SOURCE = {"build", "dist", "runs", "__pycache__", ".pytest_cache", ".ruff_cache"}
 MAX_FILE_BYTES = 5 * 1024 * 1024
-# The source archive includes every repetition from three CHT protocols.
-# The installed wheel excludes these records; individual-file limits still apply.
-MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
+# The source archive includes complete CHT repetitions and paired temporal checks.
+# The guarded-study archive brought the uncompressed sdist to 69.6 MiB.
+# The installed wheel excludes these records; per-file and member limits remain.
+MAX_ARCHIVE_BYTES = 96 * 1024 * 1024
 MAX_MEMBERS = 2000
 
 

@@ -84,7 +84,7 @@ def figures(report, output):
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from matplotlib.ticker import ScalarFormatter
+    from matplotlib.ticker import NullLocator, ScalarFormatter
 
     plt.rcParams.update(
         {"font.size": 10, "axes.spines.top": False, "axes.spines.right": False, "pdf.fonttype": 42}
@@ -129,6 +129,7 @@ def figures(report, output):
     )
     axes[0].set_xticks([4, 8, 16, 32, 64, 128, 256])
     axes[0].xaxis.set_major_formatter(ScalarFormatter())
+    axes[0].xaxis.set_minor_locator(NullLocator())
     axes[0].legend(fontsize=8, loc="lower right")
     rows = report["corrected"]["rows"]
     queries = report["corrected"]["design"]["queries"]
@@ -154,6 +155,7 @@ def figures(report, output):
     )
     axes[1].set_xticks(report["corrected"]["design"]["protocol"]["slabs"])
     axes[1].xaxis.set_major_formatter(ScalarFormatter())
+    axes[1].xaxis.set_minor_locator(NullLocator())
     axes[1].legend(fontsize=8)
     axes[1].text(
         0.03,
@@ -207,6 +209,7 @@ def figures(report, output):
             sorted({n for r in report["fixed_source_replays"] for n in r["replay_slabs"]})
         )
         axis.xaxis.set_major_formatter(ScalarFormatter())
+        axis.xaxis.set_minor_locator(NullLocator())
         axis.legend(fontsize=7)
     fig.savefig(
         output / "fixed_source_resolution.pdf", metadata={"CreationDate": None, "ModDate": None}
