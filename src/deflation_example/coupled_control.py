@@ -247,9 +247,9 @@ class CoupledControlProblem:
                 # All original momentum equations are still solved and checked.
                 factors.append(None)
             else:
-                J = self.flow.operator(result.velocity, time_step=dt) + self.flow.convection_derivative(
-                    result.velocity
-                )
+                J = self.flow.operator(
+                    result.velocity, time_step=dt
+                ) + self.flow.convection_derivative(result.velocity)
                 factors.append(splu(J[self.flow_free][:, self.flow_free].tocsc()))
             if self.evaluation_callback is not None:
                 self.evaluation_callback(

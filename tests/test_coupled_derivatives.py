@@ -50,8 +50,12 @@ def test_zero_trajectory_skips_derivative_factorization_and_verifies_zero_flow_a
     assert evaluation.jacobian.thermal_only
     assert evaluation.jacobian.factors == (None, None)
     direction = np.arange(problem.size, dtype=float)
-    np.testing.assert_array_equal(evaluation.jacobian @ direction, evaluation.frozen_operator @ direction)
-    np.testing.assert_array_equal(evaluation.jacobian.T @ direction, evaluation.frozen_operator.T @ direction)
+    np.testing.assert_array_equal(
+        evaluation.jacobian @ direction, evaluation.frozen_operator @ direction
+    )
+    np.testing.assert_array_equal(
+        evaluation.jacobian.T @ direction, evaluation.frozen_operator.T @ direction
+    )
     adjoint = problem.verify_adjoint(evaluation, np.full(problem.size, 0.1))
     assert adjoint["maximum_momentum_adjoint_relative_residual"] == 0
     assert adjoint["gradient_relative_difference"] < 1e-14

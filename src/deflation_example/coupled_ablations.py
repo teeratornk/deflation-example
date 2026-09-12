@@ -34,9 +34,12 @@ def cases(protocol, device="cpu"):
     if device not in {"cpu", "cuda"}:
         raise ValueError("Choose cpu or cuda")
     selected = protocol["deployments"][device]
-    if selected != "all" and (not isinstance(selected, list) or not selected
+    if selected != "all" and (
+        not isinstance(selected, list)
+        or not selected
         or len(set(selected)) != len(selected)
-        or set(selected) - {g["id"] for g in protocol["groups"]}):
+        or set(selected) - {g["id"] for g in protocol["groups"]}
+    ):
         raise ValueError("Declare distinct existing groups for each deployment")
     result, names, configurations = [], set(), set()
     for group in protocol["groups"]:
