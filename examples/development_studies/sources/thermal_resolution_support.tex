@@ -1,0 +1,77 @@
+\subsection{Temporal resolution of prescribed-flow optimization}
+\label{si:thermal_resolution}
+The temporal check separates the coupled discrete optimization from
+the forward response to its recovered source. It uses the original
+transformer mesh, the 600~s horizon and two targets selected before
+optimization: target 7 and the target with the largest weighted desired
+temperature exceedance, target 15. Both targets use 4, 8, 16, 32 and
+64 time slabs. Geometry, prescribed velocity, frozen properties, initial
+temperature and the physical upper bound of 357.3~K remain fixed.
+The original-system residual threshold is $10^{-10}$; KKT and
+forward-recovery thresholds are $10^{-8}$.
+Sparse-direct PDAS independently checks the four-slab solutions.
+
+Time refinement exposes a growing mode in the original advective
+temperature operator. For the homogeneous equation
+$C_\ell\dot y+Ky=0$, a verified generalized eigenvalue is
+$-0.0664~\mathrm{s}^{-1}$. At 32 steps over 600~s, its backward-Euler
+amplification modulus is 4.08. The mode's advective contribution is
+negative because the prescribed finite-element velocity is only weakly
+divergence-free. This property concerns the forward thermal equation;
+the reduced optimization Hessian remains positive definite.
+
+A separate pilot adds the standard half-divergence term to the
+elementwise thermal transport \citep{churbanov2012convection}.
+For the prescribed finite-element velocity $\beta_h$, it uses
+\begin{equation}\label{eq:thermal_skew_pilot}
+ c_E\beta_h\cdot\nabla y
+ +\tfrac12 c_E(\nabla\cdot\beta_h)y,
+ \qquad
+ \nabla\cdot\beta_h=\partial_r\beta_r+\beta_r/r+\partial_z\beta_z.
+\end{equation}
+For constant capacity $c_E$ on an element $E$, integration by parts gives
+\begin{equation}\label{eq:thermal_skew_energy}
+ \int_E c_Ey\,\beta_h\cdot\nabla y
+ +\tfrac12\int_E c_E(\nabla\cdot\beta_h)y^2
+ =\tfrac12\int_{\partial E}c_E(\beta_h\cdot n)y^2.
+\end{equation}
+The integrals use the axisymmetric volume and surface measures.
+Interior contributions cancel when the normal capacity flux is continuous;
+otherwise their jumps remain. Degree-five quadrature verifies this
+quadratic energy identity. Diffusion, streamline diffusion and all other
+inputs remain unchanged. The pilot changes the thermal discretization
+and has separate records from the published timing comparisons.
+Its computed amplification modes decay on all seven tested forward
+grids, from 4 to 256 steps. This sparse calculation tests the computed
+modes and does not enumerate the complete spectrum.
+
+Each recovered control is held constant on its original time intervals
+and applied without clipping or reoptimization. Finer forward steps
+align with every source discontinuity. The detailed study retains the
+original and corrected optimization attempts, forward residuals, and
+all successive time refinements. The final comparison uses both targets
+at the coarsest and finest optimization grids. Two consecutive maximum
+temperature changes must fall below 0.05~K; temperature-bound violations
+are evaluated separately at every forward time level. This criterion
+measures temporal sensitivity on the fixed mesh.
+
+\input{sections/generated/temporal/resolution_summary}
+
+\begin{figure}[pos=htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/temporal/resolution.pdf}
+\caption{The separate energy-consistent transport pilot compares
+discrete optimization and unchanged-source forward trajectories.
+The first panel gives the root-mean-square temperature difference from the
+64-slab optimization, using linear temporal reconstruction and
+axisymmetric lumped-mass weights. The second panel gives bound violations
+at 65\,536 forward steps. Whiskers show the maximum temperature change from
+32\,768 steps, a temporal-sensitivity measure. Nominal and demanding denote
+the two preselected targets. These comparisons use the same spatial mesh.}
+\label{si:fig_thermal_resolution}
+\end{figure}
+The \href{https://github.com/teeratornk/deflation-example/tree/prescribed-temporal-data-v1/examples/temporal_resolution}
+{versioned temporal-resolution example} provides both formulations,
+the selected targets, all optimization and replay outcomes,
+and commands for regenerating the fields and figures.
+\FloatBarrier

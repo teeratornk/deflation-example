@@ -1,0 +1,118 @@
+"""Generate the temporal-resolution text and figure from the complete paired study."""
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+URL = 'https://github.com/teeratornk/deflation-example/tree/prescribed-temporal-data-v1/examples/temporal_resolution'
+
+
+def load_evidence(archive):
+    archive = Path(archive)
+    manifest = json.loads((archive / 'manifest.json').read_text())
+    for name, checksum in manifest['files'].items():
+        if hashlib.sha256((archive / name).read_bytes()).hexdigest() != checksum:
+            raise ValueError('A temporal evidence record has changed')
+    original = json.loads((archive / 'original/summary.json').read_text())
+    corrected = json.loads((archive / 'corrected/summary.json').read_text())
+    if original['design']['queries'] != corrected['design']['queries'] or len(corrected['rows']) != 10:
+        raise ValueError('The paired target population differs')
+    replays = [json.loads((archive / f'replays/final/case-{i:02d}.json').read_text()) for i in (0, 4, 5, 9)]
+    for replay in replays:
+        if replay['replay_slabs'] != [16384, 32768, 65536]:
+            raise ValueError('Unexpected final replay time grids')
+    stability = json.loads((archive / 'stability.json').read_text())
+    return original, corrected, replays, stability, manifest
+
+
+def generate(archive):
+    original, corrected, replays, stability, manifest = load_evidence(archive)
+    data = {
+        'evidence_url': URL,
+        'sources': manifest['sources'],
+        'original_rows': original['rows'], 'corrected_rows': corrected['rows'],
+        'replays': [{k: r[k] for k in ('case', 'optimization_case', 'status', 'rows', 'fields_sha256')}
+                    for r in replays],
+        'stability_rows': stability['rows'],
+        'temperature_change_scale_K': 0.05,
+        'scope': 'Fixed-mesh temporal sensitivity; separate thermal-discretization pilot; no timing comparison.',
+    }
+    (ROOT / 'revision/temporal_resolution.json').write_text(json.dumps(data, indent=2) + '\n')
+    text_dir = ROOT / 'sections/generated/temporal'
+    text_dir.mkdir(parents=True, exist_ok=True)
+    verified = sum(r['verified'] for r in corrected['rows'])
+    count = 'All ten optimizations' if verified == 10 else f'{verified} of the ten optimizations'
+    text = [f'{count} meet the independent residual, KKT',
+            'and forward-recovery criteria. Figure~\\ref{si:fig_thermal_resolution}',
+            'compares the optimized temperatures and the refined forward responses.']
+    by_case = {r['case']: r for r in replays}
+    if all(r['status'] == 'within_temperature_change_scale' for r in replays):
+        text += ['All four selected source histories meet the two-consecutive-grid',
+                 'temperature-change criterion by 65\\,536 forward steps.']
+    else:
+        n = sum(r['status'] == 'within_temperature_change_scale' for r in replays)
+        text += [f'{n} of the four source histories meet the temperature-change criterion',
+                 'at the final forward grid; the reproduction example retains every outcome.']
+    violations = [by_case[c]['rows'][-1].get('maximum_bound_violation_K') for c in (0, 5, 4, 9)]
+    if all(v is not None for v in violations):
+        text += [f'The four-slab sources give maximum violations of {violations[0]:.2f} and',
+                 f'{violations[1]:.2f}~K for the nominal and demanding targets.',
+                 f'The corresponding 64-slab sources give {violations[2]:.2f} and {violations[3]:.2f}~K.',
+                 'The bounds hold at the optimization time levels.',
+                 'The unchanged-source forward responses exceed them between those levels.']
+    text += ['The comparison concerns temporal sensitivity on the existing mesh;',
+             'spatial and physical-model accuracy require separate assessment.']
+    (text_dir / 'resolution_summary.tex').write_text('\n'.join(text) + '\n')
+    draw(data)
+    return data
+
+
+def draw(data):
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.ticker import NullLocator, ScalarFormatter
+
+    plt.rcParams.update({'font.size': 10, 'axes.spines.top': False,
+                         'axes.spines.right': False, 'pdf.fonttype': 42})
+    fig, axes = plt.subplots(1, 2, figsize=(8.6, 3.5), constrained_layout=True)
+    queries, colors, labels = [7, 15], ['#0072b2', '#d55e00'], ['Nominal target', 'Demanding target']
+    for query, color, label in zip(queries, colors, labels):
+        rows = [r for r in data['corrected_rows'] if r['query'] == query and r['slabs'] < 64]
+        axes[0].plot([r['slabs'] for r in rows],
+                     [r.get('temperature_rms_difference_K', np.nan) if r['verified'] else np.nan for r in rows],
+                     'o-', color=color, label=label)
+    axes[0].set(xscale='log', xlabel='Optimization time slabs',
+                ylabel='Weighted temperature difference (K)', title='(a) Difference from 64 slabs')
+    axes[0].set_xticks([4, 8, 16, 32])
+    axes[0].xaxis.set_major_formatter(ScalarFormatter())
+    axes[0].xaxis.set_minor_locator(NullLocator())
+    axes[0].legend(frameon=False, fontsize=9)
+    for j, (query, color, label) in enumerate(zip(queries, colors, labels)):
+        rows = sorted([r for r in data['replays'] if r['optimization_case']['query'] == query],
+                      key=lambda r: r['optimization_case']['slabs'])
+        values = [r['rows'][-1].get('maximum_bound_violation_K', np.nan) for r in rows]
+        changes = [r['rows'][-1].get('temperature_change_max_K', np.nan) for r in rows]
+        positions = np.arange(2) + (j - 0.5) * 0.32
+        axes[1].bar(positions, values, width=0.30, color=color, label=label,
+                    yerr=changes, capsize=3)
+        for x, value in zip(positions, values):
+            if np.isfinite(value):
+                axes[1].annotate(f'{value:.2f}', (x, value), xytext=(0, 6),
+                                 textcoords='offset points', ha='center', fontsize=9)
+    axes[1].set(xticks=[0, 1], xticklabels=['4-slab source', '64-slab source'],
+                ylabel='Maximum bound violation (K)', title='(b) Unchanged-source forward response')
+    axes[1].margins(y=0.2)
+    output = ROOT / 'figures/temporal'
+    output.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output / 'resolution.pdf', metadata={'CreationDate': None, 'ModDate': None})
+    plt.close(fig)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--archive', required=True)
+    generate(parser.parse_args().archive)

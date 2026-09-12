@@ -1,0 +1,45 @@
+{
+  "manuscript_source": "cec0a88d42b8afbda0cef97f5f773fb26c00a6e1",
+  "scope": "All construction/stopping pilots, original finer-transformer attempts, and paired temporal-resolution pilot; separate from final comparisons.",
+  "files": {
+    "temporal_resolution.svg": {
+      "manuscript_path": "figures/temporal/resolution.pdf",
+      "sha256": "c69db3b0b5515cd791a6f4a21196338a9ef2186a37e468515512aebac0a66ae4"
+    },
+    "sources/thermal_resolution_support.tex": {
+      "manuscript_path": "sections/thermal_resolution_support.tex",
+      "sha256": "57e64693f63e32054adcbab3c8d52f3c3ae3cf72d3f64c1d826d1446496d4d85"
+    },
+    "sources/resolution_summary.tex": {
+      "manuscript_path": "sections/generated/temporal/resolution_summary.tex",
+      "sha256": "9a9eb3a8cfe2aae61a7cc02a6ef13db6d8cb9144d51f5b796957ab96a6db09f0"
+    },
+    "sources/pilot_protocol_rows.tex": {
+      "manuscript_path": "sections/generated/cht/pilot_protocol_rows.tex",
+      "sha256": "11ee8f31b83d2f6d632412acd6370583789c7f15f1955fb2ff772ca56ce1a167"
+    },
+    "sources/pilot_outcome_rows.tex": {
+      "manuscript_path": "sections/generated/cht/pilot_outcome_rows.tex",
+      "sha256": "3d61e80072c92342faa16e19760e188336af6895bf67fa6c07aa7553d28cd57d"
+    },
+    "sources/support_finer_pilot_rows.tex": {
+      "manuscript_path": "sections/generated/mesh/support_finer_pilot_rows.tex",
+      "sha256": "4491bb2d954551310ecbca5bd5927164a2bf9c2e05f9e05920d286e74e8c2128"
+    },
+    "sources/finer_outcomes.tex": {
+      "manuscript_path": "sections/generated/si/finer_outcomes.tex",
+      "sha256": "4febdcff0253d902a9429249fa8396911def79886063301f132c3f30aacc13b6"
+    },
+    "sources/import_temporal_study.py.txt": {
+      "manuscript_path": "tools/import_temporal_study.py",
+      "sha256": "382766320b2f27755fe819d93e9da414f053bfa8115e853a4196ebcf6b5e7d34"
+    },
+    "sources/temporal_resolution.json": {
+      "manuscript_path": "revision/temporal_resolution.json",
+      "sha256": "5bca828f5768c8ef10e5167e86d3580a48f8673bf9bc7a5568a5c279bb14f8d4"
+    },
+    "studies.json": {
+      "sha256": "3659cbe1029aef43d6c1f4ad4ba17c482a9be966f1c82d35b6aa33d5f9c78789"
+    }
+  }
+}

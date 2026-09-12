@@ -78,7 +78,7 @@ to inspect the preceding resolution stages. The reporting code checks that the
 physical inputs and optimization settings match apart from the declared
 transport form and that all four selected replays remain present.
 
-The manuscript's compact figure combines the optimized-state differences with
-the final fixed-source bound checks. Its `tools/import_temporal_study.py`
-generator takes this directory's `data` archive as `--archive`; the detailed
+The [repository-only compact figure](../development_studies/README.md#temporal-resolution-pilot)
+combines the optimized-state differences with the final fixed-source bound
+checks. Its reproduction command is given alongside that figure; the detailed
 plots above retain all forward grids and the amplification diagnostics.

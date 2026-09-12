@@ -1,0 +1,4022 @@
+{
+  "construction_stopping": [
+    {
+      "identifier": "P1",
+      "study": "steady48-spatial-pilot-v1",
+      "rows": [
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 16,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "jacobi",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 0,
+          "numerically_completed_sequences": 0,
+          "failure_statuses": {
+            "target_failure": 1
+          },
+          "failed_target_statuses": {
+            "inner_maxiter": 16
+          },
+          "median_seconds": null,
+          "minimum_seconds": null,
+          "maximum_seconds": null,
+          "median_preparation_inclusive_seconds": null,
+          "median_inner_iterations": null,
+          "median_outer_iterations": null,
+          "deployed_rank_min": null,
+          "deployed_rank_max": null,
+          "fallbacks": 0,
+          "maximum_original_residual": null,
+          "verified_memory_sequences": 0,
+          "peak_host_rss_bytes": null,
+          "peak_gpu_process_bytes": null,
+          "maximum_memory_sampling_gap_seconds": null,
+          "median_components_seconds": {}
+        },
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 16,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "reference",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 0,
+          "numerically_completed_sequences": 0,
+          "failure_statuses": {
+            "target_failure": 1
+          },
+          "failed_target_statuses": {
+            "inner_maxiter": 16
+          },
+          "median_seconds": null,
+          "minimum_seconds": null,
+          "maximum_seconds": null,
+          "median_preparation_inclusive_seconds": null,
+          "median_inner_iterations": null,
+          "median_outer_iterations": null,
+          "deployed_rank_min": null,
+          "deployed_rank_max": null,
+          "fallbacks": 0,
+          "maximum_original_residual": null,
+          "verified_memory_sequences": 0,
+          "peak_host_rss_bytes": null,
+          "peak_gpu_process_bytes": null,
+          "maximum_memory_sampling_gap_seconds": null,
+          "median_components_seconds": {}
+        },
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 16,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "recycling",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 0,
+          "numerically_completed_sequences": 0,
+          "failure_statuses": {
+            "target_failure": 1
+          },
+          "failed_target_statuses": {
+            "inner_maxiter": 16
+          },
+          "median_seconds": null,
+          "minimum_seconds": null,
+          "maximum_seconds": null,
+          "median_preparation_inclusive_seconds": null,
+          "median_inner_iterations": null,
+          "median_outer_iterations": null,
+          "deployed_rank_min": null,
+          "deployed_rank_max": null,
+          "fallbacks": 0,
+          "maximum_original_residual": null,
+          "verified_memory_sequences": 0,
+          "peak_host_rss_bytes": null,
+          "peak_gpu_process_bytes": null,
+          "maximum_memory_sampling_gap_seconds": null,
+          "median_components_seconds": {}
+        },
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 16,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "amgx",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 0,
+          "numerically_completed_sequences": 0,
+          "failure_statuses": {
+            "target_failure": 1
+          },
+          "failed_target_statuses": {
+            "inner_residual_failed": 16
+          },
+          "median_seconds": null,
+          "minimum_seconds": null,
+          "maximum_seconds": null,
+          "median_preparation_inclusive_seconds": null,
+          "median_inner_iterations": null,
+          "median_outer_iterations": null,
+          "deployed_rank_min": null,
+          "deployed_rank_max": null,
+          "fallbacks": 0,
+          "maximum_original_residual": null,
+          "verified_memory_sequences": 0,
+          "peak_host_rss_bytes": null,
+          "peak_gpu_process_bytes": null,
+          "maximum_memory_sampling_gap_seconds": null,
+          "median_components_seconds": {}
+        }
+      ],
+      "protocol": {
+        "protocol": "full-reference-cht-study-v1",
+        "controls": {
+          "phase": "pilot",
+          "device": "cuda",
+          "problem": "steady",
+          "n": 48,
+          "slabs": 8,
+          "horizon": 0.1,
+          "solid_capacity": 2.0,
+          "fluid_capacity": 1.0,
+          "initial_temperature": 0.0,
+          "reference_construction": "mode_dependent",
+          "reference_capacity": 1.0,
+          "targets": 16,
+          "rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "repeats": 1,
+          "methods": [
+            "jacobi",
+            "reference",
+            "recycling",
+            "amgx"
+          ],
+          "warm_starts": [
+            "outer_inner"
+          ],
+          "rtol": 1e-10,
+          "amgx_factor": 0.1,
+          "outer_tolerance": 1e-08,
+          "inner_cap": 10000,
+          "outer_cap": 100,
+          "threads": 4,
+          "bound": 0.00019498904452558432,
+          "calibration_grid": 8,
+          "calibration_steps": 8,
+          "calibration_activity": 0.2,
+          "memory_interval": 0.01,
+          "sequence_timeout": 7200.0
+        },
+        "physics": {
+          "alpha": 0.001,
+          "conductivity_ratio": 100.0,
+          "transport_amplitude": 50.0
+        },
+        "targets": [
+          {
+            "index": 0,
+            "angle": 0.0,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3,
+                0.3,
+                0.265
+              ],
+              [
+                0.3,
+                0.7,
+                0.265
+              ],
+              [
+                0.7,
+                0.3,
+                0.6649999999999999
+              ],
+              [
+                0.7,
+                0.7,
+                0.6649999999999999
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8,
+              0.65,
+              0.45
+            ],
+            "theta": 0.0
+          },
+          {
+            "index": 1,
+            "angle": 0.08,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3166225975333106,
+                0.28465671994564157,
+                0.26966666666666667
+              ],
+              [
+                0.28465671994564157,
+                0.6833774024666893,
+                0.26966666666666667
+              ],
+              [
+                0.7153432800543584,
+                0.3166225975333106,
+                0.6696666666666666
+              ],
+              [
+                0.6833774024666893,
+                0.7153432800543584,
+                0.6696666666666666
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.81,
+              0.65,
+              0.45
+            ],
+            "theta": 0.06666666666666667
+          },
+          {
+            "index": 2,
+            "angle": 0.16,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.33441818464772377,
+                0.2706909020020254,
+                0.2743333333333333
+              ],
+              [
+                0.2706909020020254,
+                0.6655818153522761,
+                0.2743333333333333
+              ],
+              [
+                0.7293090979979745,
+                0.33441818464772377,
+                0.6743333333333332
+              ],
+              [
+                0.6655818153522761,
+                0.7293090979979745,
+                0.6743333333333332
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8200000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 0.13333333333333333
+          },
+          {
+            "index": 3,
+            "angle": 0.24,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.35327293031502094,
+                0.25819187974416713,
+                0.27899999999999997
+              ],
+              [
+                0.25819187974416713,
+                0.646727069684979,
+                0.27899999999999997
+              ],
+              [
+                0.7418081202558328,
+                0.35327293031502094,
+                0.6789999999999999
+              ],
+              [
+                0.646727069684979,
+                0.7418081202558328,
+                0.6789999999999999
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8300000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 0.2
+          },
+          {
+            "index": 4,
+            "angle": 0.32,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.37306622850673543,
+                0.2472396042602883,
+                0.2836666666666667
+              ],
+              [
+                0.2472396042602883,
+                0.6269337714932646,
+                0.2836666666666667
+              ],
+              [
+                0.7527603957397117,
+                0.3730662285067354,
+                0.6836666666666666
+              ],
+              [
+                0.6269337714932646,
+                0.7527603957397117,
+                0.6836666666666666
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8400000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 0.26666666666666666
+          },
+          {
+            "index": 5,
+            "angle": 0.39999999999999997,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3936714696611531,
+                0.23790413273769284,
+                0.28833333333333333
+              ],
+              [
+                0.2379041327376929,
+                0.6063285303388468,
+                0.28833333333333333
+              ],
+              [
+                0.762095867262307,
+                0.3936714696611531,
+                0.6883333333333332
+              ],
+              [
+                0.6063285303388469,
+                0.762095867262307,
+                0.6883333333333332
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 0.3333333333333333
+          },
+          {
+            "index": 6,
+            "angle": 0.48,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.41495685055243975,
+                0.23024518033584657,
+                0.293
+              ],
+              [
+                0.23024518033584662,
+                0.5850431494475602,
+                0.293
+              ],
+              [
+                0.7697548196641534,
+                0.4149568505524397,
+                0.693
+              ],
+              [
+                0.5850431494475602,
+                0.7697548196641534,
+                0.693
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8600000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 0.4
+          },
+          {
+            "index": 7,
+            "angle": 0.5599999999999999,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.4367862173814935,
+                0.2243117382131401,
+                0.29766666666666663
+              ],
+              [
+                0.2243117382131401,
+                0.5632137826185065,
+                0.29766666666666663
+              ],
+              [
+                0.7756882617868599,
+                0.4367862173814934,
+                0.6976666666666667
+              ],
+              [
+                0.5632137826185065,
+                0.7756882617868599,
+                0.6976666666666667
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.87,
+              0.65,
+              0.45
+            ],
+            "theta": 0.4666666666666667
+          },
+          {
+            "index": 8,
+            "angle": 0.64,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.4590199366956199,
+                0.22014176015066306,
+                0.30233333333333334
+              ],
+              [
+                0.22014176015066306,
+                0.5409800633043801,
+                0.30233333333333334
+              ],
+              [
+                0.779858239849337,
+                0.45901993669561986,
+                0.7023333333333333
+              ],
+              [
+                0.5409800633043801,
+                0.7798582398493369,
+                0.7023333333333333
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.88,
+              0.65,
+              0.45
+            ],
+            "theta": 0.5333333333333333
+          },
+          {
+            "index": 9,
+            "angle": 0.72,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.4815157885661156,
+                0.21776191977752635,
+                0.307
+              ],
+              [
+                0.2177619197775264,
+                0.5184842114338843,
+                0.307
+              ],
+              [
+                0.7822380802224735,
+                0.4815157885661156,
+                0.707
+              ],
+              [
+                0.5184842114338843,
+                0.7822380802224735,
+                0.707
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.89,
+              0.65,
+              0.45
+            ],
+            "theta": 0.6
+          },
+          {
+            "index": 10,
+            "angle": 0.7999999999999999,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.5041298763104715,
+                0.21718743995066236,
+                0.31166666666666665
+              ],
+              [
+                0.21718743995066236,
+                0.49587012368952854,
+                0.31166666666666665
+              ],
+              [
+                0.7828125600493376,
+                0.5041298763104713,
+                0.7116666666666667
+              ],
+              [
+                0.49587012368952854,
+                0.7828125600493376,
+                0.7116666666666667
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9,
+              0.65,
+              0.45
+            ],
+            "theta": 0.6666666666666666
+          },
+          {
+            "index": 11,
+            "angle": 0.8799999999999999,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.5267175469400778,
+                0.21842199538049006,
+                0.3163333333333333
+              ],
+              [
+                0.21842199538049012,
+                0.47328245305992217,
+                0.3163333333333333
+              ],
+              [
+                0.7815780046195099,
+                0.5267175469400778,
+                0.7163333333333333
+              ],
+              [
+                0.4732824530599222,
+                0.7815780046195098,
+                0.7163333333333333
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.91,
+              0.65,
+              0.45
+            ],
+            "theta": 0.7333333333333333
+          },
+          {
+            "index": 12,
+            "angle": 0.96,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.5491343164457083,
+                0.221457689125309,
+                0.321
+              ],
+              [
+                0.22145768912530905,
+                0.4508656835542917,
+                0.321
+              ],
+              [
+                0.778542310874691,
+                0.5491343164457083,
+                0.721
+              ],
+              [
+                0.4508656835542917,
+                0.778542310874691,
+                0.721
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.92,
+              0.65,
+              0.45
+            ],
+            "theta": 0.8
+          },
+          {
+            "index": 13,
+            "angle": 1.04,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.571236794002112,
+                0.2262751031047766,
+                0.32566666666666666
+              ],
+              [
+                0.22627510310477666,
+                0.428763205997888,
+                0.32566666666666666
+              ],
+              [
+                0.7737248968952233,
+                0.5712367940021119,
+                0.7256666666666667
+              ],
+              [
+                0.428763205997888,
+                0.7737248968952233,
+                0.7256666666666667
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.93,
+              0.65,
+              0.45
+            ],
+            "theta": 0.8666666666666667
+          },
+          {
+            "index": 14,
+            "angle": 1.1199999999999999,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.5928835991799586,
+                0.2328434223093565,
+                0.3303333333333333
+              ],
+              [
+                0.23284342230935662,
+                0.4071164008200414,
+                0.3303333333333333
+              ],
+              [
+                0.7671565776906435,
+                0.5928835991799585,
+                0.7303333333333333
+              ],
+              [
+                0.40711640082004147,
+                0.7671565776906434,
+                0.7303333333333333
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9400000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 0.9333333333333333
+          },
+          {
+            "index": 15,
+            "angle": 1.2,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.6139362662981105,
+                0.24112063191122002,
+                0.33499999999999996
+              ],
+              [
+                0.24112063191122007,
+                0.38606373370188946,
+                0.33499999999999996
+              ],
+              [
+                0.75887936808878,
+                0.6139362662981105,
+                0.735
+              ],
+              [
+                0.3860637337018895,
+                0.75887936808878,
+                0.735
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 1.0
+          }
+        ],
+        "reference_policy": "one full-domain analytical Laplacian space per sequence; restrict at every inner solve",
+        "transient_convention": "one complete trajectory per query; backward Euler with capacity=solid_capacity below x3=1/2 and fluid_capacity above; right-endpoint time weights in both objective terms; common cell-volume times mean-step factor removed from reduced equations; initial temperature prescribed; bound imposed at all positive time levels",
+        "space_time_reference": "mode_dependent uses the temporal eigensystem for each spatial Laplacian eigenvalue; tensor uses one pure-time eigensystem; order candidate products by reference eigenvalue or Rayleigh value and retain the declared total rank; store spatial and temporal factors before restriction",
+        "temporal_target": "existing unequal Gaussian weights and query-dependent centers, plus rotation 0.8*t/T, vertical motion 0.05*sin(2*pi*t/T), and amplitude 0.15+0.85*sin(pi*t/T)^2",
+        "recycling_policy": "empty initial history; retain deployed coarse vectors and the last window new directions from each accepted CG solve; normalize columns in Jacobi coordinates; QR/small-factor SVD rank threshold 1e-12; retain the lowest scaled Ritz vectors; transfer by zero extension; coarse space fixed during a solve and residual restarts; clear history after a failed target",
+        "coarse_condition_limit": 10000000000.0,
+        "rank_threshold": 1e-12,
+        "residual_refresh": 1000,
+        "stopping": "same independent original relative residual and outer KKT limits; AmgX native absolute target is amgx_factor*rtol*||b||; CG triggers fresh verification at rtol",
+        "amgx_configuration": {
+          "config_version": 2,
+          "determinism_flag": 1,
+          "solver": {
+            "scope": "main",
+            "solver": "PCG",
+            "preconditioner": {
+              "scope": "amg",
+              "solver": "AMG",
+              "algorithm": "CLASSICAL",
+              "selector": "PMIS",
+              "interpolator": "D2",
+              "smoother": {
+                "solver": "MULTICOLOR_GS",
+                "relaxation_factor": 1.0,
+                "symmetric_GS": 1
+              },
+              "presweeps": 1,
+              "postsweeps": 1,
+              "cycle": "V",
+              "max_iters": 1,
+              "max_levels": 25,
+              "coarse_solver": "DENSE_LU_SOLVER"
+            },
+            "tolerance": 1.0000000000000001e-11,
+            "max_iters": 10000,
+            "norm": "L2",
+            "convergence": "ABSOLUTE",
+            "monitor_residual": 1,
+            "obtain_timings": 1,
+            "print_solve_stats": 0
+          }
+        },
+        "resources": "AmgX base Config/Resources persist per sequence; each inner solve rebuilds matrix, vectors, solver and hierarchy",
+        "warm_starts": "outer_inner passes the previous accepted target's active set and state; every accepted inner solve updates the full state; cold gives empty active sets and zero inner guesses; each repetition starts without history",
+        "timing": "fresh process for every method/repetition/start policy; one complete sequence includes assembly, reference or resource setup, all targets and PDAS inner solves, transfers, recycling updates, verification and cleanup; all-method small warmup and process initialization are separate",
+        "memory": "10 ms default sampled host RSS and NVML allocation of the same process; all libraries and allocator caches included; fresh worker process per sequence; sampling interval and maximum gap reported",
+        "failures": "retain every declared sequence and target, inner cap, outer cap, cycle, exception, timeout and memory error; clear warm-start and recycling history after a failed target; report accepted timings separately",
+        "mask_encoding": "zlib: followed by base64 of zlib-compressed, little-endian packed Boolean bits"
+      }
+    },
+    {
+      "identifier": "P2",
+      "study": "steady48-all-active-pilot-v2",
+      "rows": [
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "jacobi",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 0,
+          "numerically_completed_sequences": 0,
+          "failure_statuses": {
+            "target_failure": 1
+          },
+          "failed_target_statuses": {
+            "inner_maxiter": 2
+          },
+          "median_seconds": null,
+          "minimum_seconds": null,
+          "maximum_seconds": null,
+          "median_preparation_inclusive_seconds": null,
+          "median_inner_iterations": null,
+          "median_outer_iterations": null,
+          "deployed_rank_min": null,
+          "deployed_rank_max": null,
+          "fallbacks": 0,
+          "maximum_original_residual": null,
+          "verified_memory_sequences": 0,
+          "peak_host_rss_bytes": null,
+          "peak_gpu_process_bytes": null,
+          "maximum_memory_sampling_gap_seconds": null,
+          "median_components_seconds": {}
+        },
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "reference",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 23.836762798018754,
+          "minimum_seconds": 23.836762798018754,
+          "maximum_seconds": 23.836762798018754,
+          "median_preparation_inclusive_seconds": 42.90267388802022,
+          "median_inner_iterations": 47044.0,
+          "median_outer_iterations": 86.0,
+          "deployed_rank_min": 100,
+          "deployed_rank_max": 100,
+          "fallbacks": 0,
+          "maximum_original_residual": 9.999129680378675e-11,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1771589632,
+          "peak_gpu_process_bytes": 4043309056,
+          "maximum_memory_sampling_gap_seconds": 0.07896816451102495,
+          "median_components_seconds": {
+            "assembly": 0.22067908104509115,
+            "reference_construction": 0.13484552036970854,
+            "solver_resources": 0.00014462973922491074,
+            "cleanup": 0.0005074189975857735,
+            "kernel_conversion": 0.9198544807732105,
+            "kernel_resource_creation": 0.0,
+            "kernel_handle_creation": 0.0,
+            "kernel_upload": 0.8919362081214786,
+            "kernel_basis_processing": 0.9858100386336446,
+            "kernel_coarse_or_hierarchy_setup": 0.14174607023596764,
+            "kernel_initialization": 0.06705351267009974,
+            "kernel_iteration": 13.637730069458485,
+            "kernel_download": 0.011272089555859566,
+            "kernel_verification": 0.27494404558092356,
+            "kernel_cleanup": 0.021702985279262066,
+            "kernel_synchronization": 0.029392652213573456,
+            "kernel_host_bookkeeping": 0.0036705275997519493,
+            "target_construction": 0.019673816859722137,
+            "reference_and_recycling_transfer": 2.507717871107161,
+            "outer_preparation": 0.039678010158240795,
+            "outer_restriction": 2.2058225916698575,
+            "outer_inner_verification": 0.2982472851872444,
+            "outer_kkt_and_update": 1.114928301423788,
+            "remaining_host_work": 0.3094055913388729
+          }
+        },
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "recycling",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 49.4301666719839,
+          "minimum_seconds": 49.4301666719839,
+          "maximum_seconds": 49.4301666719839,
+          "median_preparation_inclusive_seconds": 60.98861850332469,
+          "median_inner_iterations": 96368.0,
+          "median_outer_iterations": 86.0,
+          "deployed_rank_min": 0,
+          "deployed_rank_max": 100,
+          "fallbacks": 0,
+          "maximum_original_residual": 9.999293795163338e-11,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1956589568,
+          "peak_gpu_process_bytes": 5421137920,
+          "maximum_memory_sampling_gap_seconds": 0.13512661959975958,
+          "median_components_seconds": {
+            "assembly": 0.21780593134462833,
+            "reference_construction": 4.675239324569702e-07,
+            "solver_resources": 0.00012105796486139297,
+            "cleanup": 0.00698909442871809,
+            "kernel_conversion": 0.8198056323453784,
+            "kernel_resource_creation": 0.0,
+            "kernel_handle_creation": 0.0,
+            "kernel_upload": 0.8940254142507911,
+            "kernel_basis_processing": 7.114489397965372,
+            "kernel_coarse_or_hierarchy_setup": 0.14100207202136517,
+            "kernel_initialization": 0.06288919132202864,
+            "kernel_iteration": 30.7474266551435,
+            "kernel_download": 0.01021873764693737,
+            "kernel_verification": 0.26942717377096415,
+            "kernel_cleanup": 0.019244011491537094,
+            "kernel_synchronization": 0.031829661689698696,
+            "kernel_host_bookkeeping": 0.00406003650277853,
+            "target_construction": 0.03834137599915266,
+            "reference_and_recycling_transfer": 5.260878928937018,
+            "outer_preparation": 0.04498326312750578,
+            "outer_restriction": 2.1341957841068506,
+            "outer_inner_verification": 0.30473161675035954,
+            "outer_kkt_and_update": 0.979033287614584,
+            "remaining_host_work": 0.32866788003593683
+          }
+        },
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "amgx",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 48.84334324486554,
+          "minimum_seconds": 48.84334324486554,
+          "maximum_seconds": 48.84334324486554,
+          "median_preparation_inclusive_seconds": 59.16661104187369,
+          "median_inner_iterations": 3443.0,
+          "median_outer_iterations": 86.0,
+          "deployed_rank_min": 0,
+          "deployed_rank_max": 0,
+          "fallbacks": 0,
+          "maximum_original_residual": 1.1957185116922545e-11,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1729896448,
+          "peak_gpu_process_bytes": 2004877312,
+          "maximum_memory_sampling_gap_seconds": 0.1253706030547619,
+          "median_components_seconds": {
+            "assembly": 0.23389276023954153,
+            "reference_construction": 2.8777867555618286e-07,
+            "solver_resources": 0.050749581307172775,
+            "cleanup": 0.024690518155694008,
+            "kernel_conversion": 0.925217766314745,
+            "kernel_resource_creation": 0.00040876399725675583,
+            "kernel_handle_creation": 0.45981000550091267,
+            "kernel_upload": 0.24324787966907024,
+            "kernel_basis_processing": 0.0,
+            "kernel_coarse_or_hierarchy_setup": 2.838394028134644,
+            "kernel_initialization": 0.0,
+            "kernel_iteration": 38.59191065188497,
+            "kernel_download": 0.016699005849659443,
+            "kernel_verification": 0.27018590830266476,
+            "kernel_cleanup": 0.9238157048821449,
+            "kernel_synchronization": 0.04196480568498373,
+            "kernel_host_bookkeeping": 0.0029395492747426033,
+            "target_construction": 0.030720829963684082,
+            "reference_and_recycling_transfer": 0.34643471892923117,
+            "outer_preparation": 0.040425920858979225,
+            "outer_restriction": 2.212043604813516,
+            "outer_inner_verification": 0.3009707713499665,
+            "outer_kkt_and_update": 0.9937121160328388,
+            "remaining_host_work": 0.2951080659404397
+          }
+        }
+      ],
+      "protocol": {
+        "protocol": "full-reference-cht-study-v1",
+        "controls": {
+          "phase": "pilot",
+          "device": "cuda",
+          "problem": "steady",
+          "n": 48,
+          "slabs": 8,
+          "horizon": 0.1,
+          "solid_capacity": 2.0,
+          "fluid_capacity": 1.0,
+          "initial_temperature": 0.0,
+          "reference_construction": "mode_dependent",
+          "reference_capacity": 1.0,
+          "targets": 4,
+          "rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "repeats": 1,
+          "methods": [
+            "jacobi",
+            "reference",
+            "recycling",
+            "amgx"
+          ],
+          "warm_starts": [
+            "outer_inner"
+          ],
+          "rtol": 1e-10,
+          "amgx_factor": 0.1,
+          "outer_tolerance": 1e-08,
+          "inner_cap": 10000,
+          "residual_refresh": 1000,
+          "outer_cap": 100,
+          "initial_active": "all",
+          "threads": 4,
+          "bound": 0.00019498904452558432,
+          "calibration_grid": 8,
+          "calibration_steps": 8,
+          "calibration_activity": 0.2,
+          "memory_interval": 0.01,
+          "sequence_timeout": 7200.0
+        },
+        "physics": {
+          "alpha": 0.001,
+          "conductivity_ratio": 100.0,
+          "transport_amplitude": 50.0
+        },
+        "targets": [
+          {
+            "index": 0,
+            "angle": 0.0,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3,
+                0.3,
+                0.265
+              ],
+              [
+                0.3,
+                0.7,
+                0.265
+              ],
+              [
+                0.7,
+                0.3,
+                0.6649999999999999
+              ],
+              [
+                0.7,
+                0.7,
+                0.6649999999999999
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8,
+              0.65,
+              0.45
+            ],
+            "theta": 0.0
+          },
+          {
+            "index": 1,
+            "angle": 0.39999999999999997,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3936714696611531,
+                0.23790413273769284,
+                0.28833333333333333
+              ],
+              [
+                0.2379041327376929,
+                0.6063285303388468,
+                0.28833333333333333
+              ],
+              [
+                0.762095867262307,
+                0.3936714696611531,
+                0.6883333333333332
+              ],
+              [
+                0.6063285303388469,
+                0.762095867262307,
+                0.6883333333333332
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 0.3333333333333333
+          },
+          {
+            "index": 2,
+            "angle": 0.7999999999999999,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.5041298763104715,
+                0.21718743995066236,
+                0.31166666666666665
+              ],
+              [
+                0.21718743995066236,
+                0.49587012368952854,
+                0.31166666666666665
+              ],
+              [
+                0.7828125600493376,
+                0.5041298763104713,
+                0.7116666666666667
+              ],
+              [
+                0.49587012368952854,
+                0.7828125600493376,
+                0.7116666666666667
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9,
+              0.65,
+              0.45
+            ],
+            "theta": 0.6666666666666666
+          },
+          {
+            "index": 3,
+            "angle": 1.2,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.6139362662981105,
+                0.24112063191122002,
+                0.33499999999999996
+              ],
+              [
+                0.24112063191122007,
+                0.38606373370188946,
+                0.33499999999999996
+              ],
+              [
+                0.75887936808878,
+                0.6139362662981105,
+                0.735
+              ],
+              [
+                0.3860637337018895,
+                0.75887936808878,
+                0.735
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 1.0
+          }
+        ],
+        "reference_policy": "one full-domain analytical Laplacian space per sequence; restrict at every inner solve",
+        "transient_convention": "one complete trajectory per query; backward Euler with capacity=solid_capacity below x3=1/2 and fluid_capacity above; right-endpoint time weights in both objective terms; common cell-volume times mean-step factor removed from reduced equations; initial temperature prescribed; bound imposed at all positive time levels",
+        "space_time_reference": "mode_dependent uses the temporal eigensystem for each spatial Laplacian eigenvalue; tensor uses one pure-time eigensystem; order candidate products by reference eigenvalue or Rayleigh value and retain the declared total rank; store spatial and temporal factors before restriction",
+        "temporal_target": "existing unequal Gaussian weights and query-dependent centers, plus rotation 0.8*t/T, vertical motion 0.05*sin(2*pi*t/T), and amplitude 0.15+0.85*sin(pi*t/T)^2",
+        "recycling_policy": "empty initial history; retain deployed coarse vectors and the last window new directions from each accepted CG solve; normalize columns in Jacobi coordinates; QR/small-factor SVD rank threshold 1e-12; retain the lowest scaled Ritz vectors; transfer by zero extension; coarse space fixed during a solve and residual restarts; clear history after a failed target",
+        "coarse_condition_limit": 10000000000.0,
+        "rank_threshold": 1e-12,
+        "residual_refresh": 1000,
+        "stopping": "same independent original relative residual and outer KKT limits; AmgX native absolute target is amgx_factor*rtol*||b||; CG triggers fresh verification at rtol",
+        "amgx_configuration": {
+          "config_version": 2,
+          "determinism_flag": 1,
+          "solver": {
+            "scope": "main",
+            "solver": "PCG",
+            "preconditioner": {
+              "scope": "amg",
+              "solver": "AMG",
+              "algorithm": "CLASSICAL",
+              "selector": "PMIS",
+              "interpolator": "D2",
+              "smoother": {
+                "solver": "MULTICOLOR_GS",
+                "relaxation_factor": 1.0,
+                "symmetric_GS": 1
+              },
+              "presweeps": 1,
+              "postsweeps": 1,
+              "cycle": "V",
+              "max_iters": 1,
+              "max_levels": 25,
+              "coarse_solver": "DENSE_LU_SOLVER"
+            },
+            "tolerance": 1.0000000000000001e-11,
+            "max_iters": 10000,
+            "norm": "L2",
+            "convergence": "ABSOLUTE",
+            "monitor_residual": 1,
+            "obtain_timings": 1,
+            "print_solve_stats": 0
+          }
+        },
+        "resources": "AmgX base Config/Resources persist per sequence; each inner solve rebuilds matrix, vectors, solver and hierarchy",
+        "warm_starts": "outer_inner passes the previous accepted target's active set and state; every accepted inner solve updates the full state; without accepted outer history use the declared initial_active policy; cold uses that same initial active set and zero inner guesses for each query; each repetition starts without history",
+        "timing": "fresh process for every method/repetition/start policy; one complete sequence includes assembly, reference or resource setup, all targets and PDAS inner solves, transfers, recycling updates, verification and cleanup; all-method small warmup and process initialization are separate",
+        "memory": "10 ms default sampled host RSS and NVML allocation of the same solver process; independent monitor process avoids delays from native calls holding the solver interpreter lock; all solver libraries and allocator caches included; monitor memory excluded; fresh worker process per sequence; sampling interval and maximum gap reported",
+        "failures": "retain every declared sequence and target, inner cap, outer cap, cycle, exception, timeout and memory error; clear warm-start and recycling history after a failed target; report accepted timings separately",
+        "mask_encoding": "zlib: followed by base64 of zlib-compressed, little-endian packed Boolean bits"
+      }
+    },
+    {
+      "identifier": "P3",
+      "study": "steady48-refresh-pilot-v2",
+      "rows": [
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "jacobi",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 41.863566423766315,
+          "minimum_seconds": 41.863566423766315,
+          "maximum_seconds": 41.863566423766315,
+          "median_preparation_inclusive_seconds": 50.43419901654124,
+          "median_inner_iterations": 199497.0,
+          "median_outer_iterations": 86.0,
+          "deployed_rank_min": 0,
+          "deployed_rank_max": 0,
+          "fallbacks": 0,
+          "maximum_original_residual": 9.998773138504566e-11,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1578098688,
+          "peak_gpu_process_bytes": 1096810496,
+          "maximum_memory_sampling_gap_seconds": 0.10697561968117952,
+          "median_components_seconds": {
+            "assembly": 0.21434454433619976,
+            "reference_construction": 5.206093192100525e-07,
+            "solver_resources": 7.29188323020935e-05,
+            "cleanup": 0.00011994410306215286,
+            "kernel_conversion": 0.23990643583238125,
+            "kernel_resource_creation": 0.0,
+            "kernel_handle_creation": 0.0,
+            "kernel_upload": 0.23090585507452488,
+            "kernel_basis_processing": 0.0,
+            "kernel_coarse_or_hierarchy_setup": 0.00019691605120897293,
+            "kernel_initialization": 0.036365807056427,
+            "kernel_iteration": 36.944538332521915,
+            "kernel_download": 0.010286657139658928,
+            "kernel_verification": 0.25713642220944166,
+            "kernel_cleanup": 0.022314432077109814,
+            "kernel_synchronization": 0.01843901351094246,
+            "kernel_host_bookkeeping": 0.002188446931540966,
+            "target_construction": 0.01755315437912941,
+            "reference_and_recycling_transfer": 0.3310419665649533,
+            "outer_preparation": 0.026673395186662674,
+            "outer_restriction": 2.0699335960671306,
+            "outer_inner_verification": 0.27494191471487284,
+            "outer_kkt_and_update": 0.9319569813087583,
+            "remaining_host_work": 0.23464916925877333
+          }
+        },
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "reference",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 23.305610356852412,
+          "minimum_seconds": 23.305610356852412,
+          "maximum_seconds": 23.305610356852412,
+          "median_preparation_inclusive_seconds": 40.570904458872974,
+          "median_inner_iterations": 47044.0,
+          "median_outer_iterations": 86.0,
+          "deployed_rank_min": 100,
+          "deployed_rank_max": 100,
+          "fallbacks": 0,
+          "maximum_original_residual": 9.999129680378675e-11,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1772433408,
+          "peak_gpu_process_bytes": 4043309056,
+          "maximum_memory_sampling_gap_seconds": 0.07807647529989481,
+          "median_components_seconds": {
+            "assembly": 0.21399850025773048,
+            "reference_construction": 0.1290737073868513,
+            "solver_resources": 7.281824946403503e-05,
+            "cleanup": 0.0004937276244163513,
+            "kernel_conversion": 0.8489885935559869,
+            "kernel_resource_creation": 0.0,
+            "kernel_handle_creation": 0.0,
+            "kernel_upload": 0.871463606134057,
+            "kernel_basis_processing": 0.9899850003421307,
+            "kernel_coarse_or_hierarchy_setup": 0.1389241609722376,
+            "kernel_initialization": 0.06010469514876604,
+            "kernel_iteration": 13.83604053966701,
+            "kernel_download": 0.009757369756698608,
+            "kernel_verification": 0.25670013576745987,
+            "kernel_cleanup": 0.019846192561089993,
+            "kernel_synchronization": 0.027863625437021255,
+            "kernel_host_bookkeeping": 0.003343278542160988,
+            "target_construction": 0.016780498437583447,
+            "reference_and_recycling_transfer": 2.334733218885958,
+            "outer_preparation": 0.025085720233619213,
+            "outer_restriction": 2.055456059984863,
+            "outer_inner_verification": 0.27606236189603806,
+            "outer_kkt_and_update": 0.9239354077726603,
+            "remaining_host_work": 0.26690113823860884
+          }
+        },
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "recycling",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 62.81841898616403,
+          "minimum_seconds": 62.81841898616403,
+          "maximum_seconds": 62.81841898616403,
+          "median_preparation_inclusive_seconds": 71.40795334428549,
+          "median_inner_iterations": 126936.0,
+          "median_outer_iterations": 86.0,
+          "deployed_rank_min": 0,
+          "deployed_rank_max": 100,
+          "fallbacks": 0,
+          "maximum_original_residual": 9.992064396595157e-11,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1972731904,
+          "peak_gpu_process_bytes": 5421137920,
+          "maximum_memory_sampling_gap_seconds": 0.10828013345599174,
+          "median_components_seconds": {
+            "assembly": 0.22073952201753855,
+            "reference_construction": 4.079192876815796e-07,
+            "solver_resources": 0.00011299178004264832,
+            "cleanup": 0.007798240520060062,
+            "kernel_conversion": 0.7969291117042303,
+            "kernel_resource_creation": 0.0,
+            "kernel_handle_creation": 0.0,
+            "kernel_upload": 0.8701056633144617,
+            "kernel_basis_processing": 7.422075962647796,
+            "kernel_coarse_or_hierarchy_setup": 0.14084066823124886,
+            "kernel_initialization": 0.06468690186738968,
+            "kernel_iteration": 44.07773193810135,
+            "kernel_download": 0.01329411007463932,
+            "kernel_verification": 0.26939880941063166,
+            "kernel_cleanup": 0.019718949683010578,
+            "kernel_synchronization": 0.031908612698316574,
+            "kernel_host_bookkeeping": 0.004067861475050449,
+            "target_construction": 0.017723840661346912,
+            "reference_and_recycling_transfer": 5.226240010932088,
+            "outer_preparation": 0.028604854829609394,
+            "outer_restriction": 2.0866068424656987,
+            "outer_inner_verification": 0.3023179117590189,
+            "outer_kkt_and_update": 0.9465430341660976,
+            "remaining_host_work": 0.27097273990511894
+          }
+        },
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "amgx",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 47.84956116974354,
+          "minimum_seconds": 47.84956116974354,
+          "maximum_seconds": 47.84956116974354,
+          "median_preparation_inclusive_seconds": 57.16894296184182,
+          "median_inner_iterations": 3443.0,
+          "median_outer_iterations": 86.0,
+          "deployed_rank_min": 0,
+          "deployed_rank_max": 0,
+          "fallbacks": 0,
+          "maximum_original_residual": 1.1957185116922545e-11,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1719042048,
+          "peak_gpu_process_bytes": 2004877312,
+          "maximum_memory_sampling_gap_seconds": 0.10566744115203619,
+          "median_components_seconds": {
+            "assembly": 0.2237219074741006,
+            "reference_construction": 5.185604095458984e-06,
+            "solver_resources": 0.040587492287158966,
+            "cleanup": 0.02055273950099945,
+            "kernel_conversion": 0.8790200594812632,
+            "kernel_resource_creation": 0.00034916773438453674,
+            "kernel_handle_creation": 0.29045299626886845,
+            "kernel_upload": 0.2364240363240242,
+            "kernel_basis_processing": 0.0,
+            "kernel_coarse_or_hierarchy_setup": 2.4754402497783303,
+            "kernel_initialization": 0.0,
+            "kernel_iteration": 39.31648481450975,
+            "kernel_download": 0.012160222977399826,
+            "kernel_verification": 0.2612211564555764,
+            "kernel_cleanup": 0.19026976730674505,
+            "kernel_synchronization": 0.037687028758227825,
+            "kernel_host_bookkeeping": 0.0027654897421598434,
+            "target_construction": 0.018064451403915882,
+            "reference_and_recycling_transfer": 0.3257271898910403,
+            "outer_preparation": 0.02325595449656248,
+            "outer_restriction": 2.0398040851578116,
+            "outer_inner_verification": 0.28849913738667965,
+            "outer_kkt_and_update": 0.9336693435907364,
+            "remaining_host_work": 0.23339869361370802
+          }
+        }
+      ],
+      "protocol": {
+        "protocol": "full-reference-cht-study-v1",
+        "controls": {
+          "phase": "pilot",
+          "device": "cuda",
+          "problem": "steady",
+          "n": 48,
+          "slabs": 8,
+          "horizon": 0.1,
+          "solid_capacity": 2.0,
+          "fluid_capacity": 1.0,
+          "initial_temperature": 0.0,
+          "reference_construction": "mode_dependent",
+          "reference_capacity": 1.0,
+          "targets": 4,
+          "rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "repeats": 1,
+          "methods": [
+            "jacobi",
+            "reference",
+            "recycling",
+            "amgx"
+          ],
+          "warm_starts": [
+            "outer_inner"
+          ],
+          "rtol": 1e-10,
+          "amgx_factor": 0.1,
+          "outer_tolerance": 1e-08,
+          "inner_cap": 10000,
+          "residual_refresh": 10000,
+          "outer_cap": 100,
+          "initial_active": "all",
+          "threads": 4,
+          "bound": 0.00019498904452558432,
+          "calibration_grid": 8,
+          "calibration_steps": 8,
+          "calibration_activity": 0.2,
+          "memory_interval": 0.01,
+          "sequence_timeout": 7200.0
+        },
+        "physics": {
+          "alpha": 0.001,
+          "conductivity_ratio": 100.0,
+          "transport_amplitude": 50.0
+        },
+        "targets": [
+          {
+            "index": 0,
+            "angle": 0.0,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3,
+                0.3,
+                0.265
+              ],
+              [
+                0.3,
+                0.7,
+                0.265
+              ],
+              [
+                0.7,
+                0.3,
+                0.6649999999999999
+              ],
+              [
+                0.7,
+                0.7,
+                0.6649999999999999
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8,
+              0.65,
+              0.45
+            ],
+            "theta": 0.0
+          },
+          {
+            "index": 1,
+            "angle": 0.39999999999999997,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3936714696611531,
+                0.23790413273769284,
+                0.28833333333333333
+              ],
+              [
+                0.2379041327376929,
+                0.6063285303388468,
+                0.28833333333333333
+              ],
+              [
+                0.762095867262307,
+                0.3936714696611531,
+                0.6883333333333332
+              ],
+              [
+                0.6063285303388469,
+                0.762095867262307,
+                0.6883333333333332
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 0.3333333333333333
+          },
+          {
+            "index": 2,
+            "angle": 0.7999999999999999,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.5041298763104715,
+                0.21718743995066236,
+                0.31166666666666665
+              ],
+              [
+                0.21718743995066236,
+                0.49587012368952854,
+                0.31166666666666665
+              ],
+              [
+                0.7828125600493376,
+                0.5041298763104713,
+                0.7116666666666667
+              ],
+              [
+                0.49587012368952854,
+                0.7828125600493376,
+                0.7116666666666667
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9,
+              0.65,
+              0.45
+            ],
+            "theta": 0.6666666666666666
+          },
+          {
+            "index": 3,
+            "angle": 1.2,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.6139362662981105,
+                0.24112063191122002,
+                0.33499999999999996
+              ],
+              [
+                0.24112063191122007,
+                0.38606373370188946,
+                0.33499999999999996
+              ],
+              [
+                0.75887936808878,
+                0.6139362662981105,
+                0.735
+              ],
+              [
+                0.3860637337018895,
+                0.75887936808878,
+                0.735
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 1.0
+          }
+        ],
+        "reference_policy": "one full-domain analytical Laplacian space per sequence; restrict at every inner solve",
+        "transient_convention": "one complete trajectory per query; backward Euler with capacity=solid_capacity below x3=1/2 and fluid_capacity above; right-endpoint time weights in both objective terms; common cell-volume times mean-step factor removed from reduced equations; initial temperature prescribed; bound imposed at all positive time levels",
+        "space_time_reference": "mode_dependent uses the temporal eigensystem for each spatial Laplacian eigenvalue; tensor uses one pure-time eigensystem; order candidate products by reference eigenvalue or Rayleigh value and retain the declared total rank; store spatial and temporal factors before restriction",
+        "temporal_target": "existing unequal Gaussian weights and query-dependent centers, plus rotation 0.8*t/T, vertical motion 0.05*sin(2*pi*t/T), and amplitude 0.15+0.85*sin(pi*t/T)^2",
+        "recycling_policy": "empty initial history; retain deployed coarse vectors and the last window new directions from each accepted CG solve; normalize columns in Jacobi coordinates; QR/small-factor SVD rank threshold 1e-12; retain the lowest scaled Ritz vectors; transfer by zero extension; coarse space fixed during a solve and residual restarts; clear history after a failed target",
+        "coarse_condition_limit": 10000000000.0,
+        "rank_threshold": 1e-12,
+        "residual_refresh": 10000,
+        "stopping": "same independent original relative residual and outer KKT limits; AmgX native absolute target is amgx_factor*rtol*||b||; CG triggers fresh verification at rtol",
+        "amgx_configuration": {
+          "config_version": 2,
+          "determinism_flag": 1,
+          "solver": {
+            "scope": "main",
+            "solver": "PCG",
+            "preconditioner": {
+              "scope": "amg",
+              "solver": "AMG",
+              "algorithm": "CLASSICAL",
+              "selector": "PMIS",
+              "interpolator": "D2",
+              "smoother": {
+                "solver": "MULTICOLOR_GS",
+                "relaxation_factor": 1.0,
+                "symmetric_GS": 1
+              },
+              "presweeps": 1,
+              "postsweeps": 1,
+              "cycle": "V",
+              "max_iters": 1,
+              "max_levels": 25,
+              "coarse_solver": "DENSE_LU_SOLVER"
+            },
+            "tolerance": 1.0000000000000001e-11,
+            "max_iters": 10000,
+            "norm": "L2",
+            "convergence": "ABSOLUTE",
+            "monitor_residual": 1,
+            "obtain_timings": 1,
+            "print_solve_stats": 0
+          }
+        },
+        "resources": "AmgX base Config/Resources persist per sequence; each inner solve rebuilds matrix, vectors, solver and hierarchy",
+        "warm_starts": "outer_inner passes the previous accepted target's active set and state; every accepted inner solve updates the full state; without accepted outer history use the declared initial_active policy; cold uses that same initial active set and zero inner guesses for each query; each repetition starts without history",
+        "timing": "fresh process for every method/repetition/start policy; one complete sequence includes assembly, reference or resource setup, all targets and PDAS inner solves, transfers, recycling updates, verification and cleanup; all-method small warmup and process initialization are separate",
+        "memory": "10 ms default sampled host RSS and NVML allocation of the same solver process; independent monitor process avoids delays from native calls holding the solver interpreter lock; all solver libraries and allocator caches included; monitor memory excluded; fresh worker process per sequence; sampling interval and maximum gap reported",
+        "failures": "retain every declared sequence and target, inner cap, outer cap, cycle, exception, timeout and memory error; clear warm-start and recycling history after a failed target; report accepted timings separately",
+        "mask_encoding": "zlib: followed by base64 of zlib-compressed, little-endian packed Boolean bits"
+      }
+    },
+    {
+      "identifier": "P4",
+      "study": "steady48-stopping-pilot-v2",
+      "rows": [
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "jacobi",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 0,
+          "numerically_completed_sequences": 0,
+          "failure_statuses": {
+            "target_failure": 1
+          },
+          "failed_target_statuses": {
+            "cycle": 4
+          },
+          "median_seconds": null,
+          "minimum_seconds": null,
+          "maximum_seconds": null,
+          "median_preparation_inclusive_seconds": null,
+          "median_inner_iterations": null,
+          "median_outer_iterations": null,
+          "deployed_rank_min": null,
+          "deployed_rank_max": null,
+          "fallbacks": 0,
+          "maximum_original_residual": null,
+          "verified_memory_sequences": 0,
+          "peak_host_rss_bytes": null,
+          "peak_gpu_process_bytes": null,
+          "maximum_memory_sampling_gap_seconds": null,
+          "median_components_seconds": {}
+        },
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "reference",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 0,
+          "numerically_completed_sequences": 0,
+          "failure_statuses": {
+            "target_failure": 1
+          },
+          "failed_target_statuses": {
+            "cycle": 4
+          },
+          "median_seconds": null,
+          "minimum_seconds": null,
+          "maximum_seconds": null,
+          "median_preparation_inclusive_seconds": null,
+          "median_inner_iterations": null,
+          "median_outer_iterations": null,
+          "deployed_rank_min": null,
+          "deployed_rank_max": null,
+          "fallbacks": 0,
+          "maximum_original_residual": null,
+          "verified_memory_sequences": 0,
+          "peak_host_rss_bytes": null,
+          "peak_gpu_process_bytes": null,
+          "maximum_memory_sampling_gap_seconds": null,
+          "median_components_seconds": {}
+        },
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "recycling",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 0,
+          "numerically_completed_sequences": 0,
+          "failure_statuses": {
+            "target_failure": 1
+          },
+          "failed_target_statuses": {
+            "cycle": 4
+          },
+          "median_seconds": null,
+          "minimum_seconds": null,
+          "maximum_seconds": null,
+          "median_preparation_inclusive_seconds": null,
+          "median_inner_iterations": null,
+          "median_outer_iterations": null,
+          "deployed_rank_min": null,
+          "deployed_rank_max": null,
+          "fallbacks": 0,
+          "maximum_original_residual": null,
+          "verified_memory_sequences": 0,
+          "peak_host_rss_bytes": null,
+          "peak_gpu_process_bytes": null,
+          "maximum_memory_sampling_gap_seconds": null,
+          "median_components_seconds": {}
+        },
+        {
+          "problem": "steady",
+          "n": 48,
+          "slabs": 1,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "analytical",
+          "method": "amgx",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 40.127300386317074,
+          "minimum_seconds": 40.127300386317074,
+          "maximum_seconds": 40.127300386317074,
+          "median_preparation_inclusive_seconds": 51.316790589131415,
+          "median_inner_iterations": 2808.0,
+          "median_outer_iterations": 69.0,
+          "deployed_rank_min": 0,
+          "deployed_rank_max": 0,
+          "fallbacks": 0,
+          "maximum_original_residual": 4.689335761712978e-10,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1728950272,
+          "peak_gpu_process_bytes": 2004877312,
+          "maximum_memory_sampling_gap_seconds": 0.07932768017053604,
+          "median_components_seconds": {
+            "assembly": 0.21957483422011137,
+            "reference_construction": 3.203749656677246e-07,
+            "solver_resources": 0.040178787894546986,
+            "cleanup": 0.022958739660680294,
+            "kernel_conversion": 0.7711619166657329,
+            "kernel_resource_creation": 0.0003451947122812271,
+            "kernel_handle_creation": 0.25340819638222456,
+            "kernel_upload": 0.20487559400498867,
+            "kernel_basis_processing": 0.0,
+            "kernel_coarse_or_hierarchy_setup": 2.1109936721622944,
+            "kernel_initialization": 0.0,
+            "kernel_iteration": 32.51702832709998,
+            "kernel_download": 0.015824230387806892,
+            "kernel_verification": 0.24616099707782269,
+            "kernel_cleanup": 0.2326864879578352,
+            "kernel_synchronization": 0.03205821570008993,
+            "kernel_host_bookkeeping": 0.0024265246465802193,
+            "target_construction": 0.032128309831023216,
+            "reference_and_recycling_transfer": 0.29345889016985893,
+            "outer_preparation": 0.048599690198898315,
+            "outer_restriction": 1.7747361939400434,
+            "outer_inner_verification": 0.2578993830829859,
+            "outer_kkt_and_update": 0.7889756020158529,
+            "remaining_host_work": 0.2618202781304717
+          }
+        }
+      ],
+      "protocol": {
+        "protocol": "full-reference-cht-study-v1",
+        "controls": {
+          "phase": "pilot",
+          "device": "cuda",
+          "problem": "steady",
+          "n": 48,
+          "slabs": 8,
+          "horizon": 0.1,
+          "solid_capacity": 2.0,
+          "fluid_capacity": 1.0,
+          "initial_temperature": 0.0,
+          "reference_construction": "mode_dependent",
+          "reference_capacity": 1.0,
+          "targets": 4,
+          "rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "repeats": 1,
+          "methods": [
+            "jacobi",
+            "reference",
+            "recycling",
+            "amgx"
+          ],
+          "warm_starts": [
+            "outer_inner"
+          ],
+          "rtol": 1e-09,
+          "amgx_factor": 0.1,
+          "outer_tolerance": 1e-08,
+          "inner_cap": 10000,
+          "residual_refresh": 10000,
+          "outer_cap": 100,
+          "initial_active": "empty",
+          "threads": 4,
+          "bound": 0.00019498904452558432,
+          "calibration_grid": 8,
+          "calibration_steps": 8,
+          "calibration_activity": 0.2,
+          "memory_interval": 0.01,
+          "sequence_timeout": 7200.0
+        },
+        "physics": {
+          "alpha": 0.001,
+          "conductivity_ratio": 100.0,
+          "transport_amplitude": 50.0
+        },
+        "targets": [
+          {
+            "index": 0,
+            "angle": 0.0,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3,
+                0.3,
+                0.265
+              ],
+              [
+                0.3,
+                0.7,
+                0.265
+              ],
+              [
+                0.7,
+                0.3,
+                0.6649999999999999
+              ],
+              [
+                0.7,
+                0.7,
+                0.6649999999999999
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8,
+              0.65,
+              0.45
+            ],
+            "theta": 0.0
+          },
+          {
+            "index": 1,
+            "angle": 0.39999999999999997,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3936714696611531,
+                0.23790413273769284,
+                0.28833333333333333
+              ],
+              [
+                0.2379041327376929,
+                0.6063285303388468,
+                0.28833333333333333
+              ],
+              [
+                0.762095867262307,
+                0.3936714696611531,
+                0.6883333333333332
+              ],
+              [
+                0.6063285303388469,
+                0.762095867262307,
+                0.6883333333333332
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 0.3333333333333333
+          },
+          {
+            "index": 2,
+            "angle": 0.7999999999999999,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.5041298763104715,
+                0.21718743995066236,
+                0.31166666666666665
+              ],
+              [
+                0.21718743995066236,
+                0.49587012368952854,
+                0.31166666666666665
+              ],
+              [
+                0.7828125600493376,
+                0.5041298763104713,
+                0.7116666666666667
+              ],
+              [
+                0.49587012368952854,
+                0.7828125600493376,
+                0.7116666666666667
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9,
+              0.65,
+              0.45
+            ],
+            "theta": 0.6666666666666666
+          },
+          {
+            "index": 3,
+            "angle": 1.2,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.6139362662981105,
+                0.24112063191122002,
+                0.33499999999999996
+              ],
+              [
+                0.24112063191122007,
+                0.38606373370188946,
+                0.33499999999999996
+              ],
+              [
+                0.75887936808878,
+                0.6139362662981105,
+                0.735
+              ],
+              [
+                0.3860637337018895,
+                0.75887936808878,
+                0.735
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 1.0
+          }
+        ],
+        "reference_policy": "one full-domain analytical Laplacian space per sequence; restrict at every inner solve",
+        "transient_convention": "one complete trajectory per query; backward Euler with capacity=solid_capacity below x3=1/2 and fluid_capacity above; right-endpoint time weights in both objective terms; common cell-volume times mean-step factor removed from reduced equations; initial temperature prescribed; bound imposed at all positive time levels",
+        "space_time_reference": "mode_dependent uses the temporal eigensystem for each spatial Laplacian eigenvalue; tensor uses one pure-time eigensystem; order candidate products by reference eigenvalue or Rayleigh value and retain the declared total rank; store spatial and temporal factors before restriction",
+        "temporal_target": "existing unequal Gaussian weights and query-dependent centers, plus rotation 0.8*t/T, vertical motion 0.05*sin(2*pi*t/T), and amplitude 0.15+0.85*sin(pi*t/T)^2",
+        "recycling_policy": "empty initial history; retain deployed coarse vectors and the last window new directions from each accepted CG solve; normalize columns in Jacobi coordinates; QR/small-factor SVD rank threshold 1e-12; retain the lowest scaled Ritz vectors; transfer by zero extension; coarse space fixed during a solve and residual restarts; clear history after a failed target",
+        "coarse_condition_limit": 10000000000.0,
+        "rank_threshold": 1e-12,
+        "residual_refresh": 10000,
+        "stopping": "same independent original relative residual and outer KKT limits; AmgX native absolute target is amgx_factor*rtol*||b||; CG triggers fresh verification at rtol",
+        "amgx_configuration": {
+          "config_version": 2,
+          "determinism_flag": 1,
+          "solver": {
+            "scope": "main",
+            "solver": "PCG",
+            "preconditioner": {
+              "scope": "amg",
+              "solver": "AMG",
+              "algorithm": "CLASSICAL",
+              "selector": "PMIS",
+              "interpolator": "D2",
+              "smoother": {
+                "solver": "MULTICOLOR_GS",
+                "relaxation_factor": 1.0,
+                "symmetric_GS": 1
+              },
+              "presweeps": 1,
+              "postsweeps": 1,
+              "cycle": "V",
+              "max_iters": 1,
+              "max_levels": 25,
+              "coarse_solver": "DENSE_LU_SOLVER"
+            },
+            "tolerance": 1.0000000000000002e-10,
+            "max_iters": 10000,
+            "norm": "L2",
+            "convergence": "ABSOLUTE",
+            "monitor_residual": 1,
+            "obtain_timings": 1,
+            "print_solve_stats": 0
+          }
+        },
+        "resources": "AmgX base Config/Resources persist per sequence; each inner solve rebuilds matrix, vectors, solver and hierarchy",
+        "warm_starts": "outer_inner passes the previous accepted target's active set and state; every accepted inner solve updates the full state; without accepted outer history use the declared initial_active policy; cold uses that same initial active set and zero inner guesses for each query; each repetition starts without history",
+        "timing": "fresh process for every method/repetition/start policy; one complete sequence includes assembly, reference or resource setup, all targets and PDAS inner solves, transfers, recycling updates, verification and cleanup; all-method small warmup and process initialization are separate",
+        "memory": "10 ms default sampled host RSS and NVML allocation of the same solver process; independent monitor process avoids delays from native calls holding the solver interpreter lock; all solver libraries and allocator caches included; monitor memory excluded; fresh worker process per sequence; sampling interval and maximum gap reported",
+        "failures": "retain every declared sequence and target, inner cap, outer cap, cycle, exception, timeout and memory error; clear warm-start and recycling history after a failed target; report accepted timings separately",
+        "mask_encoding": "zlib: followed by base64 of zlib-compressed, little-endian packed Boolean bits"
+      }
+    },
+    {
+      "identifier": "P5",
+      "study": "transient24-scale-pilot-v2",
+      "rows": [
+        {
+          "problem": "transient",
+          "n": 24,
+          "slabs": 8,
+          "targets": 12,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "mode_dependent",
+          "method": "jacobi",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 0,
+          "numerically_completed_sequences": 0,
+          "failure_statuses": {
+            "target_failure": 1
+          },
+          "failed_target_statuses": {
+            "inner_residual_failed": 1
+          },
+          "median_seconds": null,
+          "minimum_seconds": null,
+          "maximum_seconds": null,
+          "median_preparation_inclusive_seconds": null,
+          "median_inner_iterations": null,
+          "median_outer_iterations": null,
+          "deployed_rank_min": null,
+          "deployed_rank_max": null,
+          "fallbacks": 0,
+          "maximum_original_residual": null,
+          "verified_memory_sequences": 0,
+          "peak_host_rss_bytes": null,
+          "peak_gpu_process_bytes": null,
+          "maximum_memory_sampling_gap_seconds": null,
+          "median_components_seconds": {}
+        },
+        {
+          "problem": "transient",
+          "n": 24,
+          "slabs": 8,
+          "targets": 12,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "mode_dependent",
+          "method": "reference",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 38.85515004117042,
+          "minimum_seconds": 38.85515004117042,
+          "maximum_seconds": 38.85515004117042,
+          "median_preparation_inclusive_seconds": 48.565299708396196,
+          "median_inner_iterations": 56548.0,
+          "median_outer_iterations": 84.0,
+          "deployed_rank_min": 100,
+          "deployed_rank_max": 100,
+          "fallbacks": 0,
+          "maximum_original_residual": 9.998223310680335e-11,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1735430144,
+          "peak_gpu_process_bytes": 3359637504,
+          "maximum_memory_sampling_gap_seconds": 0.10493260901421309,
+          "median_components_seconds": {
+            "assembly": 0.1694204406812787,
+            "reference_construction": 0.013661425560712814,
+            "solver_resources": 4.010740667581558e-05,
+            "cleanup": 0.0004904763773083687,
+            "kernel_conversion": 0.9320845678448677,
+            "kernel_resource_creation": 0.0,
+            "kernel_handle_creation": 0.0,
+            "kernel_upload": 1.021940441802144,
+            "kernel_basis_processing": 0.9678449872881174,
+            "kernel_coarse_or_hierarchy_setup": 0.21930561028420925,
+            "kernel_initialization": 0.05720806214958429,
+            "kernel_iteration": 16.894059030339122,
+            "kernel_download": 0.010284505784511566,
+            "kernel_verification": 0.35645650792866945,
+            "kernel_cleanup": 0.02384965680539608,
+            "kernel_synchronization": 0.09270281624048948,
+            "kernel_host_bookkeeping": 0.0033088596537709236,
+            "target_construction": 0.05742322653532028,
+            "reference_and_recycling_transfer": 12.65152778942138,
+            "outer_preparation": 0.11603504605591297,
+            "outer_restriction": 3.161394342780113,
+            "outer_inner_verification": 0.3712587747722864,
+            "outer_kkt_and_update": 1.23540626373142,
+            "remaining_host_work": 0.49944710172712803
+          }
+        },
+        {
+          "problem": "transient",
+          "n": 24,
+          "slabs": 8,
+          "targets": 12,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "mode_dependent",
+          "method": "recycling",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 47.55669823754579,
+          "minimum_seconds": 47.55669823754579,
+          "maximum_seconds": 47.55669823754579,
+          "median_preparation_inclusive_seconds": 56.44835797697306,
+          "median_inner_iterations": 72547.0,
+          "median_outer_iterations": 84.0,
+          "deployed_rank_min": 0,
+          "deployed_rank_max": 100,
+          "fallbacks": 0,
+          "maximum_original_residual": 9.996093856046696e-11,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1983205376,
+          "peak_gpu_process_bytes": 7503609856,
+          "maximum_memory_sampling_gap_seconds": 0.13404802419245243,
+          "median_components_seconds": {
+            "assembly": 0.18456420674920082,
+            "reference_construction": 5.541369318962097e-07,
+            "solver_resources": 9.513646364212036e-05,
+            "cleanup": 0.008500478230416775,
+            "kernel_conversion": 0.9512194851413369,
+            "kernel_resource_creation": 0.0,
+            "kernel_handle_creation": 0.0,
+            "kernel_upload": 1.022531853057444,
+            "kernel_basis_processing": 7.479884829372168,
+            "kernel_coarse_or_hierarchy_setup": 0.22263688314706087,
+            "kernel_initialization": 0.06428357306867838,
+            "kernel_iteration": 25.822334713302553,
+            "kernel_download": 0.013953504152595997,
+            "kernel_verification": 0.3666851818561554,
+            "kernel_cleanup": 0.01883916836231947,
+            "kernel_synchronization": 0.032345108687877655,
+            "kernel_host_bookkeeping": 0.004350620321929455,
+            "target_construction": 0.07143464498221874,
+            "reference_and_recycling_transfer": 5.558492585085332,
+            "outer_preparation": 0.1541923964396119,
+            "outer_restriction": 3.318458112888038,
+            "outer_inner_verification": 0.4028745396062732,
+            "outer_kkt_and_update": 1.3043495984748006,
+            "remaining_host_work": 0.5546710640192032
+          }
+        },
+        {
+          "problem": "transient",
+          "n": 24,
+          "slabs": 8,
+          "targets": 12,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "mode_dependent",
+          "method": "amgx",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 81.15866979863495,
+          "minimum_seconds": 81.15866979863495,
+          "maximum_seconds": 81.15866979863495,
+          "median_preparation_inclusive_seconds": 90.26255775801837,
+          "median_inner_iterations": 2821.0,
+          "median_outer_iterations": 84.0,
+          "deployed_rank_min": 0,
+          "deployed_rank_max": 0,
+          "fallbacks": 0,
+          "maximum_original_residual": 1.0108692749023957e-11,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1754742784,
+          "peak_gpu_process_bytes": 3187671040,
+          "maximum_memory_sampling_gap_seconds": 0.10597418528050184,
+          "median_components_seconds": {
+            "assembly": 0.17085264064371586,
+            "reference_construction": 3.3155083656311035e-07,
+            "solver_resources": 0.04039600305259228,
+            "cleanup": 0.037678977474570274,
+            "kernel_conversion": 1.4298188472166657,
+            "kernel_resource_creation": 0.00041059963405132294,
+            "kernel_handle_creation": 0.41701657325029373,
+            "kernel_upload": 0.35621902253478765,
+            "kernel_basis_processing": 0.0,
+            "kernel_coarse_or_hierarchy_setup": 4.985536813735962,
+            "kernel_initialization": 0.0,
+            "kernel_iteration": 66.41903887875378,
+            "kernel_download": 0.013432340696454048,
+            "kernel_verification": 0.3656292296946049,
+            "kernel_cleanup": 0.18333739414811134,
+            "kernel_synchronization": 0.04008552338927984,
+            "kernel_host_bookkeeping": 0.002932562492787838,
+            "target_construction": 0.09420017339289188,
+            "reference_and_recycling_transfer": 0.5168518079444766,
+            "outer_preparation": 0.21570594236254692,
+            "outer_restriction": 3.4689811915159225,
+            "outer_inner_verification": 0.3928658301010728,
+            "outer_kkt_and_update": 1.2949840249493718,
+            "remaining_host_work": 0.7126950901001692
+          }
+        }
+      ],
+      "protocol": {
+        "protocol": "full-reference-cht-study-v1",
+        "controls": {
+          "phase": "pilot",
+          "device": "cuda",
+          "problem": "transient",
+          "n": 24,
+          "slabs": 8,
+          "horizon": 0.1,
+          "solid_capacity": 2.0,
+          "fluid_capacity": 1.0,
+          "initial_temperature": 0.0,
+          "reference_construction": "mode_dependent",
+          "reference_capacity": 1.0,
+          "targets": 12,
+          "rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "repeats": 1,
+          "methods": [
+            "jacobi",
+            "reference",
+            "recycling",
+            "amgx"
+          ],
+          "warm_starts": [
+            "outer_inner"
+          ],
+          "rtol": 1e-10,
+          "amgx_factor": 0.1,
+          "outer_tolerance": 1e-08,
+          "inner_cap": 10000,
+          "residual_refresh": 10000,
+          "outer_cap": 100,
+          "initial_active": "all",
+          "threads": 4,
+          "bound": 0.00026847890969378894,
+          "calibration_grid": 8,
+          "calibration_steps": 8,
+          "calibration_activity": 0.2,
+          "memory_interval": 0.01,
+          "sequence_timeout": 7200.0
+        },
+        "physics": {
+          "alpha": 0.001,
+          "conductivity_ratio": 100.0,
+          "transport_amplitude": 50.0
+        },
+        "targets": [
+          {
+            "index": 0,
+            "angle": 0.0,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3,
+                0.3,
+                0.265
+              ],
+              [
+                0.3,
+                0.7,
+                0.265
+              ],
+              [
+                0.7,
+                0.3,
+                0.6649999999999999
+              ],
+              [
+                0.7,
+                0.7,
+                0.6649999999999999
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8,
+              0.65,
+              0.45
+            ],
+            "theta": 0.0
+          },
+          {
+            "index": 1,
+            "angle": 0.10909090909090909,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3229638346946786,
+                0.27941397103627136,
+                0.27136363636363636
+              ],
+              [
+                0.27941397103627136,
+                0.6770361653053214,
+                0.27136363636363636
+              ],
+              [
+                0.7205860289637286,
+                0.3229638346946786,
+                0.6713636363636363
+              ],
+              [
+                0.6770361653053214,
+                0.7205860289637286,
+                0.6713636363636363
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8136363636363637,
+              0.65,
+              0.45
+            ],
+            "theta": 0.09090909090909091
+          },
+          {
+            "index": 2,
+            "angle": 0.21818181818181817,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3480324574315993,
+                0.26145049569173007,
+                0.2777272727272727
+              ],
+              [
+                0.26145049569173007,
+                0.6519675425684006,
+                0.2777272727272727
+              ],
+              [
+                0.7385495043082699,
+                0.3480324574315993,
+                0.6777272727272727
+              ],
+              [
+                0.6519675425684007,
+                0.7385495043082699,
+                0.6777272727272727
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8272727272727273,
+              0.65,
+              0.45
+            ],
+            "theta": 0.18181818181818182
+          },
+          {
+            "index": 3,
+            "angle": 0.3272727272727272,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3749078266367075,
+                0.2463231422394861,
+                0.28409090909090906
+              ],
+              [
+                0.24632314223948615,
+                0.6250921733632924,
+                0.28409090909090906
+              ],
+              [
+                0.7536768577605137,
+                0.3749078266367075,
+                0.6840909090909091
+              ],
+              [
+                0.6250921733632924,
+                0.7536768577605137,
+                0.6840909090909091
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8409090909090909,
+              0.65,
+              0.45
+            ],
+            "theta": 0.2727272727272727
+          },
+          {
+            "index": 4,
+            "angle": 0.43636363636363634,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.403270420275417,
+                0.2342117602182039,
+                0.29045454545454547
+              ],
+              [
+                0.2342117602182039,
+                0.596729579724583,
+                0.29045454545454547
+              ],
+              [
+                0.7657882397817961,
+                0.403270420275417,
+                0.6904545454545454
+              ],
+              [
+                0.596729579724583,
+                0.7657882397817961,
+                0.6904545454545454
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8545454545454546,
+              0.65,
+              0.45
+            ],
+            "theta": 0.36363636363636365
+          },
+          {
+            "index": 5,
+            "angle": 0.5454545454545454,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.4327830346592339,
+                0.225260342195783,
+                0.2968181818181818
+              ],
+              [
+                0.225260342195783,
+                0.567216965340766,
+                0.2968181818181818
+              ],
+              [
+                0.7747396578042169,
+                0.43278303465923385,
+                0.6968181818181818
+              ],
+              [
+                0.567216965340766,
+                0.7747396578042169,
+                0.6968181818181818
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8681818181818182,
+              0.65,
+              0.45
+            ],
+            "theta": 0.45454545454545453
+          },
+          {
+            "index": 6,
+            "angle": 0.6545454545454544,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.4630947934700725,
+                0.21957531183759266,
+                0.30318181818181816
+              ],
+              [
+                0.21957531183759266,
+                0.5369052065299275,
+                0.30318181818181816
+              ],
+              [
+                0.7804246881624073,
+                0.4630947934700725,
+                0.7031818181818181
+              ],
+              [
+                0.5369052065299275,
+                0.7804246881624073,
+                0.7031818181818181
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8818181818181818,
+              0.65,
+              0.45
+            ],
+            "theta": 0.5454545454545454
+          },
+          {
+            "index": 7,
+            "angle": 0.7636363636363636,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.49384531933885495,
+                0.21722425863246447,
+                0.3095454545454545
+              ],
+              [
+                0.21722425863246453,
+                0.506154680661145,
+                0.3095454545454545
+              ],
+              [
+                0.7827757413675355,
+                0.4938453193388549,
+                0.7095454545454545
+              ],
+              [
+                0.506154680661145,
+                0.7827757413675354,
+                0.7095454545454545
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8954545454545455,
+              0.65,
+              0.45
+            ],
+            "theta": 0.6363636363636364
+          },
+          {
+            "index": 8,
+            "angle": 0.8727272727272727,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.5246690183823786,
+                0.21823513431932312,
+                0.3159090909090909
+              ],
+              [
+                0.21823513431932318,
+                0.4753309816176214,
+                0.3159090909090909
+              ],
+              [
+                0.7817648656806768,
+                0.5246690183823786,
+                0.7159090909090908
+              ],
+              [
+                0.47533098161762144,
+                0.7817648656806768,
+                0.7159090909090908
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9090909090909092,
+              0.65,
+              0.45
+            ],
+            "theta": 0.7272727272727273
+          },
+          {
+            "index": 9,
+            "angle": 0.9818181818181818,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.5551994267594695,
+                0.22259592056816113,
+                0.32227272727272727
+              ],
+              [
+                0.2225959205681612,
+                0.44480057324053046,
+                0.32227272727272727
+              ],
+              [
+                0.7774040794318389,
+                0.5551994267594694,
+                0.7222727272727272
+              ],
+              [
+                0.4448005732405305,
+                0.7774040794318389,
+                0.7222727272727272
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9227272727272727,
+              0.65,
+              0.45
+            ],
+            "theta": 0.8181818181818182
+          },
+          {
+            "index": 10,
+            "angle": 1.0909090909090908,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.5850735675700913,
+                0.23025477186630883,
+                0.3286363636363636
+              ],
+              [
+                0.23025477186630883,
+                0.4149264324299087,
+                0.3286363636363636
+              ],
+              [
+                0.7697452281336912,
+                0.5850735675700913,
+                0.7286363636363636
+              ],
+              [
+                0.4149264324299087,
+                0.7697452281336912,
+                0.7286363636363636
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9363636363636364,
+              0.65,
+              0.45
+            ],
+            "theta": 0.9090909090909091
+          },
+          {
+            "index": 11,
+            "angle": 1.2,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.6139362662981105,
+                0.24112063191122002,
+                0.33499999999999996
+              ],
+              [
+                0.24112063191122007,
+                0.38606373370188946,
+                0.33499999999999996
+              ],
+              [
+                0.75887936808878,
+                0.6139362662981105,
+                0.735
+              ],
+              [
+                0.3860637337018895,
+                0.75887936808878,
+                0.735
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 1.0
+          }
+        ],
+        "reference_policy": "one full-domain analytical Laplacian space per sequence; restrict at every inner solve",
+        "transient_convention": "one complete trajectory per query; backward Euler with capacity=solid_capacity below x3=1/2 and fluid_capacity above; right-endpoint time weights in both objective terms; common cell-volume times mean-step factor removed from reduced equations; initial temperature prescribed; bound imposed at all positive time levels",
+        "space_time_reference": "mode_dependent uses the temporal eigensystem for each spatial Laplacian eigenvalue; tensor uses one pure-time eigensystem; order candidate products by reference eigenvalue or Rayleigh value and retain the declared total rank; store spatial and temporal factors before restriction",
+        "temporal_target": "existing unequal Gaussian weights and query-dependent centers, plus rotation 0.8*t/T, vertical motion 0.05*sin(2*pi*t/T), and amplitude 0.15+0.85*sin(pi*t/T)^2",
+        "recycling_policy": "empty initial history; retain deployed coarse vectors and the last window new directions from each accepted CG solve; normalize columns in Jacobi coordinates; QR/small-factor SVD rank threshold 1e-12; retain the lowest scaled Ritz vectors; transfer by zero extension; coarse space fixed during a solve and residual restarts; clear history after a failed target",
+        "coarse_condition_limit": 10000000000.0,
+        "rank_threshold": 1e-12,
+        "residual_refresh": 10000,
+        "stopping": "same independent original relative residual and outer KKT limits; AmgX native absolute target is amgx_factor*rtol*||b||; CG triggers fresh verification at rtol",
+        "amgx_configuration": {
+          "config_version": 2,
+          "determinism_flag": 1,
+          "solver": {
+            "scope": "main",
+            "solver": "PCG",
+            "preconditioner": {
+              "scope": "amg",
+              "solver": "AMG",
+              "algorithm": "CLASSICAL",
+              "selector": "PMIS",
+              "interpolator": "D2",
+              "smoother": {
+                "solver": "MULTICOLOR_GS",
+                "relaxation_factor": 1.0,
+                "symmetric_GS": 1
+              },
+              "presweeps": 1,
+              "postsweeps": 1,
+              "cycle": "V",
+              "max_iters": 1,
+              "max_levels": 25,
+              "coarse_solver": "DENSE_LU_SOLVER"
+            },
+            "tolerance": 1.0000000000000001e-11,
+            "max_iters": 10000,
+            "norm": "L2",
+            "convergence": "ABSOLUTE",
+            "monitor_residual": 1,
+            "obtain_timings": 1,
+            "print_solve_stats": 0
+          }
+        },
+        "resources": "AmgX base Config/Resources persist per sequence; each inner solve rebuilds matrix, vectors, solver and hierarchy",
+        "warm_starts": "outer_inner passes the previous accepted target's active set and state; every accepted inner solve updates the full state; without accepted outer history use the declared initial_active policy; cold uses that same initial active set and zero inner guesses for each query; each repetition starts without history",
+        "timing": "fresh process for every method/repetition/start policy; one complete sequence includes assembly, reference or resource setup, all targets and PDAS inner solves, transfers, recycling updates, verification and cleanup; all-method small warmup and process initialization are separate",
+        "memory": "10 ms default sampled host RSS and NVML allocation of the same solver process; independent monitor process avoids delays from native calls holding the solver interpreter lock; all solver libraries and allocator caches included; monitor memory excluded; fresh worker process per sequence; sampling interval and maximum gap reported",
+        "failures": "retain every declared sequence and target, inner cap, outer cap, cycle, exception, timeout and memory error; clear warm-start and recycling history after a failed target; report accepted timings separately",
+        "mask_encoding": "zlib: followed by base64 of zlib-compressed, little-endian packed Boolean bits"
+      }
+    },
+    {
+      "identifier": "P6",
+      "study": "transient24-cached-pilot-v3",
+      "rows": [
+        {
+          "problem": "transient",
+          "n": 24,
+          "slabs": 8,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "mode_dependent",
+          "method": "jacobi",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 19.227885514497757,
+          "minimum_seconds": 19.227885514497757,
+          "maximum_seconds": 19.227885514497757,
+          "median_preparation_inclusive_seconds": 732.4132307069376,
+          "median_inner_iterations": 75080.0,
+          "median_outer_iterations": 53.0,
+          "deployed_rank_min": 0,
+          "deployed_rank_max": 0,
+          "fallbacks": 0,
+          "maximum_original_residual": 9.98937297941021e-12,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1613991936,
+          "peak_gpu_process_bytes": 1174405120,
+          "maximum_memory_sampling_gap_seconds": 0.07849109917879105,
+          "median_components_seconds": {
+            "assembly": 0.17785248532891273,
+            "reference_construction": 3.417953848838806e-07,
+            "solver_resources": 9.456928819417953e-05,
+            "cleanup": 0.0017745830118656158,
+            "kernel_conversion": 0.26639523822814226,
+            "kernel_resource_creation": 0.0,
+            "kernel_handle_creation": 0.0,
+            "kernel_upload": 0.22227923665195704,
+            "kernel_basis_processing": 0.0,
+            "kernel_coarse_or_hierarchy_setup": 0.0001279851421713829,
+            "kernel_initialization": 0.025276919826865196,
+            "kernel_iteration": 14.602518029510975,
+            "kernel_download": 0.006743495352566242,
+            "kernel_verification": 0.21377887669950724,
+            "kernel_cleanup": 0.015014303848147392,
+            "kernel_synchronization": 0.01292490866035223,
+            "kernel_host_bookkeeping": 0.0014319168403744698,
+            "target_construction": 0.027501050382852554,
+            "reference_and_recycling_transfer": 0.31391445454210043,
+            "outer_preparation": 0.06406622286885977,
+            "outer_restriction": 1.9722919967025518,
+            "outer_inner_verification": 0.22650777827948332,
+            "outer_kkt_and_update": 0.8188784709200263,
+            "remaining_host_work": 0.258512650616467
+          }
+        },
+        {
+          "problem": "transient",
+          "n": 24,
+          "slabs": 8,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "mode_dependent",
+          "method": "reference",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 25.016972028650343,
+          "minimum_seconds": 25.016972028650343,
+          "maximum_seconds": 25.016972028650343,
+          "median_preparation_inclusive_seconds": 736.7431593919173,
+          "median_inner_iterations": 38376.0,
+          "median_outer_iterations": 53.0,
+          "deployed_rank_min": 100,
+          "deployed_rank_max": 100,
+          "fallbacks": 0,
+          "maximum_original_residual": 9.982043891409478e-12,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1737457664,
+          "peak_gpu_process_bytes": 3359637504,
+          "maximum_memory_sampling_gap_seconds": 0.07950679957866669,
+          "median_components_seconds": {
+            "assembly": 0.1743978140875697,
+            "reference_construction": 0.01330195926129818,
+            "solver_resources": 6.180442869663239e-05,
+            "cleanup": 0.0005344115197658539,
+            "kernel_conversion": 0.5752406669780612,
+            "kernel_resource_creation": 0.0,
+            "kernel_handle_creation": 0.0,
+            "kernel_upload": 0.6460773414000869,
+            "kernel_basis_processing": 0.6003403281792998,
+            "kernel_coarse_or_hierarchy_setup": 0.13769122026860714,
+            "kernel_initialization": 0.0386350043118,
+            "kernel_iteration": 11.10414048563689,
+            "kernel_download": 0.00723600760102272,
+            "kernel_verification": 0.22594046965241432,
+            "kernel_cleanup": 0.01676337979733944,
+            "kernel_synchronization": 0.12060745619237423,
+            "kernel_host_bookkeeping": 0.0022581880912184715,
+            "target_construction": 0.029402412474155426,
+            "reference_and_recycling_transfer": 7.915302199311554,
+            "outer_preparation": 0.0706927077844739,
+            "outer_restriction": 1.985225128941238,
+            "outer_inner_verification": 0.2361455699428916,
+            "outer_kkt_and_update": 0.8082920257002115,
+            "remaining_host_work": 0.30868544708937407
+          }
+        },
+        {
+          "problem": "transient",
+          "n": 24,
+          "slabs": 8,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "mode_dependent",
+          "method": "recycling",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 34.341035653837025,
+          "minimum_seconds": 34.341035653837025,
+          "maximum_seconds": 34.341035653837025,
+          "median_preparation_inclusive_seconds": 747.7461246307939,
+          "median_inner_iterations": 65977.0,
+          "median_outer_iterations": 53.0,
+          "deployed_rank_min": 0,
+          "deployed_rank_max": 100,
+          "fallbacks": 0,
+          "maximum_original_residual": 9.987350189702714e-12,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1991720960,
+          "peak_gpu_process_bytes": 7503609856,
+          "maximum_memory_sampling_gap_seconds": 0.07891011890023947,
+          "median_components_seconds": {
+            "assembly": 0.17930159997195005,
+            "reference_construction": 1.2032687664031982e-06,
+            "solver_resources": 0.00018375087529420853,
+            "cleanup": 0.00869434792548418,
+            "kernel_conversion": 0.5606101285666227,
+            "kernel_resource_creation": 0.0,
+            "kernel_handle_creation": 0.0,
+            "kernel_upload": 0.6395671302452683,
+            "kernel_basis_processing": 4.536587651818991,
+            "kernel_coarse_or_hierarchy_setup": 0.13760713022202253,
+            "kernel_initialization": 0.043229867704212666,
+            "kernel_iteration": 20.870588994584978,
+            "kernel_download": 0.007838941179215908,
+            "kernel_verification": 0.23567413818091154,
+            "kernel_cleanup": 0.0130886510014534,
+            "kernel_synchronization": 0.021402237005531788,
+            "kernel_host_bookkeeping": 0.0028777699917554855,
+            "target_construction": 0.02709676418453455,
+            "reference_and_recycling_transfer": 3.362817857414484,
+            "outer_preparation": 0.048163426108658314,
+            "outer_restriction": 2.058397138491273,
+            "outer_inner_verification": 0.254589625634253,
+            "outer_kkt_and_update": 1.021673982962966,
+            "remaining_host_work": 0.3110433164983988
+          }
+        },
+        {
+          "problem": "transient",
+          "n": 24,
+          "slabs": 8,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "mode_dependent",
+          "method": "amgx",
+          "warm_start": "outer_inner",
+          "declared_sequences": 1,
+          "recorded_sequences": 1,
+          "accepted_sequences": 1,
+          "numerically_completed_sequences": 1,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 47.43394257873297,
+          "minimum_seconds": 47.43394257873297,
+          "maximum_seconds": 47.43394257873297,
+          "median_preparation_inclusive_seconds": 760.1222381684929,
+          "median_inner_iterations": 1719.0,
+          "median_outer_iterations": 53.0,
+          "deployed_rank_min": 0,
+          "deployed_rank_max": 0,
+          "fallbacks": 0,
+          "maximum_original_residual": 1.014589929531002e-11,
+          "verified_memory_sequences": 1,
+          "peak_host_rss_bytes": 1741717504,
+          "peak_gpu_process_bytes": 3185573888,
+          "maximum_memory_sampling_gap_seconds": 0.07941406778991222,
+          "median_components_seconds": {
+            "assembly": 0.1929624928161502,
+            "reference_construction": 2.551823854446411e-07,
+            "solver_resources": 0.04265197925269604,
+            "cleanup": 0.047345757484436035,
+            "kernel_conversion": 0.8431229507550597,
+            "kernel_resource_creation": 0.0002867523580789566,
+            "kernel_handle_creation": 0.2088633021339774,
+            "kernel_upload": 0.21817542798817158,
+            "kernel_basis_processing": 0.0,
+            "kernel_coarse_or_hierarchy_setup": 2.91599153727293,
+            "kernel_initialization": 0.0,
+            "kernel_iteration": 38.99096984229982,
+            "kernel_download": 0.009171663783490658,
+            "kernel_verification": 0.23752533830702305,
+            "kernel_cleanup": 0.09158267080783844,
+            "kernel_synchronization": 0.02713477797806263,
+            "kernel_host_bookkeeping": 0.0017938623204827309,
+            "target_construction": 0.02397945709526539,
+            "reference_and_recycling_transfer": 0.31727173272520304,
+            "outer_preparation": 0.06110237631946802,
+            "outer_restriction": 1.855717753060162,
+            "outer_inner_verification": 0.24740635603666306,
+            "outer_kkt_and_update": 0.8087720330804586,
+            "remaining_host_work": 0.29211425967514515
+          }
+        }
+      ],
+      "protocol": {
+        "protocol": "full-reference-cht-study-v1",
+        "controls": {
+          "phase": "pilot",
+          "device": "cuda",
+          "problem": "transient",
+          "n": 24,
+          "slabs": 8,
+          "horizon": 0.1,
+          "solid_capacity": 2.0,
+          "fluid_capacity": 1.0,
+          "initial_temperature": 0.0,
+          "reference_construction": "mode_dependent",
+          "reference_capacity": 1.0,
+          "targets": 4,
+          "rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "repeats": 1,
+          "methods": [
+            "jacobi",
+            "reference",
+            "recycling",
+            "amgx"
+          ],
+          "warm_starts": [
+            "outer_inner"
+          ],
+          "rtol": 1e-10,
+          "cg_factor": 0.1,
+          "amgx_factor": 0.1,
+          "outer_tolerance": 1e-08,
+          "inner_cap": 10000,
+          "residual_refresh": 10000,
+          "cache_operator_product": true,
+          "outer_cap": 100,
+          "initial_active": "all",
+          "threads": 4,
+          "bound": 0.00026847890969378894,
+          "calibration_grid": 8,
+          "calibration_steps": 8,
+          "calibration_activity": 0.2,
+          "host_memory_budget_bytes": null,
+          "gpu_memory_budget_bytes": null,
+          "memory_interval": 0.01,
+          "sequence_timeout": 7200.0
+        },
+        "calibration_input": {
+          "source_record_sha256": "bac2bcc2a6afef30400e0fcf3562564be57039c42cb95c0ea2ca625737f7f4a7",
+          "source_protocol_sha256": "faadc274ca79814eaa7ef0290c9a9e880f475efc51f94620bc11177283ab5f61",
+          "source_git_head": "706dde9f5a01e1255282014e2a19dafc4d023ea4",
+          "calibration_seconds": 702.2948511019349,
+          "bound": 0.00026847890969378894,
+          "spatial_grid": 12,
+          "time_slabs": 8,
+          "scope": "measured once in the supplied calibration record; charged once in preparation-inclusive sequence totals"
+        },
+        "physics": {
+          "alpha": 0.001,
+          "conductivity_ratio": 100.0,
+          "transport_amplitude": 50.0
+        },
+        "targets": [
+          {
+            "index": 0,
+            "angle": 0.0,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3,
+                0.3,
+                0.265
+              ],
+              [
+                0.3,
+                0.7,
+                0.265
+              ],
+              [
+                0.7,
+                0.3,
+                0.6649999999999999
+              ],
+              [
+                0.7,
+                0.7,
+                0.6649999999999999
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8,
+              0.65,
+              0.45
+            ],
+            "theta": 0.0
+          },
+          {
+            "index": 1,
+            "angle": 0.39999999999999997,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3936714696611531,
+                0.23790413273769284,
+                0.28833333333333333
+              ],
+              [
+                0.2379041327376929,
+                0.6063285303388468,
+                0.28833333333333333
+              ],
+              [
+                0.762095867262307,
+                0.3936714696611531,
+                0.6883333333333332
+              ],
+              [
+                0.6063285303388469,
+                0.762095867262307,
+                0.6883333333333332
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 0.3333333333333333
+          },
+          {
+            "index": 2,
+            "angle": 0.7999999999999999,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.5041298763104715,
+                0.21718743995066236,
+                0.31166666666666665
+              ],
+              [
+                0.21718743995066236,
+                0.49587012368952854,
+                0.31166666666666665
+              ],
+              [
+                0.7828125600493376,
+                0.5041298763104713,
+                0.7116666666666667
+              ],
+              [
+                0.49587012368952854,
+                0.7828125600493376,
+                0.7116666666666667
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9,
+              0.65,
+              0.45
+            ],
+            "theta": 0.6666666666666666
+          },
+          {
+            "index": 3,
+            "angle": 1.2,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.6139362662981105,
+                0.24112063191122002,
+                0.33499999999999996
+              ],
+              [
+                0.24112063191122007,
+                0.38606373370188946,
+                0.33499999999999996
+              ],
+              [
+                0.75887936808878,
+                0.6139362662981105,
+                0.735
+              ],
+              [
+                0.3860637337018895,
+                0.75887936808878,
+                0.735
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 1.0
+          }
+        ],
+        "reference_policy": "one full-domain analytical Laplacian space per sequence; restrict at every inner solve",
+        "transient_convention": "one complete trajectory per query; backward Euler with capacity=solid_capacity below x3=1/2 and fluid_capacity above; right-endpoint time weights in both objective terms; common cell-volume times mean-step factor removed from reduced equations; initial temperature prescribed; bound imposed at all positive time levels",
+        "space_time_reference": "mode_dependent uses the temporal eigensystem for each spatial Laplacian eigenvalue; tensor uses one pure-time eigensystem; order candidate products by reference eigenvalue or Rayleigh value and retain the declared total rank; store spatial and temporal factors before restriction",
+        "temporal_target": "existing unequal Gaussian weights and query-dependent centers, plus rotation 0.8*t/T, vertical motion 0.05*sin(2*pi*t/T), and amplitude 0.15+0.85*sin(pi*t/T)^2",
+        "recycling_policy": "empty initial history; retain deployed coarse vectors and the last window new directions from each accepted CG solve; normalize columns in Jacobi coordinates; QR/small-factor SVD rank threshold 1e-12; retain the lowest scaled Ritz vectors; transfer by zero extension; coarse space fixed during a solve and residual restarts; clear history after a failed target",
+        "coarse_condition_limit": 10000000000.0,
+        "cached_products": "reference and recycling CG optionally retain BZ for projected preconditioning; construction and storage are charged; Jacobi rank zero has no coarse-space operator product",
+        "rank_threshold": 1e-12,
+        "residual_refresh": 10000,
+        "stopping": "same independent original relative residual and outer KKT limits; AmgX native absolute target is amgx_factor*rtol*||b||; CG triggers fresh verification at cg_factor*rtol; solver-specific internal margins are declared before each comparison",
+        "amgx_configuration": {
+          "config_version": 2,
+          "determinism_flag": 1,
+          "solver": {
+            "scope": "main",
+            "solver": "PCG",
+            "preconditioner": {
+              "scope": "amg",
+              "solver": "AMG",
+              "algorithm": "CLASSICAL",
+              "selector": "PMIS",
+              "interpolator": "D2",
+              "smoother": {
+                "solver": "MULTICOLOR_GS",
+                "relaxation_factor": 1.0,
+                "symmetric_GS": 1
+              },
+              "presweeps": 1,
+              "postsweeps": 1,
+              "cycle": "V",
+              "max_iters": 1,
+              "max_levels": 25,
+              "coarse_solver": "DENSE_LU_SOLVER"
+            },
+            "tolerance": 1.0000000000000001e-11,
+            "max_iters": 10000,
+            "norm": "L2",
+            "convergence": "ABSOLUTE",
+            "monitor_residual": 1,
+            "obtain_timings": 1,
+            "print_solve_stats": 0
+          }
+        },
+        "resources": "AmgX base Config/Resources persist per sequence; each inner solve rebuilds matrix, vectors, solver and hierarchy",
+        "warm_starts": "outer_inner passes the previous accepted target's active set and state; every accepted inner solve updates the full state; without accepted outer history use the declared initial_active policy; cold uses that same initial active set and zero inner guesses for each query; each repetition starts without history",
+        "timing": "fresh process for every method/repetition/start policy; one complete sequence includes assembly, reference or resource setup, all targets and PDAS inner solves, transfers, recycling updates, verification and cleanup; all-method small warmup and process initialization are separate",
+        "memory": "10 ms default sampled host RSS and NVML allocation of the same solver process; independent monitor process avoids delays from native calls holding the solver interpreter lock; all solver libraries and allocator caches included; monitor memory excluded; fresh worker process per sequence; sampling interval and maximum gap reported",
+        "memory_budget": "optional common host/GPU sampled-peak budgets are feasibility screens, not hard allocator caps; numerically completed sequences exceeding a declared budget retain their results and are excluded from budget-feasible accepted timings",
+        "failures": "retain every declared sequence and target, inner cap, outer cap, cycle, exception, timeout and memory error; clear warm-start and recycling history after a failed target; report accepted timings separately",
+        "mask_encoding": "zlib: followed by base64 of zlib-compressed, little-endian packed Boolean bits"
+      }
+    },
+    {
+      "identifier": "P7",
+      "study": "mode-dependent-construction-pilot-v2",
+      "rows": [
+        {
+          "problem": "transient",
+          "n": 8,
+          "slabs": 8,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "mode_dependent",
+          "method": "reference",
+          "warm_start": "outer_inner",
+          "declared_sequences": 3,
+          "recorded_sequences": 3,
+          "accepted_sequences": 3,
+          "numerically_completed_sequences": 3,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 1.1626540934666991,
+          "minimum_seconds": 1.1563474526628852,
+          "maximum_seconds": 1.1660337448120117,
+          "median_preparation_inclusive_seconds": 9.740681950002909,
+          "median_inner_iterations": 2346.0,
+          "median_outer_iterations": 24.0,
+          "deployed_rank_min": 100,
+          "deployed_rank_max": 100,
+          "fallbacks": 0,
+          "maximum_original_residual": 9.997494929251163e-11,
+          "verified_memory_sequences": 3,
+          "peak_host_rss_bytes": 1389047808,
+          "peak_gpu_process_bytes": 1075838976,
+          "maximum_memory_sampling_gap_seconds": 0.1044441219419241,
+          "median_components_seconds": {
+            "assembly": 0.013238470070064068,
+            "reference_construction": 0.0060189273208379745,
+            "solver_resources": 3.932882100343704e-05,
+            "cleanup": 5.989149212837219e-05,
+            "kernel_conversion": 0.07706344407051802,
+            "kernel_resource_creation": 0.0,
+            "kernel_handle_creation": 0.0,
+            "kernel_upload": 0.013626689091324806,
+            "kernel_basis_processing": 0.1942628351971507,
+            "kernel_coarse_or_hierarchy_setup": 0.025448912754654884,
+            "kernel_initialization": 0.007049179635941982,
+            "kernel_iteration": 0.6591428192332387,
+            "kernel_download": 0.0011061923578381538,
+            "kernel_verification": 0.005691695958375931,
+            "kernel_cleanup": 0.005984938703477383,
+            "kernel_synchronization": 0.0046270787715911865,
+            "kernel_host_bookkeeping": 0.0005768314003944397,
+            "target_construction": 0.003029998391866684,
+            "reference_and_recycling_transfer": 0.08448354713618755,
+            "outer_preparation": 0.0015652691945433617,
+            "outer_restriction": 0.03419175650924444,
+            "outer_inner_verification": 0.0046098493039608,
+            "outer_kkt_and_update": 0.012191514484584332,
+            "remaining_host_work": 0.011529906652867794
+          }
+        }
+      ],
+      "protocol": {
+        "protocol": "full-reference-cht-study-v1",
+        "controls": {
+          "phase": "pilot",
+          "device": "cuda",
+          "problem": "transient",
+          "n": 8,
+          "slabs": 8,
+          "horizon": 0.1,
+          "solid_capacity": 2.0,
+          "fluid_capacity": 1.0,
+          "initial_temperature": 0.0,
+          "reference_construction": "mode_dependent",
+          "reference_capacity": 1.0,
+          "targets": 4,
+          "rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "repeats": 3,
+          "methods": [
+            "reference"
+          ],
+          "warm_starts": [
+            "outer_inner"
+          ],
+          "rtol": 1e-10,
+          "amgx_factor": 0.1,
+          "outer_tolerance": 1e-08,
+          "inner_cap": 10000,
+          "residual_refresh": 1000,
+          "outer_cap": 100,
+          "initial_active": "all",
+          "threads": 4,
+          "bound": 0.0011403058942594487,
+          "calibration_grid": 8,
+          "calibration_steps": 8,
+          "calibration_activity": 0.2,
+          "memory_interval": 0.01,
+          "sequence_timeout": 7200.0
+        },
+        "physics": {
+          "alpha": 0.001,
+          "conductivity_ratio": 100.0,
+          "transport_amplitude": 50.0
+        },
+        "targets": [
+          {
+            "index": 0,
+            "angle": 0.0,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3,
+                0.3,
+                0.265
+              ],
+              [
+                0.3,
+                0.7,
+                0.265
+              ],
+              [
+                0.7,
+                0.3,
+                0.6649999999999999
+              ],
+              [
+                0.7,
+                0.7,
+                0.6649999999999999
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8,
+              0.65,
+              0.45
+            ],
+            "theta": 0.0
+          },
+          {
+            "index": 1,
+            "angle": 0.39999999999999997,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3936714696611531,
+                0.23790413273769284,
+                0.28833333333333333
+              ],
+              [
+                0.2379041327376929,
+                0.6063285303388468,
+                0.28833333333333333
+              ],
+              [
+                0.762095867262307,
+                0.3936714696611531,
+                0.6883333333333332
+              ],
+              [
+                0.6063285303388469,
+                0.762095867262307,
+                0.6883333333333332
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 0.3333333333333333
+          },
+          {
+            "index": 2,
+            "angle": 0.7999999999999999,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.5041298763104715,
+                0.21718743995066236,
+                0.31166666666666665
+              ],
+              [
+                0.21718743995066236,
+                0.49587012368952854,
+                0.31166666666666665
+              ],
+              [
+                0.7828125600493376,
+                0.5041298763104713,
+                0.7116666666666667
+              ],
+              [
+                0.49587012368952854,
+                0.7828125600493376,
+                0.7116666666666667
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9,
+              0.65,
+              0.45
+            ],
+            "theta": 0.6666666666666666
+          },
+          {
+            "index": 3,
+            "angle": 1.2,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.6139362662981105,
+                0.24112063191122002,
+                0.33499999999999996
+              ],
+              [
+                0.24112063191122007,
+                0.38606373370188946,
+                0.33499999999999996
+              ],
+              [
+                0.75887936808878,
+                0.6139362662981105,
+                0.735
+              ],
+              [
+                0.3860637337018895,
+                0.75887936808878,
+                0.735
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 1.0
+          }
+        ],
+        "reference_policy": "one full-domain analytical Laplacian space per sequence; restrict at every inner solve",
+        "transient_convention": "one complete trajectory per query; backward Euler with capacity=solid_capacity below x3=1/2 and fluid_capacity above; right-endpoint time weights in both objective terms; common cell-volume times mean-step factor removed from reduced equations; initial temperature prescribed; bound imposed at all positive time levels",
+        "space_time_reference": "mode_dependent uses the temporal eigensystem for each spatial Laplacian eigenvalue; tensor uses one pure-time eigensystem; order candidate products by reference eigenvalue or Rayleigh value and retain the declared total rank; store spatial and temporal factors before restriction",
+        "temporal_target": "existing unequal Gaussian weights and query-dependent centers, plus rotation 0.8*t/T, vertical motion 0.05*sin(2*pi*t/T), and amplitude 0.15+0.85*sin(pi*t/T)^2",
+        "recycling_policy": "empty initial history; retain deployed coarse vectors and the last window new directions from each accepted CG solve; normalize columns in Jacobi coordinates; QR/small-factor SVD rank threshold 1e-12; retain the lowest scaled Ritz vectors; transfer by zero extension; coarse space fixed during a solve and residual restarts; clear history after a failed target",
+        "coarse_condition_limit": 10000000000.0,
+        "rank_threshold": 1e-12,
+        "residual_refresh": 1000,
+        "stopping": "same independent original relative residual and outer KKT limits; AmgX native absolute target is amgx_factor*rtol*||b||; CG triggers fresh verification at rtol",
+        "amgx_configuration": {
+          "config_version": 2,
+          "determinism_flag": 1,
+          "solver": {
+            "scope": "main",
+            "solver": "PCG",
+            "preconditioner": {
+              "scope": "amg",
+              "solver": "AMG",
+              "algorithm": "CLASSICAL",
+              "selector": "PMIS",
+              "interpolator": "D2",
+              "smoother": {
+                "solver": "MULTICOLOR_GS",
+                "relaxation_factor": 1.0,
+                "symmetric_GS": 1
+              },
+              "presweeps": 1,
+              "postsweeps": 1,
+              "cycle": "V",
+              "max_iters": 1,
+              "max_levels": 25,
+              "coarse_solver": "DENSE_LU_SOLVER"
+            },
+            "tolerance": 1.0000000000000001e-11,
+            "max_iters": 10000,
+            "norm": "L2",
+            "convergence": "ABSOLUTE",
+            "monitor_residual": 1,
+            "obtain_timings": 1,
+            "print_solve_stats": 0
+          }
+        },
+        "resources": "AmgX base Config/Resources persist per sequence; each inner solve rebuilds matrix, vectors, solver and hierarchy",
+        "warm_starts": "outer_inner passes the previous accepted target's active set and state; every accepted inner solve updates the full state; without accepted outer history use the declared initial_active policy; cold uses that same initial active set and zero inner guesses for each query; each repetition starts without history",
+        "timing": "fresh process for every method/repetition/start policy; one complete sequence includes assembly, reference or resource setup, all targets and PDAS inner solves, transfers, recycling updates, verification and cleanup; all-method small warmup and process initialization are separate",
+        "memory": "10 ms default sampled host RSS and NVML allocation of the same solver process; independent monitor process avoids delays from native calls holding the solver interpreter lock; all solver libraries and allocator caches included; monitor memory excluded; fresh worker process per sequence; sampling interval and maximum gap reported",
+        "failures": "retain every declared sequence and target, inner cap, outer cap, cycle, exception, timeout and memory error; clear warm-start and recycling history after a failed target; report accepted timings separately",
+        "mask_encoding": "zlib: followed by base64 of zlib-compressed, little-endian packed Boolean bits"
+      }
+    },
+    {
+      "identifier": "P8",
+      "study": "tensor-construction-pilot-v2",
+      "rows": [
+        {
+          "problem": "transient",
+          "n": 8,
+          "slabs": 8,
+          "targets": 4,
+          "reference_rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "construction": "tensor",
+          "method": "reference",
+          "warm_start": "outer_inner",
+          "declared_sequences": 3,
+          "recorded_sequences": 3,
+          "accepted_sequences": 3,
+          "numerically_completed_sequences": 3,
+          "failure_statuses": {},
+          "failed_target_statuses": {},
+          "median_seconds": 1.1647568847984076,
+          "minimum_seconds": 1.1013118457049131,
+          "maximum_seconds": 1.2165001779794693,
+          "median_preparation_inclusive_seconds": 10.238808418624103,
+          "median_inner_iterations": 2352.0,
+          "median_outer_iterations": 24.0,
+          "deployed_rank_min": 100,
+          "deployed_rank_max": 100,
+          "fallbacks": 0,
+          "maximum_original_residual": 9.920544025790078e-11,
+          "verified_memory_sequences": 3,
+          "peak_host_rss_bytes": 1391607808,
+          "peak_gpu_process_bytes": 1075838976,
+          "maximum_memory_sampling_gap_seconds": 0.10868150182068348,
+          "median_components_seconds": {
+            "assembly": 0.011842156760394573,
+            "reference_construction": 0.0034388555213809013,
+            "solver_resources": 4.126597195863724e-05,
+            "cleanup": 7.480010390281677e-05,
+            "kernel_conversion": 0.0718369847163558,
+            "kernel_resource_creation": 0.0,
+            "kernel_handle_creation": 0.0,
+            "kernel_upload": 0.013417963869869709,
+            "kernel_basis_processing": 0.19716356322169304,
+            "kernel_coarse_or_hierarchy_setup": 0.025667020119726658,
+            "kernel_initialization": 0.007202138192951679,
+            "kernel_iteration": 0.6630394728854299,
+            "kernel_download": 0.0011631324887275696,
+            "kernel_verification": 0.005763006396591663,
+            "kernel_cleanup": 0.006402433849871159,
+            "kernel_synchronization": 0.004893729463219643,
+            "kernel_host_bookkeeping": 0.0006474293768405914,
+            "target_construction": 0.0028300192207098007,
+            "reference_and_recycling_transfer": 0.08664378896355629,
+            "outer_preparation": 0.0015291664749383926,
+            "outer_restriction": 0.035503883846104145,
+            "outer_inner_verification": 0.004570451565086842,
+            "outer_kkt_and_update": 0.011959281750023365,
+            "remaining_host_work": 0.012116664089262486
+          }
+        }
+      ],
+      "protocol": {
+        "protocol": "full-reference-cht-study-v1",
+        "controls": {
+          "phase": "pilot",
+          "device": "cuda",
+          "problem": "transient",
+          "n": 8,
+          "slabs": 8,
+          "horizon": 0.1,
+          "solid_capacity": 2.0,
+          "fluid_capacity": 1.0,
+          "initial_temperature": 0.0,
+          "reference_construction": "tensor",
+          "reference_capacity": 1.0,
+          "targets": 4,
+          "rank": 100,
+          "recycle_rank": 100,
+          "window": 100,
+          "repeats": 3,
+          "methods": [
+            "reference"
+          ],
+          "warm_starts": [
+            "outer_inner"
+          ],
+          "rtol": 1e-10,
+          "amgx_factor": 0.1,
+          "outer_tolerance": 1e-08,
+          "inner_cap": 10000,
+          "residual_refresh": 1000,
+          "outer_cap": 100,
+          "initial_active": "all",
+          "threads": 4,
+          "bound": 0.0011403058942594487,
+          "calibration_grid": 8,
+          "calibration_steps": 8,
+          "calibration_activity": 0.2,
+          "memory_interval": 0.01,
+          "sequence_timeout": 7200.0
+        },
+        "physics": {
+          "alpha": 0.001,
+          "conductivity_ratio": 100.0,
+          "transport_amplitude": 50.0
+        },
+        "targets": [
+          {
+            "index": 0,
+            "angle": 0.0,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3,
+                0.3,
+                0.265
+              ],
+              [
+                0.3,
+                0.7,
+                0.265
+              ],
+              [
+                0.7,
+                0.3,
+                0.6649999999999999
+              ],
+              [
+                0.7,
+                0.7,
+                0.6649999999999999
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8,
+              0.65,
+              0.45
+            ],
+            "theta": 0.0
+          },
+          {
+            "index": 1,
+            "angle": 0.39999999999999997,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.3936714696611531,
+                0.23790413273769284,
+                0.28833333333333333
+              ],
+              [
+                0.2379041327376929,
+                0.6063285303388468,
+                0.28833333333333333
+              ],
+              [
+                0.762095867262307,
+                0.3936714696611531,
+                0.6883333333333332
+              ],
+              [
+                0.6063285303388469,
+                0.762095867262307,
+                0.6883333333333332
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.8500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 0.3333333333333333
+          },
+          {
+            "index": 2,
+            "angle": 0.7999999999999999,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.5041298763104715,
+                0.21718743995066236,
+                0.31166666666666665
+              ],
+              [
+                0.21718743995066236,
+                0.49587012368952854,
+                0.31166666666666665
+              ],
+              [
+                0.7828125600493376,
+                0.5041298763104713,
+                0.7116666666666667
+              ],
+              [
+                0.49587012368952854,
+                0.7828125600493376,
+                0.7116666666666667
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9,
+              0.65,
+              0.45
+            ],
+            "theta": 0.6666666666666666
+          },
+          {
+            "index": 3,
+            "angle": 1.2,
+            "sigma": 0.12,
+            "centers": [
+              [
+                0.6139362662981105,
+                0.24112063191122002,
+                0.33499999999999996
+              ],
+              [
+                0.24112063191122007,
+                0.38606373370188946,
+                0.33499999999999996
+              ],
+              [
+                0.75887936808878,
+                0.6139362662981105,
+                0.735
+              ],
+              [
+                0.3860637337018895,
+                0.75887936808878,
+                0.735
+              ]
+            ],
+            "weights": [
+              1.0,
+              0.9500000000000001,
+              0.65,
+              0.45
+            ],
+            "theta": 1.0
+          }
+        ],
+        "reference_policy": "one full-domain analytical Laplacian space per sequence; restrict at every inner solve",
+        "transient_convention": "one complete trajectory per query; backward Euler with capacity=solid_capacity below x3=1/2 and fluid_capacity above; right-endpoint time weights in both objective terms; common cell-volume times mean-step factor removed from reduced equations; initial temperature prescribed; bound imposed at all positive time levels",
+        "space_time_reference": "mode_dependent uses the temporal eigensystem for each spatial Laplacian eigenvalue; tensor uses one pure-time eigensystem; order candidate products by reference eigenvalue or Rayleigh value and retain the declared total rank; store spatial and temporal factors before restriction",
+        "temporal_target": "existing unequal Gaussian weights and query-dependent centers, plus rotation 0.8*t/T, vertical motion 0.05*sin(2*pi*t/T), and amplitude 0.15+0.85*sin(pi*t/T)^2",
+        "recycling_policy": "empty initial history; retain deployed coarse vectors and the last window new directions from each accepted CG solve; normalize columns in Jacobi coordinates; QR/small-factor SVD rank threshold 1e-12; retain the lowest scaled Ritz vectors; transfer by zero extension; coarse space fixed during a solve and residual restarts; clear history after a failed target",
+        "coarse_condition_limit": 10000000000.0,
+        "rank_threshold": 1e-12,
+        "residual_refresh": 1000,
+        "stopping": "same independent original relative residual and outer KKT limits; AmgX native absolute target is amgx_factor*rtol*||b||; CG triggers fresh verification at rtol",
+        "amgx_configuration": {
+          "config_version": 2,
+          "determinism_flag": 1,
+          "solver": {
+            "scope": "main",
+            "solver": "PCG",
+            "preconditioner": {
+              "scope": "amg",
+              "solver": "AMG",
+              "algorithm": "CLASSICAL",
+              "selector": "PMIS",
+              "interpolator": "D2",
+              "smoother": {
+                "solver": "MULTICOLOR_GS",
+                "relaxation_factor": 1.0,
+                "symmetric_GS": 1
+              },
+              "presweeps": 1,
+              "postsweeps": 1,
+              "cycle": "V",
+              "max_iters": 1,
+              "max_levels": 25,
+              "coarse_solver": "DENSE_LU_SOLVER"
+            },
+            "tolerance": 1.0000000000000001e-11,
+            "max_iters": 10000,
+            "norm": "L2",
+            "convergence": "ABSOLUTE",
+            "monitor_residual": 1,
+            "obtain_timings": 1,
+            "print_solve_stats": 0
+          }
+        },
+        "resources": "AmgX base Config/Resources persist per sequence; each inner solve rebuilds matrix, vectors, solver and hierarchy",
+        "warm_starts": "outer_inner passes the previous accepted target's active set and state; every accepted inner solve updates the full state; without accepted outer history use the declared initial_active policy; cold uses that same initial active set and zero inner guesses for each query; each repetition starts without history",
+        "timing": "fresh process for every method/repetition/start policy; one complete sequence includes assembly, reference or resource setup, all targets and PDAS inner solves, transfers, recycling updates, verification and cleanup; all-method small warmup and process initialization are separate",
+        "memory": "10 ms default sampled host RSS and NVML allocation of the same solver process; independent monitor process avoids delays from native calls holding the solver interpreter lock; all solver libraries and allocator caches included; monitor memory excluded; fresh worker process per sequence; sampling interval and maximum gap reported",
+        "failures": "retain every declared sequence and target, inner cap, outer cap, cycle, exception, timeout and memory error; clear warm-start and recycling history after a failed target; report accepted timings separately",
+        "mask_encoding": "zlib: followed by base64 of zlib-compressed, little-endian packed Boolean bits"
+      }
+    }
+  ],
+  "finer_transformer_attempts": [
+    {
+      "study": "Steady",
+      "method": "jacobi",
+      "accepted_targets": 4,
+      "declared_targets": 4,
+      "complete_success": true,
+      "attempt_seconds": 41.20892943907529,
+      "failure_statuses": []
+    },
+    {
+      "study": "Steady",
+      "method": "reference",
+      "accepted_targets": 1,
+      "declared_targets": 4,
+      "complete_success": false,
+      "attempt_seconds": 41.8893325375393,
+      "failure_statuses": [
+        "breakdown"
+      ]
+    },
+    {
+      "study": "Steady",
+      "method": "recycling",
+      "accepted_targets": 4,
+      "declared_targets": 4,
+      "complete_success": true,
+      "attempt_seconds": 65.36832877155393,
+      "failure_statuses": []
+    },
+    {
+      "study": "Steady",
+      "method": "amgx",
+      "accepted_targets": 4,
+      "declared_targets": 4,
+      "complete_success": true,
+      "attempt_seconds": 24.10563584882766,
+      "failure_statuses": []
+    },
+    {
+      "study": "Transient",
+      "method": "jacobi",
+      "accepted_targets": 3,
+      "declared_targets": 4,
+      "complete_success": false,
+      "attempt_seconds": 94.13286612555385,
+      "failure_statuses": [
+        "maxiter"
+      ]
+    },
+    {
+      "study": "Transient",
+      "method": "reference",
+      "accepted_targets": 0,
+      "declared_targets": 4,
+      "complete_success": false,
+      "attempt_seconds": 154.29984839819372,
+      "failure_statuses": [
+        "breakdown",
+        "maxiter"
+      ]
+    },
+    {
+      "study": "Transient",
+      "method": "recycling",
+      "accepted_targets": 4,
+      "declared_targets": 4,
+      "complete_success": true,
+      "attempt_seconds": 142.40474981535226,
+      "failure_statuses": []
+    },
+    {
+      "study": "Transient",
+      "method": "amgx",
+      "accepted_targets": 3,
+      "declared_targets": 4,
+      "complete_success": false,
+      "attempt_seconds": 129.6806774009019,
+      "failure_statuses": [
+        "residual_failed"
+      ]
+    }
+  ]
+}

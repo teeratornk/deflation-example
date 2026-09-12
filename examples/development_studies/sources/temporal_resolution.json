@@ -1,0 +1,1193 @@
+{
+  "evidence_url": "https://github.com/teeratornk/deflation-example/tree/prescribed-temporal-data-v1/examples/temporal_resolution",
+  "sources": {
+    "original": "91f05ae68f0a58a2b1627bc744b9c97c6ca05bc5",
+    "corrected": "e4c11c8b7051e41e958bbb4cffc2e110191d9b81"
+  },
+  "original_rows": [
+    {
+      "query": 7,
+      "slabs": 4,
+      "status": "verified",
+      "verified": true,
+      "objective": 1.9312910622740328e-07,
+      "active_fraction": 0.001638965835641736,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.957561627341744e-12,
+      "kkt": {
+        "stationarity": 9.397609974628828e-11,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 9.397609974628828e-11
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 3.199211924482392e-12,
+        "temperature_change_max_K": 1.778741979693116e+152,
+        "temperature_change_rms_K": 1.8492232478348857e+149,
+        "maximum_bound_violation_K": 6.16348614310363e+84,
+        "maximum_bound_violation_time_fraction": 1.0,
+        "maximum_bound_violation_coordinates": [
+          0.572,
+          2.49611
+        ],
+        "peak_temperature_change_K": -1.7752187781921945e+152,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds."
+      }
+    },
+    {
+      "query": 7,
+      "slabs": 8,
+      "status": "verified",
+      "verified": true,
+      "objective": 1.920201871154114e-07,
+      "active_fraction": 0.0021352723915050785,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.935763687351255e-12,
+      "kkt": {
+        "stationarity": 1.21597697353699e-10,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 1.21597697353699e-10
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 3.32951126294316e-12,
+        "temperature_change_max_K": 8.565617719860837e+151,
+        "temperature_change_rms_K": 8.905023663053081e+148,
+        "maximum_bound_violation_K": 2.9680564538160094e+84,
+        "maximum_bound_violation_time_fraction": 1.0,
+        "maximum_bound_violation_coordinates": [
+          0.572,
+          2.49611
+        ],
+        "peak_temperature_change_K": -8.548651573251894e+151,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds."
+      }
+    },
+    {
+      "query": 7,
+      "slabs": 16,
+      "status": "verified",
+      "verified": true,
+      "objective": 1.9187695181988543e-07,
+      "active_fraction": 0.0021929824561403508,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.954672065765477e-12,
+      "kkt": {
+        "stationarity": 9.161502682890341e-11,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 9.161502682890341e-11
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 3.1093792438786435e-12,
+        "temperature_change_max_K": 5.349201328199836e+151,
+        "temperature_change_rms_K": 5.561159272331892e+148,
+        "maximum_bound_violation_K": 1.8535479539081371e+84,
+        "maximum_bound_violation_time_fraction": 1.0,
+        "maximum_bound_violation_coordinates": [
+          0.572,
+          2.49611
+        ],
+        "peak_temperature_change_K": -5.338606022999068e+151,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds."
+      }
+    },
+    {
+      "query": 7,
+      "slabs": 32,
+      "status": "converged",
+      "verified": false,
+      "objective": 1.918977061761621e-07,
+      "active_fraction": 0.002161241920590951,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.93775629761896e-12,
+      "kkt": {
+        "stationarity": 1.2632546953295113e-10,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 1.2632546953295113e-10
+      }
+    },
+    {
+      "query": 7,
+      "slabs": 64,
+      "status": "converged",
+      "verified": false,
+      "objective": 1.9204855986467147e-07,
+      "active_fraction": 0.0021439289012003693,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.992689789145981e-12,
+      "kkt": {
+        "stationarity": 2.393048096851788e-10,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 2.393048096851788e-10
+      }
+    },
+    {
+      "query": 15,
+      "slabs": 4,
+      "status": "verified",
+      "verified": true,
+      "objective": 2.2883555714091492e-07,
+      "active_fraction": 0.002100646352723915,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.997386406334948e-12,
+      "kkt": {
+        "stationarity": 3.028300704783045e-11,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 3.028300704783045e-11
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 3.156264965208628e-12,
+        "temperature_change_max_K": 2.0733095030797674e+152,
+        "temperature_change_rms_K": 2.155462780337354e+149,
+        "maximum_bound_violation_K": 7.184186654661199e+84,
+        "maximum_bound_violation_time_fraction": 1.0,
+        "maximum_bound_violation_coordinates": [
+          0.572,
+          2.49611
+        ],
+        "peak_temperature_change_K": -2.0692028438585184e+152,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds."
+      }
+    },
+    {
+      "query": 15,
+      "slabs": 8,
+      "status": "verified",
+      "verified": true,
+      "objective": 2.27633415855249e-07,
+      "active_fraction": 0.002493074792243767,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.844050240730455e-12,
+      "kkt": {
+        "stationarity": 7.224151157844771e-11,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 7.224151157844771e-11
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 3.5268247439322142e-12,
+        "temperature_change_max_K": 9.275092427105187e+151,
+        "temperature_change_rms_K": 9.642610754022552e+148,
+        "maximum_bound_violation_K": 3.2138952307311456e+84,
+        "maximum_bound_violation_time_fraction": 1.0,
+        "maximum_bound_violation_coordinates": [
+          0.572,
+          2.49611
+        ],
+        "peak_temperature_change_K": -9.256721005092645e+151,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds."
+      }
+    },
+    {
+      "query": 15,
+      "slabs": 16,
+      "status": "verified",
+      "verified": true,
+      "objective": 2.2745011819570351e-07,
+      "active_fraction": 0.00265466297322253,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.941559371616324e-12,
+      "kkt": {
+        "stationarity": 1.2818366790075455e-10,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 1.2818366790075455e-10
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 3.3334692879891133e-12,
+        "temperature_change_max_K": 6.054142374476564e+151,
+        "temperature_change_rms_K": 6.294033059542374e+148,
+        "maximum_bound_violation_K": 2.0978159250656766e+84,
+        "maximum_bound_violation_time_fraction": 1.0,
+        "maximum_bound_violation_coordinates": [
+          0.572,
+          2.49611
+        ],
+        "peak_temperature_change_K": -6.042150773814925e+151,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds."
+      }
+    },
+    {
+      "query": 15,
+      "slabs": 32,
+      "status": "converged",
+      "verified": false,
+      "objective": 2.2747407363676863e-07,
+      "active_fraction": 0.002692174515235457,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.917674217745738e-12,
+      "kkt": {
+        "stationarity": 1.8241421756986028e-10,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 1.8241421756986028e-10
+      }
+    },
+    {
+      "query": 15,
+      "slabs": 64,
+      "status": "converged",
+      "verified": false,
+      "objective": 2.2764139057697828e-07,
+      "active_fraction": 0.0026604339796860573,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.996758223002499e-12,
+      "kkt": {
+        "stationarity": 4.155357417966607e-10,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 4.155357417966607e-10
+      }
+    }
+  ],
+  "corrected_rows": [
+    {
+      "query": 7,
+      "slabs": 4,
+      "status": "verified",
+      "verified": true,
+      "objective": 1.9382805699013313e-07,
+      "active_fraction": 0.001638965835641736,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.973095139710974e-12,
+      "kkt": {
+        "stationarity": 9.696240241516056e-11,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 9.696240241516056e-11
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 5.231514191236915e-14,
+        "temperature_change_max_K": 0.5687530644808925,
+        "temperature_change_rms_K": 0.03757135674088765,
+        "maximum_bound_violation_K": 2.9216181646411,
+        "maximum_bound_violation_time_fraction": 0.25,
+        "maximum_bound_violation_coordinates": [
+          0.5999162,
+          1.692535
+        ],
+        "peak_temperature_change_K": 0.09153466308247094,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds.",
+        "temperature_change_within_scale": false
+      },
+      "temperature_rms_difference_K": 0.6679998084838032,
+      "temperature_max_difference_K": 5.768940188948455,
+      "control_relative_rms_difference": 0.3697794769697514,
+      "peak_temperature_difference_K": 0.0,
+      "objective_relative_difference": 0.005581557770271537
+    },
+    {
+      "query": 7,
+      "slabs": 8,
+      "status": "verified",
+      "verified": true,
+      "objective": 1.9272170283871e-07,
+      "active_fraction": 0.0021352723915050785,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.658410402945898e-12,
+      "kkt": {
+        "stationarity": 7.296417090375411e-11,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 7.296417090375411e-11
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 5.2666010903541966e-14,
+        "temperature_change_max_K": 0.37334671050158336,
+        "temperature_change_rms_K": 0.028669080313020817,
+        "maximum_bound_violation_K": 2.2498201768454917,
+        "maximum_bound_violation_time_fraction": 0.375,
+        "maximum_bound_violation_coordinates": [
+          0.5999162,
+          1.391755
+        ],
+        "peak_temperature_change_K": 0.08519513170532456,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds.",
+        "temperature_change_within_scale": false
+      },
+      "temperature_rms_difference_K": 0.4521744607730337,
+      "temperature_max_difference_K": 5.470482610824958,
+      "control_relative_rms_difference": 0.2005522041160726,
+      "peak_temperature_difference_K": 0.0,
+      "objective_relative_difference": 0.00015821668916240274
+    },
+    {
+      "query": 7,
+      "slabs": 16,
+      "status": "verified",
+      "verified": true,
+      "objective": 1.9257967432534658e-07,
+      "active_fraction": 0.0021929824561403508,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.970256865982642e-12,
+      "kkt": {
+        "stationarity": 1.1267895505864896e-10,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 1.1267895505864896e-10
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 5.525246727758244e-14,
+        "temperature_change_max_K": 0.30069443726591105,
+        "temperature_change_rms_K": 0.021797651342053505,
+        "maximum_bound_violation_K": 1.3380564745970536,
+        "maximum_bound_violation_time_fraction": 0.3125,
+        "maximum_bound_violation_coordinates": [
+          0.5999162,
+          1.525435
+        ],
+        "peak_temperature_change_K": 0.10010648621415319,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds.",
+        "temperature_change_within_scale": false
+      },
+      "temperature_rms_difference_K": 0.28547968195335405,
+      "temperature_max_difference_K": 4.720554629312108,
+      "control_relative_rms_difference": 0.11778602913063907,
+      "peak_temperature_difference_K": 0.0,
+      "objective_relative_difference": 0.0008950617875119201
+    },
+    {
+      "query": 7,
+      "slabs": 32,
+      "status": "verified",
+      "verified": true,
+      "objective": 1.9260101861684942e-07,
+      "active_fraction": 0.002167012927054478,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.94653694303129e-12,
+      "kkt": {
+        "stationarity": 1.178209209629269e-10,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 1.178209209629269e-10
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 5.428255984006964e-14,
+        "temperature_change_max_K": 0.2834370664458141,
+        "temperature_change_rms_K": 0.019315230267530955,
+        "maximum_bound_violation_K": 0.6426303194591987,
+        "maximum_bound_violation_time_fraction": 0.3125,
+        "maximum_bound_violation_coordinates": [
+          0.5999162,
+          1.525435
+        ],
+        "peak_temperature_change_K": 0.09657801696018042,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds.",
+        "temperature_change_within_scale": false
+      },
+      "temperature_rms_difference_K": 0.14803408072266117,
+      "temperature_max_difference_K": 3.0943843566048024,
+      "control_relative_rms_difference": 0.07491994156371251,
+      "peak_temperature_difference_K": 0.0,
+      "objective_relative_difference": 0.0007843274272122438
+    },
+    {
+      "query": 7,
+      "slabs": 64,
+      "status": "verified",
+      "verified": true,
+      "objective": 1.927521994535363e-07,
+      "active_fraction": 0.0021439289012003693,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.992029282587423e-12,
+      "kkt": {
+        "stationarity": 4.355060879883199e-10,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 4.355060879883199e-10
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 5.463339865594675e-14,
+        "temperature_change_max_K": 0.3103259466446989,
+        "temperature_change_rms_K": 0.018048598885843217,
+        "maximum_bound_violation_K": 0.2781448650413676,
+        "maximum_bound_violation_time_fraction": 0.3125,
+        "maximum_bound_violation_coordinates": [
+          0.5999162,
+          1.525435
+        ],
+        "peak_temperature_change_K": 0.09436403955731087,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds.",
+        "temperature_change_within_scale": false
+      },
+      "temperature_rms_difference_K": 0.0,
+      "temperature_max_difference_K": 0.0,
+      "control_relative_rms_difference": 0.0,
+      "peak_temperature_difference_K": 0.0,
+      "objective_relative_difference": 0.0
+    },
+    {
+      "query": 15,
+      "slabs": 4,
+      "status": "verified",
+      "verified": true,
+      "objective": 2.2849365993117462e-07,
+      "active_fraction": 0.002100646352723915,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.891980209156673e-12,
+      "kkt": {
+        "stationarity": 8.50097149273067e-11,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 8.50097149273067e-11
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 5.222014472997461e-14,
+        "temperature_change_max_K": 0.5685392549950385,
+        "temperature_change_rms_K": 0.04161905900843827,
+        "maximum_bound_violation_K": 4.834756365743278,
+        "maximum_bound_violation_time_fraction": 0.25,
+        "maximum_bound_violation_coordinates": [
+          0.6681982,
+          1.525435
+        ],
+        "peak_temperature_change_K": 0.10344783960640314,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds.",
+        "temperature_change_within_scale": false
+      },
+      "temperature_rms_difference_K": 0.6879927408600849,
+      "temperature_max_difference_K": 6.1716710536259285,
+      "control_relative_rms_difference": 0.37293516127977216,
+      "peak_temperature_difference_K": 0.0,
+      "objective_relative_difference": 0.0052888297071963805
+    },
+    {
+      "query": 15,
+      "slabs": 8,
+      "status": "verified",
+      "verified": true,
+      "objective": 2.2728644291478505e-07,
+      "active_fraction": 0.002504616805170822,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.997392326707129e-12,
+      "kkt": {
+        "stationarity": 8.422510855698158e-11,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 8.422510855698158e-11
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 5.116792078266795e-14,
+        "temperature_change_max_K": 0.32674141388698064,
+        "temperature_change_rms_K": 0.03164970016667648,
+        "maximum_bound_violation_K": 2.870156745349821,
+        "maximum_bound_violation_time_fraction": 0.25,
+        "maximum_bound_violation_coordinates": [
+          0.6681982,
+          1.525435
+        ],
+        "peak_temperature_change_K": 0.11768790611141666,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds.",
+        "temperature_change_within_scale": false
+      },
+      "temperature_rms_difference_K": 0.4651526584922972,
+      "temperature_max_difference_K": 5.862432306561477,
+      "control_relative_rms_difference": 0.2013154473105378,
+      "peak_temperature_difference_K": 0.0,
+      "objective_relative_difference": 2.2485197446650747e-05
+    },
+    {
+      "query": 15,
+      "slabs": 16,
+      "status": "verified",
+      "verified": true,
+      "objective": 2.2710132707110324e-07,
+      "active_fraction": 0.0026719759926131115,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.961291937426384e-12,
+      "kkt": {
+        "stationarity": 1.2821146671385012e-10,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 1.2821146671385012e-10
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 5.131687101542662e-14,
+        "temperature_change_max_K": 0.26917093311066675,
+        "temperature_change_rms_K": 0.025256107961069866,
+        "maximum_bound_violation_K": 1.481816034449821,
+        "maximum_bound_violation_time_fraction": 0.25,
+        "maximum_bound_violation_coordinates": [
+          0.6681982,
+          1.525435
+        ],
+        "peak_temperature_change_K": 0.11315799753150335,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds.",
+        "temperature_change_within_scale": false
+      },
+      "temperature_rms_difference_K": 0.2941049320533873,
+      "temperature_max_difference_K": 5.0651997639026085,
+      "control_relative_rms_difference": 0.11664133215314569,
+      "peak_temperature_difference_K": 0.0,
+      "objective_relative_difference": 0.0008369274446022317
+    },
+    {
+      "query": 15,
+      "slabs": 32,
+      "status": "verified",
+      "verified": true,
+      "objective": 2.2712461997537536e-07,
+      "active_fraction": 0.002695060018467221,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.906319337719548e-12,
+      "kkt": {
+        "stationarity": 1.5719443507030563e-10,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 1.5719443507030563e-10
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 5.2445850775696675e-14,
+        "temperature_change_max_K": 0.28353766536872993,
+        "temperature_change_rms_K": 0.022544625750459284,
+        "maximum_bound_violation_K": 0.6974034169707344,
+        "maximum_bound_violation_time_fraction": 0.25,
+        "maximum_bound_violation_coordinates": [
+          0.6681982,
+          1.509125
+        ],
+        "peak_temperature_change_K": 0.10584198612182405,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds.",
+        "temperature_change_within_scale": false
+      },
+      "temperature_rms_difference_K": 0.1524744684469968,
+      "temperature_max_difference_K": 3.321932839189597,
+      "control_relative_rms_difference": 0.07321401794365777,
+      "peak_temperature_difference_K": 0.0,
+      "objective_relative_difference": 0.000734447154850386
+    },
+    {
+      "query": 15,
+      "slabs": 64,
+      "status": "verified",
+      "verified": true,
+      "objective": 2.2729155361024593e-07,
+      "active_fraction": 0.0026719759926131115,
+      "state_maximum": 0.8,
+      "maximum_bound_violation": 0.0,
+      "maximum_original_residual": 9.990426360846669e-12,
+      "kkt": {
+        "stationarity": 1.1980152133856614e-10,
+        "primal": 0.0,
+        "dual": 0.0,
+        "complementarity": 0.0,
+        "projected_gradient": 1.1980152133856614e-10
+      },
+      "replay": {
+        "slabs": [
+          128,
+          256
+        ],
+        "maximum_original_residual": 5.097019199234125e-14,
+        "temperature_change_max_K": 0.3104491385890465,
+        "temperature_change_rms_K": 0.02116164030699022,
+        "maximum_bound_violation_K": 0.3052713660157269,
+        "maximum_bound_violation_time_fraction": 0.265625,
+        "maximum_bound_violation_coordinates": [
+          0.6681982,
+          1.625695
+        ],
+        "peak_temperature_change_K": 0.10368169351237855,
+        "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
+        "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds.",
+        "temperature_change_within_scale": false
+      },
+      "temperature_rms_difference_K": 0.0,
+      "temperature_max_difference_K": 0.0,
+      "control_relative_rms_difference": 0.0,
+      "peak_temperature_difference_K": 0.0,
+      "objective_relative_difference": 0.0
+    }
+  ],
+  "replays": [
+    {
+      "case": 0,
+      "optimization_case": {
+        "query": 7,
+        "slabs": 4
+      },
+      "status": "within_temperature_change_scale",
+      "rows": [
+        {
+          "slabs": 16384,
+          "maximum_original_residual": 6.879251998876605e-16,
+          "status": "verified",
+          "maximum_bound_violation_K": 3.012300610227532,
+          "maximum_temperature_rise_K": 19.012300610227534,
+          "maximum_bound_violation_time_seconds": 150.0,
+          "maximum_bound_violation_coordinates": [
+            0.5999162,
+            1.692535
+          ],
+          "temperature_change_within_scale": false
+        },
+        {
+          "slabs": 32768,
+          "maximum_original_residual": 4.3170907866175105e-16,
+          "status": "verified",
+          "maximum_bound_violation_K": 3.0130223328575245,
+          "maximum_temperature_rise_K": 19.013022332857524,
+          "maximum_bound_violation_time_seconds": 150.0,
+          "maximum_bound_violation_coordinates": [
+            0.5999162,
+            1.692535
+          ],
+          "temperature_change_max_K": 0.0342681041793122,
+          "temperature_change_rms_K": 0.00047970304563527626,
+          "temperature_change_within_scale": true
+        },
+        {
+          "slabs": 65536,
+          "maximum_original_residual": 3.325432175966428e-16,
+          "status": "verified",
+          "maximum_bound_violation_K": 3.0133832051697995,
+          "maximum_temperature_rise_K": 19.013383205169802,
+          "maximum_bound_violation_time_seconds": 150.0,
+          "maximum_bound_violation_coordinates": [
+            0.5999162,
+            1.692535
+          ],
+          "temperature_change_max_K": 0.018672387132802892,
+          "temperature_change_rms_K": 0.00024358400629718814,
+          "temperature_change_within_scale": true
+        }
+      ],
+      "fields_sha256": "9c893d1ddb62c03d8d9be9580faac08c849d5b13b4a1b7121cc22014e4c982f6"
+    },
+    {
+      "case": 4,
+      "optimization_case": {
+        "query": 7,
+        "slabs": 64
+      },
+      "status": "within_temperature_change_scale",
+      "rows": [
+        {
+          "slabs": 16384,
+          "maximum_original_residual": 6.38770664080353e-16,
+          "status": "verified",
+          "maximum_bound_violation_K": 0.37274342330961385,
+          "maximum_temperature_rise_K": 16.372743423309615,
+          "maximum_bound_violation_time_seconds": 187.5,
+          "maximum_bound_violation_coordinates": [
+            0.5999162,
+            1.525435
+          ],
+          "temperature_change_within_scale": false
+        },
+        {
+          "slabs": 32768,
+          "maximum_original_residual": 4.0972417939227794e-16,
+          "status": "verified",
+          "maximum_bound_violation_K": 0.37350133523333273,
+          "maximum_temperature_rise_K": 16.373501335233335,
+          "maximum_bound_violation_time_seconds": 187.5,
+          "maximum_bound_violation_coordinates": [
+            0.5999162,
+            1.525435
+          ],
+          "temperature_change_max_K": 0.013812013983107597,
+          "temperature_change_rms_K": 0.00022899390119628926,
+          "temperature_change_within_scale": true
+        },
+        {
+          "slabs": 65536,
+          "maximum_original_residual": 3.166628156719923e-16,
+          "status": "verified",
+          "maximum_bound_violation_K": 0.373880335007426,
+          "maximum_temperature_rise_K": 16.373880335007428,
+          "maximum_bound_violation_time_seconds": 187.5,
+          "maximum_bound_violation_coordinates": [
+            0.5999162,
+            1.525435
+          ],
+          "temperature_change_max_K": 0.007514468614179311,
+          "temperature_change_rms_K": 0.00011587186173891447,
+          "temperature_change_within_scale": true
+        }
+      ],
+      "fields_sha256": "614c22e234d06d37e3fa17a4e058773d03b35a13283c22dc3b74fa132b456b51"
+    },
+    {
+      "case": 5,
+      "optimization_case": {
+        "query": 15,
+        "slabs": 4
+      },
+      "status": "within_temperature_change_scale",
+      "rows": [
+        {
+          "slabs": 16384,
+          "maximum_original_residual": 6.427486279772274e-16,
+          "status": "verified",
+          "maximum_bound_violation_K": 4.937305783949633,
+          "maximum_temperature_rise_K": 20.937305783949633,
+          "maximum_bound_violation_time_seconds": 150.0,
+          "maximum_bound_violation_coordinates": [
+            0.6681982,
+            1.525435
+          ],
+          "temperature_change_within_scale": false
+        },
+        {
+          "slabs": 32768,
+          "maximum_original_residual": 4.377185878688925e-16,
+          "status": "verified",
+          "maximum_bound_violation_K": 4.938122235025131,
+          "maximum_temperature_rise_K": 20.938122235025133,
+          "maximum_bound_violation_time_seconds": 150.0,
+          "maximum_bound_violation_coordinates": [
+            0.6681982,
+            1.525435
+          ],
+          "temperature_change_max_K": 0.026423578164170708,
+          "temperature_change_rms_K": 0.0005129681857468848,
+          "temperature_change_within_scale": true
+        },
+        {
+          "slabs": 65536,
+          "maximum_original_residual": 3.3805794224946354e-16,
+          "status": "verified",
+          "maximum_bound_violation_K": 4.938530474783702,
+          "maximum_temperature_rise_K": 20.938530474783704,
+          "maximum_bound_violation_time_seconds": 150.0,
+          "maximum_bound_violation_coordinates": [
+            0.6681982,
+            1.525435
+          ],
+          "temperature_change_max_K": 0.013783145971316968,
+          "temperature_change_rms_K": 0.0002592355157761227,
+          "temperature_change_within_scale": true
+        }
+      ],
+      "fields_sha256": "09931f7041be7a7b1ce728597bf5bbb75224aa1acada1e21e0042ee2f60ef7e1"
+    },
+    {
+      "case": 9,
+      "optimization_case": {
+        "query": 15,
+        "slabs": 64
+      },
+      "status": "within_temperature_change_scale",
+      "rows": [
+        {
+          "slabs": 16384,
+          "maximum_original_residual": 6.397394683435443e-16,
+          "status": "verified",
+          "maximum_bound_violation_K": 0.40929735452124083,
+          "maximum_temperature_rise_K": 16.409297354521243,
+          "maximum_bound_violation_time_seconds": 159.375,
+          "maximum_bound_violation_coordinates": [
+            0.6681982,
+            1.625695
+          ],
+          "temperature_change_within_scale": false
+        },
+        {
+          "slabs": 32768,
+          "maximum_original_residual": 3.931703685471372e-16,
+          "status": "verified",
+          "maximum_bound_violation_K": 0.4101311714236222,
+          "maximum_temperature_rise_K": 16.41013117142362,
+          "maximum_bound_violation_time_seconds": 159.375,
+          "maximum_bound_violation_coordinates": [
+            0.6681982,
+            1.625695
+          ],
+          "temperature_change_max_K": 0.010912505473197887,
+          "temperature_change_rms_K": 0.00024587089692295494,
+          "temperature_change_within_scale": true
+        },
+        {
+          "slabs": 65536,
+          "maximum_original_residual": 3.071736010244217e-16,
+          "status": "verified",
+          "maximum_bound_violation_K": 0.4105481310891368,
+          "maximum_temperature_rise_K": 16.410548131089136,
+          "maximum_bound_violation_time_seconds": 159.375,
+          "maximum_bound_violation_coordinates": [
+            0.6681982,
+            1.625695
+          ],
+          "temperature_change_max_K": 0.00569840990764639,
+          "temperature_change_rms_K": 0.00012400933914374036,
+          "temperature_change_within_scale": true
+        }
+      ],
+      "fields_sha256": "17881c078b7e7ec6f7633b7e692c36b2ee6f8e0744a7b441760de3f62fc99cd0"
+    }
+  ],
+  "stability_rows": [
+    {
+      "transport_form": "advective",
+      "slabs": 4,
+      "time_step_seconds": 150.0,
+      "largest_computed_amplification_modulus": 0.3788654854375073,
+      "amplification_real": 0.37886548524635977,
+      "amplification_imaginary": 1.2034882408544036e-05,
+      "spatial_eigenvalue_real_per_second": 0.010929728147721371,
+      "spatial_eigenvalue_imaginary_per_second": -5.589597116975934e-07,
+      "relative_eigenpair_residual": 2.098027461752799e-06,
+      "modal_energy_per_second": {
+        "diffusion": 0.015820563633329544,
+        "transport": -0.056697880576325355,
+        "stabilization": 0.051807045090880494
+      },
+      "energy_identity_absolute_error": 1.6331207219888455e-13,
+      "status": "eigenpair_residual_failed"
+    },
+    {
+      "transport_form": "advective",
+      "slabs": 8,
+      "time_step_seconds": 75.0,
+      "largest_computed_amplification_modulus": 0.5495838091523072,
+      "amplification_real": 0.5495838091523072,
+      "amplification_imaginary": 0.0,
+      "spatial_eigenvalue_real_per_second": 0.010927449301255237,
+      "spatial_eigenvalue_imaginary_per_second": 0.0,
+      "relative_eigenpair_residual": 1.6945699365893354e-09,
+      "modal_energy_per_second": {
+        "diffusion": 0.015812928494873167,
+        "transport": -0.05666443601795073,
+        "stabilization": 0.05177895682433172
+      },
+      "energy_identity_absolute_error": 1.0772632785815972e-15,
+      "status": "eigenpair_verified"
+    },
+    {
+      "transport_form": "advective",
+      "slabs": 16,
+      "time_step_seconds": 37.5,
+      "largest_computed_amplification_modulus": 0.7093039223986889,
+      "amplification_real": 0.7093039208192831,
+      "amplification_imaginary": 4.733452744008082e-05,
+      "spatial_eigenvalue_real_per_second": 0.010928877027929064,
+      "spatial_eigenvalue_imaginary_per_second": -2.5088925105349847e-06,
+      "relative_eigenpair_residual": 4.124716235243047e-09,
+      "modal_energy_per_second": {
+        "diffusion": 0.01581766215783967,
+        "transport": -0.05668513427464963,
+        "stabilization": 0.0517963491447525
+      },
+      "energy_identity_absolute_error": 1.3480536131815768e-14,
+      "status": "eigenpair_verified"
+    },
+    {
+      "transport_form": "advective",
+      "slabs": 32,
+      "time_step_seconds": 18.75,
+      "largest_computed_amplification_modulus": 4.07616548868851,
+      "amplification_real": -4.07616548868851,
+      "amplification_imaginary": 0.0,
+      "spatial_eigenvalue_real_per_second": -0.0664175256904236,
+      "spatial_eigenvalue_imaginary_per_second": 0.0,
+      "relative_eigenpair_residual": 3.3110805042526536e-14,
+      "modal_energy_per_second": {
+        "diffusion": 0.000845886226379569,
+        "transport": -0.2364864476900657,
+        "stabilization": 0.16922303577326192
+      },
+      "energy_identity_absolute_error": 5.967448757360216e-16,
+      "status": "eigenpair_verified"
+    },
+    {
+      "transport_form": "advective",
+      "slabs": 64,
+      "time_step_seconds": 9.375,
+      "largest_computed_amplification_modulus": 2.6501600799288547,
+      "amplification_real": 2.6501600799288547,
+      "amplification_imaginary": 0.0,
+      "spatial_eigenvalue_real_per_second": -0.06641752569042413,
+      "spatial_eigenvalue_imaginary_per_second": 0.0,
+      "relative_eigenpair_residual": 2.7786249259359752e-14,
+      "modal_energy_per_second": {
+        "diffusion": 0.0008458862263795707,
+        "transport": -0.23648644769006588,
+        "stabilization": 0.16922303577326214
+      },
+      "energy_identity_absolute_error": 4.163336342344337e-17,
+      "status": "eigenpair_verified"
+    },
+    {
+      "transport_form": "advective",
+      "slabs": 128,
+      "time_step_seconds": 4.6875,
+      "largest_computed_amplification_modulus": 15.396341745844598,
+      "amplification_real": -15.396341745844598,
+      "amplification_imaginary": 0.0,
+      "spatial_eigenvalue_real_per_second": -0.22718943868971847,
+      "spatial_eigenvalue_imaginary_per_second": 0.0,
+      "relative_eigenpair_residual": 3.597095469191174e-14,
+      "modal_energy_per_second": {
+        "diffusion": 0.024797020200974556,
+        "transport": -0.6009472866840568,
+        "stabilization": 0.3489608277933611
+      },
+      "energy_identity_absolute_error": 2.7478019859472624e-15,
+      "status": "eigenpair_verified"
+    },
+    {
+      "transport_form": "advective",
+      "slabs": 256,
+      "time_step_seconds": 2.34375,
+      "largest_computed_amplification_modulus": 2.138924181942137,
+      "amplification_real": 2.138924181942137,
+      "amplification_imaginary": 0.0,
+      "spatial_eigenvalue_real_per_second": -0.22718943868972427,
+      "spatial_eigenvalue_imaginary_per_second": 0.0,
+      "relative_eigenpair_residual": 2.2781296044165244e-14,
+      "modal_energy_per_second": {
+        "diffusion": 0.024797020200974573,
+        "transport": -0.6009472866840571,
+        "stabilization": 0.3489608277933622
+      },
+      "energy_identity_absolute_error": 3.969047313034935e-15,
+      "status": "eigenpair_verified"
+    },
+    {
+      "transport_form": "skew",
+      "slabs": 4,
+      "time_step_seconds": 150.0,
+      "largest_computed_amplification_modulus": 0.2870087637426993,
+      "amplification_real": 0.2870087637426993,
+      "amplification_imaginary": 0.0,
+      "spatial_eigenvalue_real_per_second": 0.016561427764077867,
+      "spatial_eigenvalue_imaginary_per_second": 0.0,
+      "relative_eigenpair_residual": 1.1775096027124527e-13,
+      "modal_energy_per_second": {
+        "diffusion": 0.0054792907276308795,
+        "transport": 0.009151572913286353,
+        "stabilization": 0.0019305641231605719
+      },
+      "energy_identity_absolute_error": 6.245004513516506e-17,
+      "status": "eigenpair_verified"
+    },
+    {
+      "transport_form": "skew",
+      "slabs": 8,
+      "time_step_seconds": 75.0,
+      "largest_computed_amplification_modulus": 0.44600902780511276,
+      "amplification_real": 0.44600902780511276,
+      "amplification_imaginary": 0.0,
+      "spatial_eigenvalue_real_per_second": 0.01656142776365379,
+      "spatial_eigenvalue_imaginary_per_second": 0.0,
+      "relative_eigenpair_residual": 1.6251790101814117e-13,
+      "modal_energy_per_second": {
+        "diffusion": 0.005479290727474583,
+        "transport": 0.009151572913110232,
+        "stabilization": 0.0019305641230691283
+      },
+      "energy_identity_absolute_error": 1.5265566588595902e-16,
+      "status": "eigenpair_verified"
+    },
+    {
+      "transport_form": "skew",
+      "slabs": 16,
+      "time_step_seconds": 37.5,
+      "largest_computed_amplification_modulus": 0.616882770751723,
+      "amplification_real": 0.616882770751723,
+      "amplification_imaginary": 0.0,
+      "spatial_eigenvalue_real_per_second": 0.016561427763934974,
+      "spatial_eigenvalue_imaginary_per_second": 0.0,
+      "relative_eigenpair_residual": 3.0673706386776004e-13,
+      "modal_energy_per_second": {
+        "diffusion": 0.005479290727578325,
+        "transport": 0.009151572913227015,
+        "stabilization": 0.0019305641231297987
+      },
+      "energy_identity_absolute_error": 1.6306400674181987e-16,
+      "status": "eigenpair_verified"
+    },
+    {
+      "transport_form": "skew",
+      "slabs": 32,
+      "time_step_seconds": 18.75,
+      "largest_computed_amplification_modulus": 0.7630519439388427,
+      "amplification_real": 0.7630519439388427,
+      "amplification_imaginary": 0.0,
+      "spatial_eigenvalue_real_per_second": 0.016561427773006124,
+      "spatial_eigenvalue_imaginary_per_second": 0.0,
+      "relative_eigenpair_residual": 2.9209275192317674e-13,
+      "modal_energy_per_second": {
+        "diffusion": 0.005479290730922309,
+        "transport": 0.00915157291699763,
+        "stabilization": 0.0019305641250868637
+      },
+      "energy_identity_absolute_error": 6.800116025829084e-16,
+      "status": "eigenpair_verified"
+    },
+    {
+      "transport_form": "skew",
+      "slabs": 64,
+      "time_step_seconds": 9.375,
+      "largest_computed_amplification_modulus": 0.86560347432714,
+      "amplification_real": 0.86560347432714,
+      "amplification_imaginary": 0.0,
+      "spatial_eigenvalue_real_per_second": 0.016561427755645942,
+      "spatial_eigenvalue_imaginary_per_second": 0.0,
+      "relative_eigenpair_residual": 4.3408441526430576e-13,
+      "modal_energy_per_second": {
+        "diffusion": 0.00547929072452262,
+        "transport": 0.009151572909781828,
+        "stabilization": 0.00193056412134154
+      },
+      "energy_identity_absolute_error": 4.5102810375396984e-17,
+      "status": "eigenpair_verified"
+    },
+    {
+      "transport_form": "skew",
+      "slabs": 128,
+      "time_step_seconds": 4.6875,
+      "largest_computed_amplification_modulus": 0.9279608301006753,
+      "amplification_real": 0.9279608301006753,
+      "amplification_imaginary": 0.0,
+      "spatial_eigenvalue_real_per_second": 0.01656142775285237,
+      "spatial_eigenvalue_imaginary_per_second": 0.0,
+      "relative_eigenpair_residual": 7.026308639583061e-12,
+      "modal_energy_per_second": {
+        "diffusion": 0.005479290723493918,
+        "transport": 0.009151572908621898,
+        "stabilization": 0.0019305641207394942
+      },
+      "energy_identity_absolute_error": 2.9386215683047112e-15,
+      "status": "eigenpair_verified"
+    },
+    {
+      "transport_form": "skew",
+      "slabs": 256,
+      "time_step_seconds": 2.34375,
+      "largest_computed_amplification_modulus": 0.962634526063674,
+      "amplification_real": 0.962634526063674,
+      "amplification_imaginary": 0.0,
+      "spatial_eigenvalue_real_per_second": 0.016561427812093542,
+      "spatial_eigenvalue_imaginary_per_second": 0.0,
+      "relative_eigenpair_residual": 3.422918176268e-11,
+      "modal_energy_per_second": {
+        "diffusion": 0.0054792907453331185,
+        "transport": 0.009151572933246028,
+        "stabilization": 0.0019305641335205545
+      },
+      "energy_identity_absolute_error": 6.158268339717665e-15,
+      "status": "eigenpair_verified"
+    }
+  ],
+  "temperature_change_scale_K": 0.05,
+  "scope": "Fixed-mesh temporal sensitivity; separate thermal-discretization pilot; no timing comparison."
+}
