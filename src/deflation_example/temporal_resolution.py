@@ -69,8 +69,12 @@ def settings(config):
         raise ValueError("Fixed-source replays use twice and four times the finest slab count")
     if c["geometry"] not in {"transformer_2d", "engine_3d"}:
         raise ValueError("Unknown thermal geometry")
-    if c["action"] not in {"prepare", "run", "report"}:
-        raise ValueError("Choose prepare, run or report")
+    if c["transport_form"] not in {"advective", "skew"} or (
+        c["transport_form"] == "skew" and c["geometry"] != "transformer_2d"
+    ):
+        raise ValueError("The skew pilot requires the quadratic transformer velocity")
+    if c["action"] not in {"prepare", "run", "report", "stability"}:
+        raise ValueError("Choose prepare, run, report or stability")
     return c
 
 
@@ -91,7 +95,8 @@ def model(c, slabs):
                     "slabs": slabs,
                 }
             )
-        )
+        ),
+        transport_form=c["transport_form"],
     )
 
 
@@ -118,6 +123,7 @@ def prepare(c):
         "cases": [{"query": q, "slabs": n} for q in queries for n in c["slabs"]],
         "physical": showcase.parameters["physical"],
         "scope": "Fixed-mesh prescribed-flow temporal sensitivity; no solver speedup or spatial-resolution claim.",
+        "transport_form": c["transport_form"],
     }
     write_report(root / "design.json", result)
     return result
@@ -209,7 +215,11 @@ def run_case(c):
         )
         metrics, fields = solve_case(p, d, c["bound"], c, reference)
         report.update(
-            status=metrics["status"],
+            status=(
+                "optimization_verification_failed"
+                if metrics["status"] == "converged" and not metrics["success"]
+                else metrics["status"]
+            ),
             optimization=metrics,
             state_dofs=p.size,
             reference=reference.description,
@@ -250,6 +260,10 @@ def run_case(c):
                 "control_representation": "Piecewise constant on original intervals; aligned subdivision; unchanged source values.",
                 "resolution_scope": "Differences between two time steps estimate temporal sensitivity; they are not rigorous error bounds.",
             }
+            change = report["replay"]["temperature_change_max_K"]
+            report["replay"]["temperature_change_within_scale"] = bool(
+                np.isfinite(change) and change <= c["temperature_change_K"]
+            )
             # These sampled peaks include every replay time level, without clipping.
             write_fields(output / "replays.npz", coarse=replay_states[0], fine=fine)
             direct_ok = "direct_check" not in report or (
@@ -353,6 +367,10 @@ def summarize(c):
         "rows": rows,
         "comparison": "Optimized states use piecewise-linear reconstruction through the initial value; controls are piecewise constant. Differences use the finest optimized grid as a numerical reference and physical lumped-mass weights.",
         "all_verified": all(r["verified"] for r in rows),
+        "verification_scope": "Discrete residual and optimality checks; temporal resolution is assessed separately.",
+        "all_replays_within_temperature_change_scale": all(
+            r.get("replay", {}).get("temperature_change_within_scale", False) for r in rows
+        ),
     }
     output = Path(c["output"])
     output.mkdir(parents=True, exist_ok=False)
@@ -360,11 +378,51 @@ def summarize(c):
     return result
 
 
+def stability_report(c):
+    from .temporal_stability import amplification_mode
+
+    if c["geometry"] != "transformer_2d":
+        raise ValueError("The paired transport diagnostic uses the transformer geometry")
+    output = Path(c["output"])
+    output.mkdir(parents=True, exist_ok=False)
+    rows = []
+    report = {
+        "environment": environment(),
+        "protocol": protocol(c),
+        "rows": rows,
+        "scope": "Thermal forward amplification diagnostics; no optimization timing comparison.",
+    }
+    for form in ("advective", "skew"):
+        showcase, _ = model({**c, "transport_form": form}, min(c["slabs"]))
+        seconds = showcase.parameters["physical"]["time_scale_s"]
+        report["input_sha256"] = showcase.preparation["input_sha256"]
+        for n in [*c["slabs"], *[f * max(c["slabs"]) for f in c["replay_factors"]]]:
+            row = {
+                "transport_form": form,
+                "slabs": n,
+                "time_step_seconds": c["horizon"] * seconds / n,
+            }
+            try:
+                row.update(amplification_mode(showcase.assembly, c["horizon"] / n, seconds))
+                row["status"] = (
+                    "eigenpair_verified"
+                    if row["relative_eigenpair_residual"] <= 1e-8
+                    else "eigenpair_residual_failed"
+                )
+            except Exception as error:
+                row.update(status="error", error_type=type(error).__name__)
+            rows.append(row)
+            write_report(output / "stability.json", report)
+    return report
+
+
 @hydra.main(version_base=None, config_path="conf", config_name="temporal_resolution")
 def main(config):
     c = settings(config)
     with threadpool_limits(c["threads"]):
-        {"prepare": prepare, "run": run_case, "report": summarize}[c["action"]](c)
+        {"prepare": prepare, "run": run_case, "report": summarize, "stability": stability_report}[
+            c["action"]
+        ](c)
 
 
 if __name__ == "__main__":

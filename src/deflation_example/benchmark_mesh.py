@@ -143,8 +143,8 @@ def _hash(array):
     return hashlib.sha256(np.ascontiguousarray(array).tobytes()).hexdigest()
 
 
-def build_model(c):
-    showcase = build_showcase(c["geometry"], c["level"])
+def build_model(c, *, transport_form="advective"):
+    showcase = build_showcase(c["geometry"], c["level"], transport_form=transport_form)
     steps = np.full(c["slabs"], c["horizon"] / c["slabs"]) if c["transient"] else None
     initial = np.full(len(showcase.assembly.mesh.free), c["initial_temperature"])
     model = build_mesh_control(

@@ -8,6 +8,7 @@ root: runs/temporal-resolution
 output: runs/temporal-resolution-summary
 case: 0
 geometry: transformer_2d
+transport_form: advective
 level: 0
 alpha: 1.0e-14
 bound: 0.8

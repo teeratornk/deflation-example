@@ -156,13 +156,26 @@ def simplex_geometry(mesh):
     return gradients, local_mass
 
 
-def assemble_thermal(mesh, conductivity, capacity, velocity=None, source=None, streamline=False):
+def assemble_thermal(
+    mesh,
+    conductivity,
+    capacity,
+    velocity=None,
+    source=None,
+    streamline=False,
+    *,
+    transport_form="advective",
+):
     """Assemble diffusion, nonconservative transport, and optional streamline diffusion.
 
     Conductivity is a symmetric positive-definite tensor per cell. Capacity and
     velocity are frozen per cell. Streamline diffusion adds a declared symmetric
     artificial-diffusion term to the discrete state equation; no SUPG right-hand
     side is implied. The exact transpose of the resulting equation is used.
+    For a continuous quadratic 2D velocity, ``skew`` adds half the cellwise
+    divergence times temperature. Its quadratic form is the boundary heat flux
+    plus any interelement capacity-flux jumps. Axisymmetric divergence includes
+    v_r/r. The original advective form remains the default.
     """
     nc, d = len(mesh.cells), mesh.dimension
     k = real_array(conductivity, "Conductivity")
@@ -179,6 +192,10 @@ def assemble_thermal(mesh, conductivity, capacity, velocity=None, source=None, s
     if c.shape != (nc,) or not np.isfinite(c).all() or np.any(c <= 0):
         raise ValueError("Capacity must be finite and positive in every cell")
     quadratic_flow = d == 2 and v.shape == (nc, 6, 2)
+    if transport_form not in {"advective", "skew"}:
+        raise ValueError("Choose advective or skew thermal transport")
+    if transport_form == "skew" and not quadratic_flow:
+        raise ValueError("Skew thermal transport requires a quadratic 2D velocity")
     if (v.shape != (nc, d) and not quadratic_flow) or not np.isfinite(v).all():
         raise ValueError("Velocity must be finite with one vector per cell")
     if q.shape != (nc,) or not np.isfinite(q).all():
@@ -204,6 +221,27 @@ def assemble_thermal(mesh, conductivity, capacity, velocity=None, source=None, s
             qmeasure = qmeasure * 2 * np.pi * (mesh.nodes[mesh.cells, 0] @ bary.T)
         moments = np.einsum("eq,qi,eqd->eid", qmeasure, bary, samples)
         transport = c[:, None, None] * np.einsum("eid,ejd->eij", moments, grad)
+        if transport_form == "skew":
+            divergence = np.einsum("qa,ead,ead->eq", 4 * bary - 1, grad, v[:, :3])
+            for edge, (left, right) in enumerate(((0, 1), (0, 2), (1, 2)), start=3):
+                derivative = 4 * (
+                    bary[None, :, left, None] * grad[:, None, right]
+                    + bary[None, :, right, None] * grad[:, None, left]
+                )
+                divergence += np.einsum("eqd,ed->eq", derivative, v[:, edge])
+            weighted_divergence = volume[:, None] * quadrature_weights * divergence
+            if mesh.axisymmetric:
+                radius = mesh.nodes[mesh.cells, 0] @ bary.T
+                weighted_divergence = (
+                    2
+                    * np.pi
+                    * volume[:, None]
+                    * quadrature_weights
+                    * (radius * divergence + samples[:, :, 0])
+                )
+            transport += (
+                0.5 * c[:, None, None] * np.einsum("eq,qi,qj->eij", weighted_divergence, bary, bary)
+            )
         v = (-v[:, :3].sum(axis=1) + 4 * v[:, 3:].sum(axis=1)) / 9
     else:
         transport_gradient = c[:, None] * np.einsum("ed,eid->ei", v, grad)

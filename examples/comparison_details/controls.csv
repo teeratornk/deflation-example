@@ -1,0 +1,17 @@
+geometry_and_rank,form,method,verified_sequences,median_and_range_seconds,median_outer_iterations,median_inner_iterations,sampled_host_peak_GiB,sampled_gpu_peak_GiB
+"Bore 2, $r=20$",Steady,Jacobi-CG,5/5,"57.277 [56.787, 57.608]",121,203569,1.570,1.016
+"Bore 2, $r=20$",Steady,Reference,5/5,"43.431 [43.276, 43.796]",121,90501,1.574,1.041
+"Bore 2, $r=20$",Steady,Recycling,5/5,"58.515 [58.146, 59.977]",121,135975,1.563,1.166
+"Bore 2, $r=20$",Steady,AmgX,5/5,"104.585 [104.395, 105.205]",121,6473,1.571,2.209
+"Bore 2, $r=200$",Steady,Jacobi-CG,5/5,"55.546 [55.400, 56.270]",121,203569,1.563,1.016
+"Bore 2, $r=200$",Steady,Reference,5/5,"31.948 [31.867, 32.243]",121,36570,1.568,2.314
+"Bore 2, $r=200$",Steady,Recycling,5/5,"43.391 [42.923, 43.916]",121,52788,1.557,4.559
+"Bore 2, $r=200$",Steady,AmgX,5/5,"102.594 [100.404, 103.589]",121,6473,1.575,2.209
+Bore 1,8 slabs,Jacobi-CG,5/5,"17.983 [17.880, 18.364]",82,35202,1.245,1.016
+Bore 1,8 slabs,Reference,5/5,"17.658 [17.337, 17.807]",82,17833,1.360,1.367
+Bore 1,8 slabs,Recycling,5/5,"22.028 [22.024, 22.054]",82,25900,1.403,2.348
+Bore 1,8 slabs,AmgX,5/5,"50.285 [50.003, 50.803]",82,1959,1.374,2.346
+Transformer,8 slabs,Jacobi-CG,5/5,"47.004 [46.705, 47.342]",47,222639,1.281,1.025
+Transformer,8 slabs,Reference,5/5,"29.276 [28.876, 29.670]",47,81080,1.389,1.596
+Transformer,8 slabs,Recycling,5/5,"103.036 [100.373, 103.397]",47,321862,1.422,3.285
+Transformer,8 slabs,AmgX,5/5,"82.434 [82.182, 82.802]",47,13188,1.406,1.658

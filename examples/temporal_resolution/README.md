@@ -67,3 +67,49 @@ relative to that scale.
 The full fields, controls, verification records and source identifiers are saved
 under each case directory. Smaller timesteps can change the discrete optimizer
 and the fixed-source response; these are reported separately.
+
+## Separate energy-consistent transport pilot
+
+The original `prescribed-temporal-source-v1` study uses advective thermal
+transport. Its finer fixed-source replays reveal growing modes in the discrete
+thermal operator. Small equation residuals establish algebraic accuracy and do
+not establish temporal resolution. Both the original attempts and this diagnosis
+are retained.
+
+The `prescribed-temporal-skew-v1` pilot keeps the mesh, prescribed quadratic
+velocity, properties, targets, bound and 600-second horizon. It adds
+`0.5*c*div(v)*T` to the cellwise thermal transport term. In axisymmetric
+coordinates, `div(v) = d_r(v_r) + v_r/r + d_z(v_z)`. Exact polynomial quadrature
+gives the corresponding discrete energy identity: transport contributes half
+the boundary flux and any interelement capacity-flux jumps. With continuous
+normal capacity flux and homogeneous inflow temperature, its energy contribution
+is the outflow term. This change corrects the energy term caused by discrete
+velocity divergence; it does not project the supplied velocity to an exactly
+divergence-free field.
+
+The pilot changes the thermal discretization. Its results do not replace or
+relabel the primary optimization timing records. The default public model and
+all frozen measured sources keep their original transport form.
+
+```bash
+git checkout prescribed-temporal-skew-v1
+uv sync --frozen --extra study
+uv run --frozen pytest tests/test_thermal_transport.py tests/test_temporal_resolution.py
+uv run --frozen python -m deflation_example.temporal_resolution action=stability output=runs/transport-stability
+uv run --frozen python -m deflation_example.temporal_resolution action=prepare transport_form=skew root=runs/temporal-skew
+uv run --frozen python -m deflation_example.temporal_resolution action=run transport_form=skew root=runs/temporal-skew case=0
+```
+
+Run cases 0–9 separately and summarize with `action=report transport_form=skew
+root=runs/temporal-skew output=runs/temporal-skew-summary`. The paired stability
+diagnostic reports both formulations at each declared time step, the computed
+amplification factor, the spatial eigenpair residual and diffusion, transport
+and stabilization energy contributions. A verified growing eigenmode establishes
+instability. Finding only decaying modes in the sparse calculation is not an
+exhaustive stability certificate.
+
+The corrected pilot uses the original target-selection rule before optimizing.
+The original and corrected designs must select the same nominal and demanding
+targets. Every replay keeps its optimized source unchanged and records the
+temperature-change scale separately from the equation and KKT checks. Neither
+pilot measures fully coupled flow–temperature optimization or a deflation speedup.

@@ -1,0 +1,25 @@
+geometry_and_rank,form,method,verified_sequences,median_and_range_seconds,median_outer_iterations,median_inner_iterations,sampled_host_peak_GiB,sampled_gpu_peak_GiB
+Transformer,Steady,Jacobi-CG,5/5,"25.655 [25.255, 25.750]",48,149353,1.117,1.000
+Transformer,Steady,Reference,5/5,"11.049 [10.880, 11.688]",48,35657,1.153,1.041
+Transformer,Steady,Recycling,5/5,"39.301 [38.857, 40.071]",48,142089,1.234,1.154
+Transformer,Steady,AmgX,5/5,"17.124 [17.054, 17.350]",48,9896,1.235,1.656
+Transformer,4 slabs,Jacobi-CG,5/5,"38.857 [38.623, 39.220]",46,206171,1.183,1.002
+Transformer,4 slabs,Reference,5/5,"22.361 [22.315, 22.530]",46,70207,1.292,1.137
+Transformer,4 slabs,Recycling,5/5,"73.504 [72.180, 77.877]",46,251111,1.320,1.971
+Transformer,4 slabs,AmgX,5/5,"52.096 [51.999, 52.567]",46,11516,1.308,1.656
+Bore 1,Steady,Jacobi-CG,5/5,"6.244 [6.219, 6.367]",72,27806,1.153,1.000
+Bore 1,Steady,Reference,5/5,"3.743 [3.700, 4.041]",72,5618,1.148,1.002
+Bore 1,Steady,Recycling,5/5,"5.576 [5.486, 5.802]",72,7347,1.262,1.045
+Bore 1,Steady,AmgX,5/5,"8.496 [8.060, 8.691]",72,1617,1.252,1.656
+Bore 1,4 slabs,Jacobi-CG,5/5,"11.500 [11.291, 12.635]",81,34633,1.170,1.000
+Bore 1,4 slabs,Reference,5/5,"9.927 [9.694, 10.076]",81,12580,1.268,1.078
+Bore 1,4 slabs,Recycling,5/5,"13.747 [13.557, 14.000]",81,18515,1.326,1.471
+Bore 1,4 slabs,AmgX,5/5,"34.991 [34.715, 36.095]",81,1940,1.300,2.209
+Bore 2,Steady,Jacobi-CG,5/5,"57.099 [56.648, 57.582]",121,203569,1.555,1.016
+Bore 2,Steady,Reference,5/5,"31.966 [31.515, 32.370]",121,42305,1.575,1.385
+Bore 2,Steady,Recycling,5/5,"48.214 [47.544, 49.264]",121,85682,1.565,2.516
+Bore 2,Steady,AmgX,5/5,"102.937 [101.917, 105.854]",121,6473,1.576,2.209
+Bore 2,4 slabs,Jacobi-CG,5/5,"153.957 [150.871, 155.738]",138,248751,1.759,1.893
+Bore 2,4 slabs,Reference,5/5,"133.791 [131.055, 135.721]",138,91498,1.845,4.760
+Bore 2,4 slabs,Recycling,5/5,"166.499 [165.952, 174.366]",138,165066,1.924,11.141
+Bore 2,4 slabs,AmgX,5/5,"521.214 [519.823, 523.360]",138,7610,1.903,4.484

@@ -36,7 +36,7 @@ def engine_velocity(points, speed=50.0):
     return np.column_stack((-dy * factor, dx * factor, np.zeros_like(x)))
 
 
-def _assembly(mesh, parameters, velocity=None, source=None):
+def _assembly(mesh, parameters, velocity=None, source=None, *, transport_form="advective"):
     nc, dim = len(mesh.cells), mesh.dimension
     p = parameters["physical"]
     k = np.tile(np.eye(dim), (nc, 1, 1))
@@ -47,7 +47,9 @@ def _assembly(mesh, parameters, velocity=None, source=None):
         capacity = np.array(p["capacity_J_m3_K"])[mesh.materials] / p["capacity_J_m3_K"][0]
         velocity = velocity * p["time_scale_s"] / p["length_scale_m"]
         source = source * p["length_scale_m"] ** 2 / (conductivity_scale * p["temperature_scale_K"])
-        return assemble_thermal(mesh, k, capacity, velocity, source, streamline=True)
+        return assemble_thermal(
+            mesh, k, capacity, velocity, source, streamline=True, transport_form=transport_form
+        )
     k[mesh.materials == 1] *= p["conductivity_ratio"]
     center = mesh.nodes[mesh.cells].mean(axis=1)
     velocity = engine_velocity(center, p["velocity_max"])
@@ -70,12 +72,18 @@ def _assembly(mesh, parameters, velocity=None, source=None):
     return result
 
 
-def build_showcase(geometry="engine_3d", level=0, data_directory=None):
+def build_showcase(
+    geometry="engine_3d", level=0, data_directory=None, *, transport_form="advective"
+):
     import time
 
     start = time.perf_counter()
     if geometry not in {"engine_3d", "transformer_2d"}:
         raise ValueError("Choose transformer_2d or engine_3d")
+    if transport_form not in {"advective", "skew"}:
+        raise ValueError("Choose advective or skew thermal transport")
+    if transport_form == "skew" and geometry != "transformer_2d":
+        raise ValueError("The skew transport pilot uses the quadratic transformer velocity")
     level = integer(level, "Mesh refinement level")
     directory = (
         Path(__file__).parent / "data" / geometry
@@ -92,7 +100,7 @@ def build_showcase(geometry="engine_3d", level=0, data_directory=None):
         with np.load(directory / "inputs.npz", allow_pickle=False) as inputs:
             velocity = inputs["velocity_P2_m_s"]
             source = inputs["source_W_m3"]
-    coarse = _assembly(mesh, parameters, velocity, source)
+    coarse = _assembly(mesh, parameters, velocity, source, transport_form=transport_form)
     P = sparse.eye(len(mesh.nodes), format="csr")
     for _ in range(level):
         fine, interpolation, parent = refine(mesh)
@@ -101,7 +109,11 @@ def build_showcase(geometry="engine_3d", level=0, data_directory=None):
             source = source[parent]
         mesh = fine
         P = interpolation @ P
-    current = coarse if not level else _assembly(mesh, parameters, velocity, source)
+    current = (
+        coarse
+        if not level
+        else _assembly(mesh, parameters, velocity, source, transport_form=transport_form)
+    )
     return MeshShowcase(
         current,
         coarse,
@@ -116,6 +128,7 @@ def build_showcase(geometry="engine_3d", level=0, data_directory=None):
             },
             "refinement": "nested simplex subdivision with inherited materials",
             "level": level,
+            "transport_form": transport_form,
             "nodes": len(mesh.nodes),
             "cells": len(mesh.cells),
             "state_degrees_of_freedom": len(mesh.free),

@@ -1,0 +1,17 @@
+{
+  "source_repository": "https://github.com/teeratornk/opt_control",
+  "source_revision": "f36d3f2b7ebdfad117b2f18562e8ef4743caa122",
+  "conversion": "Vector SVG rendering of the unchanged source PDF; no data or curves were changed.",
+  "files": {
+    "complete_sequences.svg": {
+      "source_path": "figures/cht/complete_sequences.pdf",
+      "source_sha256": "0fdc4182133ceabdae37167247667c5e00b6af37f19f5509dedc923590042ce5",
+      "sha256": "ee1c5db98fa5aece71cd36c6881fce6f0096ad947427e550e328ee6143a8d565"
+    },
+    "complete_components.svg": {
+      "source_path": "figures/cht/complete_components.pdf",
+      "source_sha256": "9c3bf92349b314dceea06a996e5e8b0ebf176fbe5d104b8081f93c7ae7c26967",
+      "sha256": "26e61811a0df47a3f80aa9ce76bc62f40f4af21246f49bb0eda1904d73ce3356"
+    }
+  }
+}
