@@ -143,14 +143,18 @@ def test_changed_protocol_cannot_run(completed):
         run_case({**completed, "bound": 0.35})
 
 
-def test_algebraic_convergence_does_not_hide_failed_forward_verification(completed, tmp_path, monkeypatch):
+def test_algebraic_convergence_does_not_hide_failed_forward_verification(
+    completed, tmp_path, monkeypatch
+):
     import deflation_example.temporal_resolution as module
 
     c = {**completed, "root": str(tmp_path / "verification-failure")}
     prepare(c)
-    monkeypatch.setattr(module, "solve_case", lambda p, *args: (
-        {"status": "converged", "success": False}, {"state": np.zeros(p.size)}
-    ))
+    monkeypatch.setattr(
+        module,
+        "solve_case",
+        lambda p, *args: ({"status": "converged", "success": False}, {"state": np.zeros(p.size)}),
+    )
     result = run_case(c)
     assert result["status"] == "optimization_verification_failed"
     assert result["optimization"]["status"] == "converged"
