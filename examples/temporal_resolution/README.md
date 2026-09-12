@@ -113,3 +113,30 @@ The original and corrected designs must select the same nominal and demanding
 targets. Every replay keeps its optimized source unchanged and records the
 temperature-change scale separately from the equation and KKT checks. Neither
 pilot measures fully coupled flow–temperature optimization or a deflation speedup.
+
+## Finer fixed-source assessment
+
+The separate `prescribed-replay-source-v1` driver evaluates both preselected
+targets at the coarsest and finest optimization grids (cases 0, 4, 5 and 9).
+It runs 256, 512, 1024, 2048 and 4096 forward steps for each saved source.
+Selection uses the declared target and time grids, not the outcomes. The source
+remains piecewise constant on its original intervals. Input, numerical-source
+and optimized-field checksums prevent changes during transfer.
+
+```bash
+git checkout prescribed-replay-source-v1
+uv sync --frozen --extra study
+uv run --frozen pytest tests/test_temporal_resolution.py tests/test_thermal_transport.py
+uv run --frozen python -m deflation_example.temporal_replay \
+  --root runs/temporal-skew --case 0 --output runs/replay-case-00
+```
+
+Run all four selected indices with separate outputs. The root must contain
+the completed `prescribed-temporal-skew-v1` optimizations. The driver retains
+unverified optimizations as such instead of interpreting their controls.
+It keeps every forward grid and all bound violations. Both final consecutive
+maximum temperature changes must be at most 0.05 K, and every equation residual
+must meet `1e-10`, to meet the declared time-step sensitivity criterion. A
+larger change at the final grid is recorded as `resolution_cap`. Meeting this
+criterion does not imply temperature-bound satisfaction or spatial resolution.
+Saved time histories and spatial peak maps accompany the numerical summary.

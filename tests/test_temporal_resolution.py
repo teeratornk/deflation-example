@@ -159,3 +159,66 @@ def test_algebraic_convergence_does_not_hide_failed_forward_verification(
     assert result["status"] == "optimization_verification_failed"
     assert result["optimization"]["status"] == "converged"
     assert not result["verified"]
+
+
+def test_finer_fixed_source_replay_checks_all_declared_grids(completed, tmp_path):
+    from deflation_example.temporal_replay import run, selected_cases
+
+    design = json.loads((Path(completed["root"]) / "design.json").read_text())
+    assert selected_cases(design) == [0, 2, 3, 5]
+    result = run(completed["root"], tmp_path / "replay", 0, steps=[16, 32, 64])
+    assert len(result["rows"]) == 3
+    assert all(r["status"] == "verified" for r in result["rows"])
+    assert result["fields_sha256"]
+    assert "temperature_change_max_K" not in result["rows"][0]
+    assert all("temperature_change_max_K" in r for r in result["rows"][1:])
+    assert result["status"] in {"within_temperature_change_scale", "resolution_cap"}
+    for steps in ([8, 16], [8, 16, 31], [5, 10, 20]):
+        with pytest.raises(ValueError):
+            run(completed["root"], tmp_path / "invalid", 0, steps=steps)
+    with pytest.raises(ValueError, match="endpoint"):
+        run(completed["root"], tmp_path / "invalid", 1, steps=[8, 16, 32])
+
+
+def test_fixed_source_replay_retains_unverified_optimization(completed, tmp_path):
+    from deflation_example.temporal_replay import run
+
+    root = tmp_path / "records"
+    shutil.copytree(completed["root"], root)
+    path = root / "case-00/record.json"
+    record = json.loads(path.read_text())
+    record["verified"] = False
+    path.write_text(json.dumps(record))
+    result = run(root, tmp_path / "replay", 0, steps=[8, 16, 32])
+    assert result["status"] == "optimization_not_verified"
+    assert result["rows"] == []
+
+
+def test_fixed_source_replay_rejects_changed_control(completed, tmp_path):
+    from deflation_example.temporal_replay import run
+
+    root = tmp_path / "records"
+    shutil.copytree(completed["root"], root)
+    (root / "case-00/fields.npz").write_bytes(b"changed fields")
+    with pytest.raises(ValueError, match="checksum"):
+        run(root, tmp_path / "replay", 0, steps=[8, 16, 32])
+
+
+def test_replay_temporal_difference_is_separate_from_bound_violation():
+    from types import SimpleNamespace
+    from deflation_example.temporal_replay import replay_metrics
+
+    p = SimpleNamespace(
+        free=np.array([0, 1]),
+        assembly=SimpleNamespace(
+            mass=np.array([1.0, 3.0]),
+            mesh=SimpleNamespace(nodes=np.array([[0.0, 0.0], [1.0, 2.0]])),
+        ),
+    )
+    coarse = np.array([[0.5, 1.0], [0.8, 1.2]])
+    fine = np.array([[0.3, 0.9], [0.5, 1.0], [0.7, 1.5], [0.8, 1.2]])
+    result = replay_metrics(fine, coarse, p, 1.0, 20.0, 600.0)
+    assert result["temperature_change_max_K"] == 0
+    assert result["maximum_bound_violation_K"] == 10
+    assert result["maximum_bound_violation_time_seconds"] == 450
+    assert result["maximum_bound_violation_coordinates"] == [1.0, 2.0]
