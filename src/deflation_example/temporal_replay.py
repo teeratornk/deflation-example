@@ -170,11 +170,12 @@ def main():
     parser.add_argument("--root", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--case", required=True, type=int)
+    parser.add_argument("--slabs", nargs="+", type=int, default=[256, 512, 1024, 2048, 4096])
     parser.add_argument("--threads", type=int, default=8)
     args = parser.parse_args()
     integer(args.threads, "Threads", 1)
     with threadpool_limits(args.threads):
-        run(args.root, args.output, args.case)
+        run(args.root, args.output, args.case, args.slabs)
 
 
 if __name__ == "__main__":

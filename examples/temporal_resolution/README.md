@@ -140,3 +140,46 @@ must meet `1e-10`, to meet the declared time-step sensitivity criterion. A
 larger change at the final grid is recorded as `resolution_cap`. Meeting this
 criterion does not imply temperature-bound satisfaction or spatial resolution.
 Saved time histories and spatial peak maps accompany the numerical summary.
+
+The separately versioned `prescribed-replay-extension-v1` follow-up extends
+all four selected sources after the four-slab replays reach the 4096-step cap.
+It uses 4096, 8192, 16384 and 32768 steps, with the same two-consecutive-change
+criterion and no control changes. Preserve the capped outputs and give the
+extension new output directories:
+
+```bash
+git checkout prescribed-replay-extension-v1
+uv sync --frozen --extra study
+uv run --frozen python -m deflation_example.temporal_replay \
+  --root runs/temporal-skew --case 0 --slabs 4096 8192 16384 32768 \
+  --output runs/replay-extension-case-00
+```
+
+Repeat for cases 4, 5 and 9. The extension is an additional resolution check;
+the original cap and every bound violation remain reported.
+
+## Regenerate the assessment figures
+
+Use `prescribed-replay-extension-v1` for the following reporting command.
+The report checks that both optimization populations have identical targets,
+mesh inputs and settings apart from the declared transport form. It retains
+all optimization rows, including failures, and requires all four selected
+replays. Numerical-source identifiers and input checksums accompany the plots.
+
+```bash
+uv sync --frozen --extra study --extra plot
+uv run --frozen python tools/report_temporal_assessment.py \
+  --original runs/temporal-resolution-summary/summary.json \
+  --corrected runs/temporal-skew-summary/summary.json \
+  --stability runs/transport-stability/stability.json \
+  --replays runs/replay-case-00/summary.json runs/replay-case-04/summary.json \
+    runs/replay-case-05/summary.json runs/replay-case-09/summary.json \
+  --output runs/temporal-assessment
+```
+
+Repeat with the four extension summaries and a new output directory to show
+the extended resolution check. The weighted root-mean-square temperature
+differences compare the corrected optimizations with their 64-slab reference.
+The amplification plot shows computed modes with independently checked
+eigenpairs; it is not an exhaustive spectral certificate. Fixed-source plots
+show consecutive-grid changes and bound violations at every replay level.
