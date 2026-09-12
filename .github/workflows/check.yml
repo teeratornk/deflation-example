@@ -28,6 +28,8 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: uv sync --locked --extra plot --extra study --python '${{ matrix.python }}'
       - run: uv run --locked --extra plot --extra study pytest -m 'not gpu'
+      - name: Regenerate relocated evidence from the clean checkout
+        run: uv run --locked --extra plot --extra study python tools/reproduce_repository_examples.py --output runs/relocated-evidence
       - run: uv run --locked ruff check . && uv run --locked ruff format --check .
       - run: uv build
       - run: uv run --locked python tools/check_release.py --source . --history dist/*.whl dist/*.tar.gz

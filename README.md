@@ -13,6 +13,8 @@ presets. Separate benchmarks reproduce the matched GPU comparison, complete
 CHT sequences, scaled Ritz control, conditional spectral examples,
 history-based recycling control and matrix-free rank study.
 
+The [relocated-study guide](docs/reproduce-relocated-studies.md) provides a tested
+runner for the archived figures and tables, plus versioned numerical reruns.
 The [detailed supplementary tables](docs/supplementary-tables.md) provide
 per-case accuracy, ranks, cost components, preparation times, memory and
 refinement diagnostics. Read them on GitHub or regenerate them from the

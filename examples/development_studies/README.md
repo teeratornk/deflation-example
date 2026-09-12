@@ -5,6 +5,11 @@ results, configurations and figures are repository-only; they are separate
 from the manuscript's completed benchmark comparisons. Every selected case,
 failed attempt and earlier resolution cap remains available.
 
+The [relocated-study reproduction guide](../../docs/reproduce-relocated-studies.md)
+provides one command for the bundled evidence, optional complete data checkouts,
+and links to the versioned numerical reruns. It distinguishes report generation
+from new optimization and timing calculations.
+
 The manifest identifies the former manuscript source and checksums of the
 relocated tables, temporal discussion and figure generator. The archived TeX
 files preserve that version's wording and cross-reference labels; they are
@@ -97,6 +102,9 @@ uv run --frozen python tools/reproduce_development_studies.py \
 ```
 
 The output includes `figures/temporal/resolution.pdf` and its numerical summary.
+Input checks precede output creation. The command verifies the generated
+quantities against the archive and refuses an existing output directory.
+`reproduction.json` supplies the input-manifest and output checksums.
 The paired temporal example provides the commands for rerunning the optimized
 controls and the full forward-resolution diagnostics. No control is modified
 or temperature clipped during a replay.
