@@ -26,7 +26,7 @@ residual policy to distinguish them.
 | --- | --- | --- |
 | Primary projected CG, `terminal` | `dc89ae8518ff6a975eadf2f6f3bae1acbd17b83b` | Six primary body-fitted comparisons and rank/temporal controls |
 | Residual correction, `refine`, before the initial guard | `926b37c40935fbbe7134a3ab5f87ebdfddb68837` | Finer-transformer study: 40 complete four-target sequences |
-| Residual correction with initial guard, `refine` | `0b3b3f06a535f515256932c0dbf27537c242744d` | Guard regression tests and small CPU sequences; no GPU timing evaluation |
+| Residual correction with initial guard, `refine` | `0b3b3f06a535f515256932c0dbf27537c242744d` | Regression tests, small CPU sequences and a separate 40-sequence finer-transformer GPU study |
 
 ### Reproduce the measured implementations
 
@@ -65,6 +65,12 @@ These small examples run on a CPU. Their reports record the guarded source
 and policy; they do not reproduce the frozen GPU timings. With a preset that
 already defines `residual_policy`, use `residual_policy=refine` without `+`.
 The `+` adds this key to the small default Hydra configuration.
+
+The [guarded GPU follow-up](../examples/guarded_refinement/README.md) contains
+all 40 complete sequences and their checked summaries. Every sequence meets
+the original residual and KKT criteria. These measurements remain separate
+from the earlier primary and correction studies; the [GPU commands](../examples/temporal_resolution/guarded_gpu.md)
+specify the measured source and settings.
 
 ## Run the examples
 

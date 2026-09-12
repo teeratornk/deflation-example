@@ -1,0 +1,142 @@
+[
+  {
+    "method": "jacobi",
+    "repetition": 0,
+    "status": "completed",
+    "process_wall_seconds": 56.05813943222165,
+    "record": "jacobi-0/record.json"
+  },
+  {
+    "method": "reference",
+    "repetition": 0,
+    "status": "completed",
+    "process_wall_seconds": 46.14163212291896,
+    "record": "reference-0/record.json"
+  },
+  {
+    "method": "recycling",
+    "repetition": 0,
+    "status": "completed",
+    "process_wall_seconds": 82.01121053937823,
+    "record": "recycling-0/record.json"
+  },
+  {
+    "method": "amgx",
+    "repetition": 0,
+    "status": "completed",
+    "process_wall_seconds": 36.746416157111526,
+    "record": "amgx-0/record.json"
+  },
+  {
+    "method": "reference",
+    "repetition": 1,
+    "status": "completed",
+    "process_wall_seconds": 43.18738244753331,
+    "record": "reference-1/record.json"
+  },
+  {
+    "method": "recycling",
+    "repetition": 1,
+    "status": "completed",
+    "process_wall_seconds": 78.78892880026251,
+    "record": "recycling-1/record.json"
+  },
+  {
+    "method": "amgx",
+    "repetition": 1,
+    "status": "completed",
+    "process_wall_seconds": 36.875287948176265,
+    "record": "amgx-1/record.json"
+  },
+  {
+    "method": "jacobi",
+    "repetition": 1,
+    "status": "completed",
+    "process_wall_seconds": 53.453479087911546,
+    "record": "jacobi-1/record.json"
+  },
+  {
+    "method": "recycling",
+    "repetition": 2,
+    "status": "completed",
+    "process_wall_seconds": 80.94691399950534,
+    "record": "recycling-2/record.json"
+  },
+  {
+    "method": "amgx",
+    "repetition": 2,
+    "status": "completed",
+    "process_wall_seconds": 37.4343406772241,
+    "record": "amgx-2/record.json"
+  },
+  {
+    "method": "jacobi",
+    "repetition": 2,
+    "status": "completed",
+    "process_wall_seconds": 54.01276853028685,
+    "record": "jacobi-2/record.json"
+  },
+  {
+    "method": "reference",
+    "repetition": 2,
+    "status": "completed",
+    "process_wall_seconds": 49.049154894426465,
+    "record": "reference-2/record.json"
+  },
+  {
+    "method": "amgx",
+    "repetition": 3,
+    "status": "completed",
+    "process_wall_seconds": 37.881140927784145,
+    "record": "amgx-3/record.json"
+  },
+  {
+    "method": "jacobi",
+    "repetition": 3,
+    "status": "completed",
+    "process_wall_seconds": 53.605438236147165,
+    "record": "jacobi-3/record.json"
+  },
+  {
+    "method": "reference",
+    "repetition": 3,
+    "status": "completed",
+    "process_wall_seconds": 44.19145420007408,
+    "record": "reference-3/record.json"
+  },
+  {
+    "method": "recycling",
+    "repetition": 3,
+    "status": "completed",
+    "process_wall_seconds": 85.72137181647122,
+    "record": "recycling-3/record.json"
+  },
+  {
+    "method": "jacobi",
+    "repetition": 4,
+    "status": "completed",
+    "process_wall_seconds": 54.66516849398613,
+    "record": "jacobi-4/record.json"
+  },
+  {
+    "method": "reference",
+    "repetition": 4,
+    "status": "completed",
+    "process_wall_seconds": 43.987369305454195,
+    "record": "reference-4/record.json"
+  },
+  {
+    "method": "recycling",
+    "repetition": 4,
+    "status": "completed",
+    "process_wall_seconds": 79.80112303141505,
+    "record": "recycling-4/record.json"
+  },
+  {
+    "method": "amgx",
+    "repetition": 4,
+    "status": "completed",
+    "process_wall_seconds": 37.732822405174375,
+    "record": "amgx-4/record.json"
+  }
+]

@@ -114,6 +114,10 @@ targets. Every replay keeps its optimized source unchanged and records the
 temperature-change scale separately from the equation and KKT checks. Neither
 pilot measures fully coupled flow–temperature optimization or a deflation speedup.
 
+The separate [guarded-solver GPU comparison](../guarded_refinement/README.md)
+tests the recommended numerical procedure on the original finer-transformer
+problems. It preserves their thermal operator and has its own timing records.
+
 ## Finer fixed-source assessment
 
 The separate `prescribed-replay-source-v1` driver evaluates both preselected
