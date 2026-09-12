@@ -158,6 +158,14 @@ uv run --frozen python -m deflation_example.temporal_replay \
 Repeat for cases 4, 5 and 9. The extension is an additional resolution check;
 the original cap and every bound violation remain reported.
 
+The four-slab nominal replay has consecutive maximum changes of 0.0585 K
+and 0.0343 K at 16384 and 32768 steps. A final follow-up uses 16384, 32768
+and 65536 steps for all four selected sources. It retains the same criterion
+and preserves both earlier output sets. Use the same extension source and
+replace the command's slab list by `--slabs 16384 32768 65536`, with a new
+output directory for every case. This adds a resolution check without changing
+any optimization or choosing a new target.
+
 ## Regenerate the assessment figures
 
 Use `prescribed-temporal-report-v1` for the following reporting command.
