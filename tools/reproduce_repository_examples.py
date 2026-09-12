@@ -21,8 +21,9 @@ def verify_guarded(root=None):
     if manifest.get("schema") != "guarded-refinement-evidence-v1":
         raise ValueError("Unknown guarded evidence schema")
     expected = set(manifest["files"])
-    observed = {p.relative_to(root).as_posix() for p in (root / "records").rglob("*")
-                if p.is_file()}
+    observed = {
+        p.relative_to(root).as_posix() for p in (root / "records").rglob("*") if p.is_file()
+    }
     if not expected or observed != expected:
         raise ValueError("Guarded record inventory differs from its manifest")
     for name, checksum in manifest["files"].items():
