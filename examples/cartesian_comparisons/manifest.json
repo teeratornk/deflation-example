@@ -1,0 +1,19 @@
+{
+  "source_repository": "https://github.com/teeratornk/opt_control",
+  "source_revision": "f36d3f2b7ebdfad117b2f18562e8ef4743caa122",
+  "scope": "Unchanged Cartesian measurements; all methods and all timing ranges.",
+  "files": {
+    "steady.csv": {
+      "sha256": "da27b7aaf172f98ac30ade4094163723e61851ba727037ffc5d267c2cbde6695",
+      "rows": 24,
+      "original_path": "sections/generated/cht/complete_rows_steady.tex",
+      "original_sha256": "ed006cdf65f9016671462996a78db66e6aa8325add18d091cc6531aae6dac2e2"
+    },
+    "transient.csv": {
+      "sha256": "46b7127d1bce13b839d468bdaf8a1a4085e5031ead9dd945479f2abaaccbe797",
+      "rows": 36,
+      "original_path": "sections/generated/cht/complete_rows_transient.tex",
+      "original_sha256": "245ff149f43c724f5ebb20071b8788901d335d1d870654e094853e1eaddb564a"
+    }
+  }
+}

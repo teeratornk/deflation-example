@@ -1,0 +1,37 @@
+defaults:
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+  - _self_
+
+action: prepare
+root: runs/temporal-resolution
+output: runs/temporal-resolution-summary
+case: 0
+geometry: transformer_2d
+level: 0
+alpha: 1.0e-14
+bound: 0.8
+horizon: 0.000048444553995823255
+initial_temperature: 0.0
+query_population: 16
+nominal_query: 7
+slabs: [4, 8, 16, 32, 64]
+rank: 100
+threads: 8
+inner_cap: 50000
+outer_cap: 100
+residual_refresh: 10000
+rtol: 1.0e-10
+kkt_tolerance: 1.0e-8
+cg_factor: 0.1
+forward_tolerance: 1.0e-8
+direct_check: true
+state_comparison_tolerance: 1.0e-7
+replay_factors: [2, 4]
+temperature_change_K: 0.05
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job:
+    chdir: false
