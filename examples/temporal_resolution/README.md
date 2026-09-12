@@ -160,7 +160,9 @@ the original cap and every bound violation remain reported.
 
 ## Regenerate the assessment figures
 
-Use `prescribed-replay-extension-v1` for the following reporting command.
+Use `prescribed-temporal-report-v1` for the following reporting command.
+This reporting version recognizes the original advective source, which
+predates the optional transport-form setting.
 The report checks that both optimization populations have identical targets,
 mesh inputs and settings apart from the declared transport form. It retains
 all optimization rows, including failures, and requires all four selected

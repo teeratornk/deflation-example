@@ -12,7 +12,11 @@ from deflation_example.reporting import write_report
 
 def validate_pair(original, corrected):
     a, b = original["design"], corrected["design"]
-    if a["protocol"]["transport_form"] != "advective" or b["protocol"]["transport_form"] != "skew":
+    # The original source predates the transport option and implements advective transport.
+    if (
+        a["protocol"].get("transport_form", "advective") != "advective"
+        or b["protocol"]["transport_form"] != "skew"
+    ):
         raise ValueError("Expected the original advective and separate skew pilot")
     for key in ("input_sha256", "queries", "cases", "desired_exceedance_scores", "physical"):
         if a[key] != b[key]:

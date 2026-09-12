@@ -41,6 +41,12 @@ def test_paired_report_retains_unsuccessful_rows():
         report.validate_pair(a, b)
 
 
+def test_original_source_predates_the_transport_option():
+    a, b = pair()
+    del a["design"]["protocol"]["transport_form"]
+    report.validate_pair(a, b)
+
+
 @pytest.mark.parametrize(
     "key", ["queries", "input_sha256", "physical", "cases", "desired_exceedance_scores"]
 )
