@@ -41,7 +41,7 @@ uv run --locked python tools/check_release.py --source . --history
 ```
 
 The check accepts text and the three reviewed numerical mesh bundles. It limits individual
-files to 5 MiB and source archives to 64 MiB / 2,000 entries. It rejects duplicate paths,
+files to 5 MiB and source archives to 96 MiB / 2,000 entries. It rejects duplicate paths,
 Windows drive paths, links, special files and oversized members without extracting
 them. History checking refuses shallow clones. Source-archive users can run the
 ordinary source/archive checks without Git.

@@ -52,7 +52,7 @@ Use a separate checkout and select `refine` explicitly:
 ```bash
 git clone https://github.com/teeratornk/deflation-example.git guarded-example
 cd guarded-example
-git checkout --detach 0b3b3f06a535f515256932c0dbf27537c242744d
+git checkout --detach 83efaf0537ffa361cf2a3b863f46e7e145cf3c07
 uv sync --locked
 uv run --locked pytest tests/test_refinement.py tests/test_study_solvers.py
 uv run --locked python -m deflation_example.benchmark_mesh \
@@ -65,6 +65,14 @@ These small examples run on a CPU. Their reports record the guarded source
 and policy; they do not reproduce the frozen GPU timings. With a preset that
 already defines `residual_policy`, use `residual_policy=refine` without `+`.
 The `+` adds this key to the small default Hydra configuration.
+
+This checkout preserves the guarded numerical procedure and adds NVML device
+identifier compatibility for process-memory sampling. The three measured
+sources in the table remain unchanged. An older checkout can fail memory
+initialization when CUDA supplies a bare UUID and NVML requires the `GPU-`
+prefix. The compatibility fix normalizes that identifier; it does not change
+the solver, accuracy criteria, or recorded benchmark results. New measurements
+must identify their actual source, including this change.
 
 The [guarded GPU follow-up](../examples/guarded_refinement/README.md) contains
 all 40 complete sequences and their checked summaries. Every sequence meets
