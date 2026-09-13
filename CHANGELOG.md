@@ -12,6 +12,8 @@
 - Plot matched nonlinear optimality and cumulative inner work, retaining unsuccessful attempts.
 - Expose forward-replay relaxation and iteration limits while recording unchanged coupled and conservation thresholds.
 - Declare matched coupled ablations of rank, bounds, targets, time slabs, nonlinear policy and reference construction/transfer; retain all outcomes in checked summaries.
+- Preserve unavailable activation/release counts and their coverage in ablation summaries; leave the measured numerical implementation unchanged.
+- Attach optional checked scheduler outcomes to ablation reports, preserving numerical records and excluding interrupted runs from completed-comparison claims.
 - Keep application speedup claims pending coupled convergence and resolution studies; preserve all prescribed-flow numerical sources and timings.
 
 ## 0.6.2

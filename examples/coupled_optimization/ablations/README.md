@@ -95,13 +95,14 @@ also need not add independently when several settings change together.
 
 ## Summaries and figures
 
-Use `coupled-ablations-report-v1` for the reporting commands below. It preserves
+Use `coupled-ablations-report-v2` for the reporting commands below. It preserves
 an explicit launcher error when an interrupted sequence still has a running
-record. The numerical source and declared configurations remain those of
+record and handles unavailable activation/release counts. The numerical source
+and declared configurations remain those of
 `coupled-ablations-source-v1`.
 
 ```bash
-git checkout coupled-ablations-report-v1
+git checkout coupled-ablations-report-v2
 uv run --extra plot python -m deflation_example.coupled_ablations report --root runs/ablations-cpu --output runs/ablation-summary-cpu --plot
 uv run --extra plot python -m deflation_example.coupled_ablations report --device cuda --root runs/ablations-gpu --output runs/ablation-summary-gpu --plot
 ```
@@ -112,3 +113,20 @@ crosses for elapsed work in unsuccessful attempts; they never turn failed solves
 into speedups. Empty positions have no completed measurement. The report checks
 the declared settings, source/deployment consistency and the final accuracy and
 timing records. Use a new output directory for every summary snapshot.
+
+The first inactive system has no preceding mask. Its transition counts may be
+unavailable, as may counts from other uninstrumented solves. The summary keeps
+incomplete totals as `null`, gives the subtotal of explicitly recorded counts,
+and reports the number of recorded and unrecorded steps. A recorded zero remains
+zero. These coverage fields distinguish measured transitions from missing data.
+
+For scheduled runs, retain an execution-status JSON alongside the solver records
+and pass `--execution-status runs/execution-status-cpu.json` to the report command.
+Use schema `coupled-ablation-execution-status-v1`, the declared `protocol_sha256`,
+the `device` (`cpu` or `cuda`), and a `rows` list. Each row identifies a declared
+`case`, its zero-based `repetition`, and its scheduler `status`, such as
+`COMPLETED`, `TIMEOUT`, `CANCELLED`, or `OUT_OF_MEMORY`. Export these statuses
+from the scheduler; an unfinished numerical record alone cannot identify why
+its process ended. The reporter retains both statuses, checks the case mapping,
+and excludes unsuccessful launches from completed-comparison claims. It never
+supplies a completed time for an interrupted solve with no final measurement.

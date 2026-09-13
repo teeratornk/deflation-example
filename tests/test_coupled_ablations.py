@@ -165,3 +165,103 @@ def test_launcher_error_overrides_an_unfinished_sequence_record(tmp_path):
     assert row["record_status"] == "running"
     assert row["error_type"] == "RuntimeError"
     assert not row["verified"]
+
+
+def test_nullable_transition_counts_preserve_coverage_in_the_complete_report(tmp_path):
+    data = record("jacobi", 0, 3)
+    data["cases"][0]["history"] = [
+        {
+            "attempts": [
+                {
+                    "qp_history": [
+                        {"timing": {"newly_active": None, "newly_inactive": None}},
+                        {"timing": {"newly_active": 0, "newly_inactive": 5}},
+                    ]
+                }
+            ]
+        }
+    ]
+    save_case(tmp_path, protocol(), 0, data)
+    row = ablations.summarize(protocol(), tmp_path)["rows"][0]
+    assert row["verified"]
+    assert row["newly_active"] is None
+    assert row["newly_inactive"] is None
+    assert row["newly_active_recorded_total"] == 0
+    assert row["newly_inactive_recorded_total"] == 5
+    assert row["newly_inactive_recorded_steps"] == 1
+    assert row["newly_inactive_unrecorded_steps"] == 1
+
+
+@pytest.mark.parametrize("steps", [[], [{}], [{"timing": None}], [{"timing": {}}]])
+def test_absent_transition_counts_remain_unavailable(steps):
+    result = ablations.transition_summary(steps)
+    for name in ("newly_active", "newly_inactive"):
+        assert result[name] is None
+        assert result[name + "_recorded_total"] is None
+        assert result[name + "_recorded_steps"] == 0
+        assert result[name + "_unrecorded_steps"] == len(steps)
+
+
+def test_complete_transition_counts_include_true_zeros():
+    result = ablations.transition_summary(
+        [
+            {"timing": {"newly_active": 0, "newly_inactive": 2}},
+            {"timing": {"newly_active": 0, "newly_inactive": 3}},
+        ]
+    )
+    assert result["newly_active"] == 0
+    assert result["newly_inactive"] == 5
+    assert result["newly_inactive_unrecorded_steps"] == 0
+
+
+def execution_record(status):
+    return {
+        "schema": "coupled-ablation-execution-status-v1",
+        "protocol_sha256": ablations.protocol_digest(protocol()),
+        "device": "cpu",
+        "rows": [{"case": "baseline-jacobi", "repetition": 0, "status": status}],
+    }
+
+
+@pytest.mark.parametrize("status", ["TIMEOUT", "CANCELLED", "OUT_OF_MEMORY"])
+def test_interrupted_jobs_do_not_remain_running(tmp_path, status):
+    data = record("jacobi", 0, 3)
+    data["status"] = "running"
+    del data["sequence_seconds"]
+    save_case(tmp_path, protocol(), 0, data)
+    report = ablations.summarize(protocol(), tmp_path)
+    ablations.apply_execution_status(report, execution_record(status))
+    row = report["rows"][0]
+    assert row["status"] == "execution_" + status.lower()
+    assert row["record_status"] == "running"
+    assert not row["verified"]
+    assert "sequence_seconds" not in row
+
+
+def test_execution_failure_does_not_erase_a_verified_numerical_record(tmp_path):
+    save_case(tmp_path, protocol(), 0, record("jacobi", 0, 3))
+    report = ablations.summarize(protocol(), tmp_path)
+    ablations.apply_execution_status(report, execution_record("FAILED"))
+    row = report["rows"][0]
+    assert row["numerical_record_verified"]
+    assert not row["verified"]
+    assert row["sequence_seconds"] == 3
+
+
+def test_completed_launcher_requires_complete_numerical_output(tmp_path):
+    report = ablations.summarize(protocol(), tmp_path)
+    ablations.apply_execution_status(report, execution_record("COMPLETED"))
+    assert report["rows"][0]["status"] == "incomplete_output"
+    assert not report["rows"][0]["verified"]
+
+
+def test_execution_status_rejects_wrong_device_and_duplicate_cases(tmp_path):
+    report = ablations.summarize(protocol(), tmp_path)
+    wrong = execution_record("COMPLETED")
+    wrong["device"] = "cuda"
+    with pytest.raises(ValueError, match="protocol and device"):
+        ablations.apply_execution_status(report, wrong)
+    duplicate = execution_record("COMPLETED")
+    duplicate["rows"] *= 2
+    with pytest.raises(ValueError, match="distinct declared cases"):
+        ablations.apply_execution_status(report, duplicate)

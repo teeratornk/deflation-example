@@ -198,6 +198,21 @@ def run_case(protocol, index, baseline, gate_directory, root, device="cpu", repe
     return result
 
 
+def transition_summary(steps):
+    """Keep incomplete transition counts distinct from measured zero counts."""
+    result = {}
+    for name in ("newly_inactive", "newly_active"):
+        values = [(step.get("timing") or {}).get(name) for step in steps]
+        observed = [integer(value, name, 0) for value in values if value is not None]
+        subtotal = sum(observed) if observed else None
+        missing = len(values) - len(observed)
+        result[name] = subtotal if values and missing == 0 else None
+        result[name + "_recorded_total"] = subtotal
+        result[name + "_recorded_steps"] = len(observed)
+        result[name + "_unrecorded_steps"] = missing
+    return result
+
+
 def summarize(protocol, root, device="cpu"):
     rows, identities = [], set()
     for case in cases(protocol, device):
@@ -303,12 +318,7 @@ def summarize(protocol, root, device="cpu"):
                         (s["linear_residual"] for s in steps if "linear_residual" in s),
                         default=None,
                     )
-                    row["newly_inactive"] = sum(
-                        s.get("timing", {}).get("newly_inactive", 0) for s in steps
-                    )
-                    row["newly_active"] = sum(
-                        s.get("timing", {}).get("newly_active", 0) for s in steps
-                    )
+                    row.update(transition_summary(steps))
                     memory = report["memory"]
                     for key in ("peak_host_rss_bytes", "peak_gpu_process_bytes"):
                         row["sampled_" + key] = memory.get(key) if memory.get("complete") else None
@@ -327,6 +337,64 @@ def summarize(protocol, root, device="cpu"):
         "scope": protocol["timing"],
         "outcome_policy": protocol["outcomes"],
     }
+
+
+def apply_execution_status(report, execution):
+    """Attach launcher outcomes without modifying or overstating solver records."""
+    if (
+        execution.get("schema") != "coupled-ablation-execution-status-v1"
+        or execution.get("protocol_sha256") != report["protocol_sha256"]
+        or execution.get("device") != report["device"]
+    ):
+        raise ValueError("Execution status must match the declared ablation protocol and device")
+    terminal = {
+        "FAILED",
+        "TIMEOUT",
+        "CANCELLED",
+        "OUT_OF_MEMORY",
+        "NODE_FAIL",
+        "PREEMPTED",
+        "BOOT_FAIL",
+        "DEADLINE",
+        "REVOKED",
+        "GATE_FAILURE",
+    }
+    allowed = terminal | {
+        "COMPLETED",
+        "PENDING",
+        "RUNNING",
+        "SUBMITTED",
+        "CONFIGURING",
+        "COMPLETING",
+        "SUSPENDED",
+        "UNKNOWN",
+        "RESIZING",
+        "SIGNALING",
+        "STAGE_OUT",
+    }
+    rows = {(row["case"], row["repetition"]): row for row in report["rows"]}
+    seen = set()
+    validated = []
+    for entry in execution["rows"]:
+        key = (entry["case"], integer(entry["repetition"], "Execution repetition", 0))
+        status = entry["status"]
+        if key not in rows or key in seen or status not in allowed:
+            raise ValueError(
+                "Execution outcomes require distinct declared cases and known statuses"
+            )
+        seen.add(key)
+        validated.append((rows[key], status))
+    for row, status in validated:
+        row["execution_status"] = status
+        row["numerical_record_verified"] = row["verified"]
+        row["verified"] = row["verified"] and status == "COMPLETED"
+        if status in terminal:
+            row["status"] = "execution_" + status.lower()
+        elif status == "COMPLETED" and row["status"] in {"missing", "running"}:
+            row["status"] = "incomplete_output"
+        elif status != "COMPLETED":
+            row["status"] = "execution_" + status.lower()
+    report["execution_status_sha256"] = protocol_digest(execution)
 
 
 def plot_summary(report, output):
@@ -406,6 +474,7 @@ def main():
     parser.add_argument("--root", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--plot", action="store_true")
+    parser.add_argument("--execution-status", type=Path)
     args = parser.parse_args()
     protocol = json.loads(args.protocol.read_text())
     required = {
@@ -427,6 +496,8 @@ def main():
         )
     else:
         report = summarize(protocol, args.root, args.device)
+        if args.execution_status is not None:
+            apply_execution_status(report, json.loads(args.execution_status.read_text()))
         write_summary(report, args.output)
         if args.plot:
             plot_summary(report, args.output)
