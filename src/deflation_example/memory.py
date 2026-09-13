@@ -4,8 +4,20 @@ import os
 import multiprocessing
 import threading
 import time
+from uuid import UUID
 
 from .validation import positive_real
+
+
+def _nvml_device_uuid(cuda_uuid):
+    """Convert a bare CUDA UUID to NVML's identifier, preserving GPU/MIG prefixes."""
+    identifier = str(cuda_uuid)
+    if identifier.startswith(("GPU-", "MIG-")):
+        return identifier
+    try:
+        return f"GPU-{UUID(identifier)}"
+    except ValueError as error:
+        raise ValueError("CUDA device UUID must identify a GPU or MIG device") from error
 
 
 def _memory_process(connection, observed_pid, device_uuid, interval):
@@ -95,7 +107,7 @@ class ProcessMemory:
                 from .gpu import require_cuda
 
                 torch = require_cuda()
-                self.device_uuid = str(
+                self.device_uuid = _nvml_device_uuid(
                     torch.cuda.get_device_properties(torch.cuda.current_device()).uuid
                 )
             elif device != "cpu":
@@ -151,12 +163,16 @@ class ProcessMemory:
                 self.process.terminate()
                 self.process.join(5)
                 self.connection.close()
+                self.closed = True
                 raise RuntimeError("Memory sampler did not initialize")
             self.initial_state = self.connection.recv()
             if self.initial_state["error"]:
                 self.process.join(5)
                 self.connection.close()
-                raise RuntimeError("Initial process memory measurement failed")
+                self.closed = True
+                raise RuntimeError(
+                    "Initial process memory measurement failed: " + self.initial_state["error"]
+                )
             return self
         if self.thread is not None:
             raise RuntimeError("Memory sampler is already running")

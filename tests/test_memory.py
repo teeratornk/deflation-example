@@ -2,8 +2,83 @@
 
 import pytest
 import time
+from types import SimpleNamespace
 
-from deflation_example.memory import ProcessMemory
+from deflation_example.memory import ProcessMemory, _nvml_device_uuid
+
+
+@pytest.mark.parametrize(
+    "identifier, expected",
+    [
+        ("01234567-89ab-cdef-0123-456789abcdef", "GPU-01234567-89ab-cdef-0123-456789abcdef"),
+        ("01234567-89AB-CDEF-0123-456789ABCDEF", "GPU-01234567-89ab-cdef-0123-456789abcdef"),
+        ("GPU-01234567-89ab-cdef-0123-456789abcdef", "GPU-01234567-89ab-cdef-0123-456789abcdef"),
+        ("MIG-01234567-89ab-cdef-0123-456789abcdef", "MIG-01234567-89ab-cdef-0123-456789abcdef"),
+        (
+            "MIG-GPU-01234567-89ab-cdef-0123-456789abcdef/1/0",
+            "MIG-GPU-01234567-89ab-cdef-0123-456789abcdef/1/0",
+        ),
+    ],
+)
+def test_memory_normalizes_cuda_uuid_for_nvml(identifier, expected):
+    assert _nvml_device_uuid(identifier) == expected
+
+
+@pytest.mark.parametrize("identifier", ["", "cuda:0", "unknown"])
+def test_memory_rejects_an_unrecognized_uuid(identifier):
+    with pytest.raises(ValueError, match="CUDA device UUID"):
+        _nvml_device_uuid(identifier)
+
+
+def test_sampler_resolves_the_current_cuda_device_by_uuid(monkeypatch):
+    from deflation_example import gpu
+
+    observed = []
+
+    def properties(index):
+        observed.append(index)
+        return SimpleNamespace(uuid="01234567-89ab-cdef-0123-456789abcdef")
+
+    cuda = SimpleNamespace(current_device=lambda: 2, get_device_properties=properties)
+    monkeypatch.setattr(gpu, "require_cuda", lambda: SimpleNamespace(cuda=cuda))
+    sampler = ProcessMemory("cuda")
+    assert observed == [2]
+    assert sampler.device_uuid == "GPU-01234567-89ab-cdef-0123-456789abcdef"
+    assert sampler.process is None
+
+
+@pytest.mark.parametrize("ready", [True, False])
+def test_failed_external_initialization_closes_the_sampler(monkeypatch, ready):
+    from deflation_example import memory
+
+    operations = []
+    parent = SimpleNamespace(
+        poll=lambda timeout: ready,
+        recv=lambda: {"error": "NVMLError_NotFound"},
+        close=lambda: operations.append("parent_closed"),
+    )
+    child = SimpleNamespace(close=lambda: operations.append("child_closed"))
+    process = SimpleNamespace(
+        start=lambda: operations.append("started"),
+        join=lambda timeout: operations.append("joined"),
+        terminate=lambda: operations.append("terminated"),
+    )
+    context = SimpleNamespace(Pipe=lambda: (parent, child), Process=lambda **kwargs: process)
+    monkeypatch.setattr(memory.multiprocessing, "get_context", lambda method: context)
+    sampler = ProcessMemory()
+    message = "NVMLError_NotFound" if ready else "did not initialize"
+    with pytest.raises(RuntimeError, match=message):
+        sampler.start()
+    assert sampler.closed
+    assert operations == [
+        "started",
+        "child_closed",
+        *([] if ready else ["terminated"]),
+        "joined",
+        "parent_closed",
+    ]
+    with pytest.raises(RuntimeError, match="has not been started"):
+        sampler.finish()
 
 
 def test_memory_uses_same_process_boundary_and_reports_peaks():

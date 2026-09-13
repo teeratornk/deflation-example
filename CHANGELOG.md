@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased memory-measurement compatibility
+
+- Normalize bare CUDA device UUIDs to NVML's GPU identifier format and preserve explicit GPU/MIG identifiers.
+- Report the initialization error type when process-memory sampling fails; preserve failed attempts and leave frozen timings unchanged.
+- Test UUID conversion without a GPU and exercise process-memory sampling on a CUDA device.
+
 ## Unreleased coupled-optimization verification
 
 - Add temperature-based elimination with exact discrete buoyancy, transport and stabilization derivatives.

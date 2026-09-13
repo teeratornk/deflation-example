@@ -49,10 +49,18 @@ ordinary source/archive checks without Git.
 To exercise the optional implementation on a CUDA device:
 
 ```bash
-uv sync --locked --extra gpu --extra plot
-uv run --locked --extra gpu pytest -m gpu
-uv run --locked --extra gpu deflation-example device=cuda problem=cht output=runs/gpu-check
+uv sync --locked --extra gpu --extra plot --extra study
+uv run --locked --extra gpu --extra plot --extra study pytest -m gpu -ra
+uv run --locked --extra gpu --extra plot --extra study deflation-example device=cuda problem=cht output=runs/gpu-check
 ```
+
+The `study` extra supplies process-memory measurement dependencies. The
+sampler resolves the current CUDA device by UUID, including CUDA identifiers
+without NVML's `GPU-` prefix. It fails explicitly if NVML cannot measure the
+solver process; allocator-only values do not replace the process measurement.
+The coupled CUDA tests additionally require the `coupled-gpu` extra. Native
+AmgX installation and commands that preserve its binding are documented in
+[the GPU guide](gpu-benchmark.md).
 
 CPU CI runs on Python 3.11 and 3.12 and builds both distributions. It installs the
 wheel into a separate environment with dependencies exported from `uv.lock`,
