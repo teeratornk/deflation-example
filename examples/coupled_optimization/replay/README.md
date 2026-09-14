@@ -134,3 +134,17 @@ original endpoints and the piecewise-linear original trajectory separately,
 and evaluates tracking against the same physical target at every new time
 level. It reports the predeclared 0.05 K and 1% resolution checks for complete
 refined trajectories, while retaining every unsuccessful solve.
+
+Compare completed refinements directly, independently of their differences
+from the original optimized trajectory:
+
+```bash
+uv run --extra plot python -m deflation_example.coupled_time_resolution_report --replays runs/newton-subdivision2 runs/newton-subdivision4 --temperature-scale 20 --output runs/newton-time-summary --plot
+```
+
+Use the temperature scale declared for the saved optimization. This command
+checks the common source and physical configuration, recomputes differences
+at shared time levels, and compares the tracking integrals using the finer
+integral as denominator. It preserves missing and unsuccessful computations.
+Agreement at these time levels does not certify feasibility at every
+intermediate physical time.
