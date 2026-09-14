@@ -67,3 +67,22 @@ violations or tracking changes. Small equation residuals alone do not bound
 trajectory error. A remaining unexplained discrepancy requires further diagnosis
 before the coupled example can support an application claim. Temporal or spatial
 refinement is a separate check of discretization error.
+
+## Generate the comparison
+
+The transformer example uses a temperature scale of 20 K. After the replays,
+regenerate the summary and temperature-difference curves from their saved fields:
+
+```bash
+uv run --extra plot python -m deflation_example.coupled_replay_report \
+  --optimization-fields runs/optimized/reference-fields.npz \
+  --replays runs/replay-1e-8 runs/replay-1e-10 runs/replay-1e-11 \
+  --temperature-scale 20 --plot --output runs/replay-summary
+```
+
+The report checks the common optimized source, time grid and configuration. It
+recomputes each temperature difference and checks it against the saved summary.
+Incomplete replays retain their termination status and partial trace; their
+full-trajectory difference remains unavailable. A missing run remains a row in
+the summary. Scheduler timeouts must be recorded separately when a killed
+process leaves its last numerical status as `running`.
