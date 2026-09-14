@@ -235,3 +235,85 @@ def test_resolution_cli_preserves_source_history_and_recomputes_comparisons(
         )
     assert report["maximum_endpoint_difference_K"] == pytest.approx(endpoint_error)
     assert (report["resolution_thresholds_met"] is None) == (subdivision == 1)
+
+
+def test_newton_trajectory_replays_saved_controls_and_retains_partial_failure():
+    from deflation_example.coupled_newton_replay import newton_trajectory
+
+    problem, state, evaluation, _ = data()
+    source = evaluation.control.copy()
+    progress = []
+    result = newton_trajectory(problem, source, callback=progress.append)
+    assert result["status"] == "converged"
+    assert len(progress) == problem.slabs
+    np.testing.assert_allclose(result["states"].ravel(), state, atol=1e-8)
+    np.testing.assert_array_equal(source, evaluation.control)
+    failed = newton_trajectory(problem, source, cap=0)
+    assert failed["status"] == "newton_iteration_cap"
+    assert len(failed["states"]) == 1
+    assert len(failed["steps"]) == 1
+
+
+def test_newton_spatial_cli_preserves_forward_protocol_and_fields(tmp_path, monkeypatch):
+    import json
+    import sys
+    from scipy import sparse
+    import deflation_example.coupled_spatial_resolution as module
+    from deflation_example.coupled_targets import desired_temperature
+
+    problem, state, evaluation, _ = data()
+    config = {
+        "slabs": 2,
+        "transient": True,
+        "query": 0,
+        "target_count": 2,
+        "lower_K": 299.0,
+        "upper_K": 301.0,
+    }
+    fields = {
+        "state": state,
+        "control": evaluation.control,
+        "desired": desired_temperature(problem, 0, 2),
+    }
+    baseline = {"baseline_sha256": "test", "configuration": {"convection_form": "advective"}}
+    monkeypatch.setattr(
+        module, "load_saved_solution", lambda *a: (baseline, config, fields, "fields")
+    )
+    monkeypatch.setattr(module, "load_problem", lambda *a: (problem, baseline))
+    monkeypatch.setattr(
+        module,
+        "transfer_source",
+        lambda c, f, u: (
+            u.reshape(problem.slabs, -1).copy(),
+            sparse.eye(problem.spatial_size, format="csr"),
+        ),
+    )
+    output = tmp_path / "spatial"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "spatial",
+            "--baseline",
+            "coarse",
+            "--fine-baseline",
+            "fine",
+            "--optimization",
+            "saved",
+            "--procedure",
+            "monolithic_newton",
+            "--tolerance",
+            "1e-12",
+            "--output",
+            str(output),
+        ],
+    )
+    module.main()
+    report = json.loads((output / "record.json").read_text())
+    assert report["status"] == "converged"
+    assert report["forward_solver"]["procedure"] == "monolithic_newton"
+    assert report["forward_solver"]["tolerance"] == 1e-12
+    assert report["maximum_temperature_difference_K"] < 1e-8
+    with np.load(output / "states.npz") as arrays:
+        assert {"velocity", "pressure", "state", "times_s"} <= set(arrays.files)
+        np.testing.assert_allclose(arrays["state"].ravel(), state, atol=1e-8)

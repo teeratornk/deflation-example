@@ -214,6 +214,48 @@ def newton_step(
     return CoupledResult(state, flow, status, history, time.perf_counter() - start)
 
 
+def newton_trajectory(problem, controls, *, tolerance=1e-12, cap=30, callback=None):
+    """Replay a signed source history using the problem's unchanged time grid."""
+    values = real_array(controls, "Fixed source history").copy()
+    if values.size != problem.size or not np.isfinite(values).all():
+        raise ValueError("The source history must match the complete trajectory")
+    values = values.reshape(problem.slabs, problem.spatial_size)
+    values.flags.writeable = False
+    state, flow = problem.full_temperature(problem.initial), problem.initial_flow
+    states, velocities, pressures, rows = [], [], [], []
+    start = time.perf_counter()
+    for n, current in enumerate(values):
+        source = np.zeros(len(problem.mesh.nodes))
+        source[problem.free] = current
+        result = newton_step(
+            problem, source, state, flow, n, tolerance=tolerance, max_iterations=cap
+        )
+        states.append(result.state[problem.free].copy())
+        velocities.append(result.flow.velocity.copy())
+        pressures.append(result.flow.pressure.copy())
+        row = {
+            "slab_zero_based": n,
+            "time_s": float(problem.physical_steps[: n + 1].sum()),
+            "status": result.status,
+            "seconds": result.seconds,
+            "history": result.history,
+        }
+        rows.append(row)
+        if callback is not None:
+            callback(row.copy())
+        if result.status != "converged":
+            break
+        state, flow = result.state, result.flow
+    return {
+        "status": result.status,
+        "steps": rows,
+        "states": np.stack(states),
+        "velocities": np.stack(velocities),
+        "pressures": np.stack(pressures),
+        "seconds": time.perf_counter() - start,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", type=Path, required=True)

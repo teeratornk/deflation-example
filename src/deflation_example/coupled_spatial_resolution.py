@@ -7,6 +7,7 @@ import numpy as np
 from threadpoolctl import threadpool_limits
 
 from .coupled_optimize import load_problem
+from .coupled_newton_replay import newton_trajectory
 from .coupled_reference import nested_prolongation
 from .coupled_resolution import (
     add_forward_options,
@@ -52,6 +53,10 @@ def main():
     parser.add_argument("--target-position", type=int)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--threads", type=int, default=4)
+    parser.add_argument(
+        "--procedure", choices=("segregated", "monolithic_newton"), default="segregated"
+    )
+    parser.add_argument("--newton-cap", type=int, default=30)
     add_forward_options(parser)
     args = parser.parse_args()
     options = forward_options(args)
@@ -99,19 +104,41 @@ def main():
             "control_transfer": "Nested P1 interpolation with zero source at prescribed-temperature nodes; identical piecewise-constant temporal source intervals.",
             "scope": "Fixed-source spatial resolution with unchanged physical time steps; no reoptimization or temperature clipping.",
         }
+        if args.procedure == "monolithic_newton":
+            metadata["forward_solver"] = {
+                "procedure": args.procedure,
+                "tolerance": options["tolerance"],
+                "newton_cap": integer(args.newton_cap, "Newton iteration cap", 0),
+                "linear_internal_target": 1e-10,
+                "linear_acceptance_target": 1e-8,
+                "linear_correction_cap": 2,
+                "linear_residual": "Row-equilibrated original Jacobian equation",
+                "mass_tolerance": 1e-6,
+                "energy_tolerance": 1e-6,
+            }
         write_report(args.output / "record.json", {**metadata, "status": "running"})
-        result = replay_controls(
-            fine,
-            source,
-            subdivision=1,
-            **options,
-            callback=lambda row: write_report(args.output / "progress.json", row),
-        )
+
+        def callback(row):
+            write_report(args.output / "progress.json", row)
+
+        if args.procedure == "monolithic_newton":
+            result = newton_trajectory(
+                fine, source, tolerance=options["tolerance"], cap=args.newton_cap, callback=callback
+            )
+        else:
+            result = replay_controls(fine, source, subdivision=1, **options, callback=callback)
         states = result.pop("states")
+        flow_fields = {}
+        if "velocities" in result:
+            flow_fields = {
+                "velocity": result.pop("velocities"),
+                "pressure": result.pop("pressures"),
+            }
         write_fields(
             args.output / "states.npz",
             state=states,
             times_s=np.array([r["time_s"] for r in result["steps"]]),
+            **flow_fields,
         )
         report = {**metadata, **result}
         if result["status"] == "converged":

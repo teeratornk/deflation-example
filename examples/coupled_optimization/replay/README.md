@@ -148,3 +148,16 @@ at shared time levels, and compares the tracking integrals using the finer
 integral as denominator. It preserves missing and unsuccessful computations.
 Agreement at these time levels does not certify feasibility at every
 intermediate physical time.
+
+The same monolithic Newton procedure also supports the declared spatial
+refinement with an unchanged physical time grid:
+
+```bash
+uv run python -m deflation_example.coupled_spatial_resolution --baseline runs/stabilized-baseline --fine-baseline runs/refined-baseline --optimization runs/startup60-reference-pilot --procedure monolithic_newton --tolerance 1e-12 --newton-cap 30 --output runs/newton-spatial
+```
+
+The spatial driver checks matching material data, boundary conditions and
+physical scales, then transfers the saved signed source by nested P1
+interpolation. It retains the computed temperatures, velocities, pressures,
+conservation checks and any unsuccessful step. Its default segregated
+procedure remains available for reproducing earlier computations.
