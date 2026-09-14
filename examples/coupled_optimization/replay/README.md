@@ -86,3 +86,24 @@ Incomplete replays retain their termination status and partial trace; their
 full-trajectory difference remains unavailable. A missing run remains a row in
 the summary. Scheduler timeouts must be recorded separately when a killed
 process leaves its last numerical status as `running`.
+
+## Linearized propagation
+
+For selected saved steps, examine the coupled current/history Jacobian pencil
+and the thermal pencil with velocity fixed:
+
+```bash
+uv run python -m deflation_example.coupled_step_spectrum \
+  --baseline runs/stabilized-baseline --optimization runs/optimized \
+  --method reference --slabs 0 15 27 --modes 4 --threads 8 \
+  --output runs/step-amplification
+```
+
+For the current-state Jacobian `H` and preceding-state derivative `-C`, the map
+`H^{-1} C` propagates first-order perturbations while the control is fixed.
+The command reports its largest-modulus eigenvalues and original pencil
+residuals. A modulus above one identifies a growing mode of that particular
+discrete linearization. Changing time-step maps and nonnormal amplification
+require separate analysis; these local eigenvalues do not certify stability
+or instability of the physical system or the complete trajectory. Eigensolver
+iteration caps remain visible alongside any converged eigenpairs.

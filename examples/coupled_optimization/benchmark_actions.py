@@ -20,6 +20,7 @@ from deflation_example.coupled_cuda import CudaControlJacobian, CudaGaussNewton
 from deflation_example.coupled_derivatives import GaussNewtonOperator
 from deflation_example.coupled_optimize import load_problem
 from deflation_example.reporting import environment, write_report
+from deflation_example.validation import integer
 
 
 def main():
@@ -30,13 +31,22 @@ def main():
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--method", default="jacobi")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--columns", type=int, nargs="+", default=[1, 20, 100])
+    parser.add_argument("--warmups", type=int, default=2)
+    parser.add_argument("--repeats", type=int, default=5)
+    parser.add_argument("--threads", type=int, default=4)
     parser.add_argument(
         "--ordering", choices=("COLAMD", "MMD_AT_PLUS_A", "MMD_ATA"), default="COLAMD"
     )
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
-    with threadpool_limits(4):
+    columns_requested = [integer(c, "Column count", 1) for c in args.columns]
+    if len(set(columns_requested)) != len(columns_requested):
+        raise ValueError("Column counts must be distinct")
+    warmups = integer(args.warmups, "Warmup count", 1)
+    repeats = integer(args.repeats, "Repetition count", 1)
+    with threadpool_limits(integer(args.threads, "Thread count", 1)):
         record = json.loads((args.run / "record.json").read_text())
         problem, _ = load_problem(
             {**record["configuration"], "baseline_directory": str(args.baseline)}
@@ -68,16 +78,33 @@ def main():
         upload = time.perf_counter() - tick
         rng = np.random.default_rng(782)
         rows = []
-        for columns in (1, 20, 100):
+        metadata = {
+            "environment": environment(),
+            "driver_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "columns": columns_requested,
+            "warmups": warmups,
+            "repeats": repeats,
+            "cupy": cp.__version__,
+            "device": cp.cuda.runtime.getDeviceProperties(0)["name"].decode(),
+            "field_sha256": hashlib.sha256(field.read_bytes()).hexdigest(),
+            "factor_ordering": args.ordering,
+            "factor_assembly_and_construction_seconds": factorization,
+            "factor_nonzeros": [f.L.nnz + f.U.nnz for f in factors],
+            "derivative_upload_seconds": upload,
+            "derivative_device_bytes": derivative.storage_bytes(),
+            "scope": "Fixed normal products with the recorded matched warmups and repetitions. CPU momentum factorization and complete optimization are outside these intervals.",
+        }
+        write_report(args.output, {**metadata, "status": "running", "rows": rows})
+        for columns in columns_requested:
             x = rng.normal(size=(problem.size, columns))
             device_x = cp.asarray(x)
             # Consistent warmups precede each block-size measurement.
-            for _ in range(2):
+            for _ in range(warmups):
                 H @ x
                 gpu.apply(device_x)
             cp.cuda.get_current_stream().synchronize()
             cpu_times, gpu_times = [], []
-            for _ in range(5):
+            for _ in range(repeats):
                 tick = time.perf_counter()
                 expected = H @ x
                 cpu_times.append(time.perf_counter() - tick)
@@ -94,22 +121,9 @@ def main():
                     "relative_action_error": error,
                 }
             )
-        write_report(
-            args.output,
-            {
-                "environment": environment(),
-                "cupy": cp.__version__,
-                "device": cp.cuda.runtime.getDeviceProperties(0)["name"].decode(),
-                "field_sha256": hashlib.sha256(field.read_bytes()).hexdigest(),
-                "factor_ordering": args.ordering,
-                "factor_assembly_and_construction_seconds": factorization,
-                "factor_nonzeros": [f.L.nnz + f.U.nnz for f in factors],
-                "derivative_upload_seconds": upload,
-                "derivative_device_bytes": derivative.storage_bytes(),
-                "rows": rows,
-                "scope": "Fixed normal products with two warmups and five repetitions per block size. CPU momentum factorization and complete optimization are outside these intervals.",
-            },
-        )
+            write_report(args.output, {**metadata, "status": "running", "rows": rows})
+        derivative.close()
+        write_report(args.output, {**metadata, "status": "complete", "rows": rows})
 
 
 if __name__ == "__main__":
