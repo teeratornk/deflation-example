@@ -23,17 +23,26 @@ from .validation import integer, positive_real
 
 
 def add_forward_options(parser):
-    """Expose iteration controls while retaining the declared accuracy criteria."""
+    """Expose iteration controls and stricter residual targets for verification."""
     parser.add_argument("--relaxation", type=float, default=0.5)
     parser.add_argument("--coupling-cap", type=int, default=100)
+    parser.add_argument(
+        "--tolerance",
+        type=float,
+        default=1e-8,
+        help="Coupled residual target (at most 1e-8); momentum uses one tenth of this value.",
+    )
 
 
 def forward_options(args):
     relaxation = positive_real(args.relaxation, "Coupling relaxation")
     if relaxation > 1:
         raise ValueError("Coupling relaxation must not exceed one")
+    tolerance = positive_real(getattr(args, "tolerance", 1e-8), "Coupled tolerance")
+    if tolerance > 1e-8:
+        raise ValueError("Coupled tolerance may only tighten the original 1e-8 target")
     return {
-        "tolerance": 1e-8,
+        "tolerance": tolerance,
         "coupling_cap": integer(args.coupling_cap, "Coupling iteration cap", 1),
         "relaxation": relaxation,
     }
@@ -49,6 +58,40 @@ def forward_protocol(problem, options):
         "mass_tolerance": 1e-6,
         "energy_tolerance": 1e-6,
     }
+
+
+def forward_model(problem):
+    """Construct the same thermal and flow model for replay and saved-state checks."""
+    fluid_capacity = problem.capacity[problem.flow.fluid_cells]
+    if np.ptp(fluid_capacity) > 0:
+        raise ValueError("The conservation check requires the declared constant fluid capacity")
+
+    def thermal_builder(velocity):
+        return assemble_thermal(
+            problem.mesh,
+            problem.conductivity,
+            problem.capacity,
+            problem.velocity_scale * velocity,
+            problem.source,
+            streamline=True,
+        )
+
+    return CoupledForward(
+        problem.flow,
+        thermal_builder,
+        problem.boundary_indices,
+        problem.boundary_values,
+        expansion=problem.expansion,
+        temperature_offset=problem.temperature_offset,
+        temperature_scale=problem.temperature_scale,
+        time_scale=problem.time_scale,
+        buoyancy_reference=problem.buoyancy_reference,
+        thermal_boundary=problem.thermal_boundary,
+        acceleration=problem.acceleration,
+        pressure_gauge=problem.pressure_gauge,
+        transport_factor=problem.velocity_scale * fluid_capacity[0],
+        flow_method="newton",
+    )
 
 
 def replay_controls(
@@ -68,36 +111,7 @@ def replay_controls(
     if not np.isfinite(controls).all():
         raise ValueError("The saved source must be finite")
     controls.flags.writeable = False
-    fluid_capacity = problem.capacity[problem.flow.fluid_cells]
-    if np.ptp(fluid_capacity) > 0:
-        raise ValueError("The conservation check requires the declared constant fluid capacity")
-
-    def thermal_builder(velocity):
-        return assemble_thermal(
-            problem.mesh,
-            problem.conductivity,
-            problem.capacity,
-            problem.velocity_scale * velocity,
-            problem.source,
-            streamline=True,
-        )
-
-    model = CoupledForward(
-        problem.flow,
-        thermal_builder,
-        problem.boundary_indices,
-        problem.boundary_values,
-        expansion=problem.expansion,
-        temperature_offset=problem.temperature_offset,
-        temperature_scale=problem.temperature_scale,
-        time_scale=problem.time_scale,
-        buoyancy_reference=problem.buoyancy_reference,
-        thermal_boundary=problem.thermal_boundary,
-        acceleration=problem.acceleration,
-        pressure_gauge=problem.pressure_gauge,
-        transport_factor=problem.velocity_scale * fluid_capacity[0],
-        flow_method="newton",
-    )
+    model = forward_model(problem)
     state = problem.full_temperature(problem.initial)
     flow = problem.initial_flow
     states, rows, elapsed = [], [], 0.0

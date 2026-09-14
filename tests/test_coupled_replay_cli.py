@@ -15,8 +15,9 @@ from test_coupled_derivatives import small_coupled_problem
 
 @pytest.mark.parametrize("module", [temporal, spatial])
 @pytest.mark.parametrize("relaxation,cap", [(0.5, 100), (0.25, 160)])
+@pytest.mark.parametrize("tolerance", [None, 1e-10])
 def test_replay_cli_records_and_applies_iteration_options(
-    tmp_path, monkeypatch, module, relaxation, cap
+    tmp_path, monkeypatch, module, relaxation, cap, tolerance
 ):
     problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
     config = {"query": 0, "target_count": 16, "lower_K": 0, "upper_K": 1}
@@ -68,23 +69,26 @@ def test_replay_cli_records_and_applies_iteration_options(
     ]
     if module is spatial:
         arguments.extend(["--fine-baseline", "fine-baseline"])
+    if tolerance is not None:
+        arguments.extend(["--tolerance", str(tolerance)])
+    target = 1e-8 if tolerance is None else tolerance
     monkeypatch.setattr(sys, "argv", arguments)
     module.main()
     report = json.loads((output / "record.json").read_text())
     assert report["status"] == "coupling_iteration_cap"
     assert "resolution_thresholds_met" not in report
     assert report["forward_solver"] == {
-        "tolerance": 1e-8,
+        "tolerance": target,
         "coupling_cap": cap,
         "relaxation": relaxation,
         "flow_method": "newton",
         "flow_cap": problem.flow_cap,
-        "momentum_internal_tolerance": 1e-9,
+        "momentum_internal_tolerance": target * 0.1,
         "mass_tolerance": 1e-6,
         "energy_tolerance": 1e-6,
     }
     np.testing.assert_array_equal(calls[0][0].ravel(), fields["control"])
-    assert calls[0][1]["tolerance"] == 1e-8
+    assert calls[0][1]["tolerance"] == target
     assert calls[0][1]["relaxation"] == relaxation
     assert calls[0][1]["coupling_cap"] == cap
 
@@ -98,3 +102,11 @@ def test_replay_options_reject_invalid_relaxation(relaxation):
 def test_replay_options_reject_invalid_cap():
     with pytest.raises(ValueError, match="cap"):
         temporal.forward_options(SimpleNamespace(relaxation=0.5, coupling_cap=0))
+
+
+@pytest.mark.parametrize("tolerance", [0, -1e-10, 1e-7, float("nan"), float("inf")])
+def test_replay_options_only_allow_finite_positive_tighter_targets(tolerance):
+    with pytest.raises(ValueError, match="tolerance"):
+        temporal.forward_options(
+            SimpleNamespace(relaxation=0.5, coupling_cap=100, tolerance=tolerance)
+        )

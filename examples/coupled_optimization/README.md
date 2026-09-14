@@ -185,6 +185,9 @@ Final optimization checks also reassemble the momentum transpose equations
 independently. `evaluation_progress=true` writes per-slab progress for development
 pilots; leave it disabled for final timing comparisons.
 
+The [saved-trajectory and forward-replay example](replay/README.md) checks every
+time slab and varies the forward stopping target while preserving the source.
+
 The diagnostic scripts in this directory have `--help` interfaces:
 
 - `check_saved_gradient.py` tests an objective gradient at a saved nonlinear iterate.
