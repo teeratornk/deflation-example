@@ -114,18 +114,23 @@ def plot_fields(problem, fields, source_scale, upper_K, output, indices=None):
         )
         if row == 0:
             artists.append(artist)
-        axes[row, 0].set_ylabel(
-            f"$t={times[index]:g}$ s\n$r$ (m)" if len(problem.physical_steps) else "$r$ (m)"
-        )
+        axes[row, 0].set_ylabel("$r$ (m)")
+        if len(problem.physical_steps):
+            # Separate time labels from the radial axis so long times remain
+            # readable without extending beyond the left edge of the canvas.
+            axes[row, 0].set_title(
+                ("Desired temperature\n" if row == 0 else "") + f"$t={times[index]:g}$ s"
+            )
     titles = ("Desired temperature", "Temperature", "Distributed source", "Fluid speed")
     units = ("K", "K", r"MW m$^{-3}$", r"m s$^{-1}$")
     for col, (title, unit) in enumerate(zip(titles, units, strict=True)):
-        axes[0, col].set_title(title)
+        if col or not len(problem.physical_steps):
+            axes[0, col].set_title(title)
         axes[-1, col].set_xlabel("$z$ (m)")
         fig.colorbar(
             artists[col], ax=axes[:, col], orientation="horizontal", label=unit, shrink=0.9
         )
-    fig.savefig(output, dpi=220)
+    fig.savefig(output, dpi=220, bbox_inches="tight")
     plt.close(fig)
     return {
         "time_indices": indices.tolist(),
