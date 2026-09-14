@@ -189,8 +189,8 @@ def run(config):
         raise ValueError("A verified baseline_directory is required")
     if cfg["mode"] not in {"derivatives", "optimize"}:
         raise ValueError("Choose derivatives or optimize")
-    if cfg["device"] not in {"cpu", "cuda"}:
-        raise ValueError("Choose cpu or cuda")
+    if cfg["device"] not in {"cpu", "cuda", "hybrid"}:
+        raise ValueError("Choose cpu, cuda or hybrid")
     output = Path(cfg["output"])
     output.mkdir(parents=True, exist_ok=False)
     with threadpool_limits(integer(cfg["threads"], "Threads", 1)):
@@ -254,6 +254,10 @@ def run(config):
                     from .coupled_cuda_solver import CudaCoupledSolver
 
                     solver_class = CudaCoupledSolver
+                elif cfg["device"] == "hybrid":
+                    from .coupled_hybrid_solver import HybridCoupledSolver
+
+                    solver_class = HybridCoupledSolver
                 solver = solver_class(
                     method,
                     rank=cfg["rank"],

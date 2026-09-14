@@ -33,7 +33,7 @@ def prepare_device(device, interval):
         pass
 
     solver_class = StudySolver
-    if device == "cuda":
+    if device in {"cuda", "hybrid"}:
         import cupy as cp
         import pynvml
         from cupy_backends.cuda.libs import cusparse
@@ -56,8 +56,15 @@ def prepare_device(device, interval):
             "gpu": cp.cuda.runtime.getDeviceProperties(0)["name"].decode(),
         }
         solver_class = CudaCoupledSolver
+        if device == "hybrid":
+            from .coupled_hybrid_solver import HybridCoupledSolver
+
+            solver_class = HybridCoupledSolver
+            details["operator_policy"] = (
+                "CPU vectors and original residuals; CUDA blocks of at least 20 columns"
+            )
     elif device != "cpu":
-        raise ValueError("Choose cpu or cuda")
+        raise ValueError("Choose cpu, cuda or hybrid")
     return sampler, barrier, solver_class, details
 
 

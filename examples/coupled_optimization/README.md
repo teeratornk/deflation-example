@@ -185,6 +185,43 @@ Final optimization checks also reassemble the momentum transpose equations
 independently. `evaluation_progress=true` writes per-slab progress for development
 pilots; leave it disabled for final timing comparisons.
 
+### Hybrid block-processing check
+
+The development option `device=hybrid` keeps vector iterations and independent
+residual checks on the CPU. It applies the coupled operator to blocks of at
+least twenty columns on the GPU. Reference deflation and recycling use the same
+rule. Orthogonalization and coarse factorizations remain on the CPU. A rank-zero
+solve avoids uploading derivative factors.
+
+```bash
+uv run --extra coupled-gpu pytest tests/test_coupled_hybrid_solver.py tests/test_coupled_cuda.py -q
+```
+
+The checks include complete small trajectory optimizations, changing inactive
+sets, nonlinear derivative updates, secant terms, and exact warm starts. This
+backend is a separate computational experiment; it is not the implementation
+underlying the existing CPU or CUDA timings. Complete sequence measurements
+include factor uploads, block transfers, synchronization and cleanup. Nested
+`hybrid_block_processing.seconds` values describe work already contained in
+the solver intervals and must not be added to the total again. The threshold
+of twenty columns follows a measured block-product comparison; it is not a
+claim of an optimal threshold for other systems or hardware.
+
+For a larger fixed-derivative check using a saved, verified optimization:
+
+```bash
+uv run --extra coupled-gpu python examples/coupled_optimization/benchmark_hybrid.py --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --rank 100 --cap 500 --repeats 2 --output runs/hybrid-kernel-check
+```
+
+This command compares both backends for Jacobi-CG, reference deflation and
+recycling. It uses manufactured right-hand sides on the saved inactive set and
+then the full domain, with zero initial guesses and a shared iteration budget
+for each linear system. It reverses the method order on alternate repetitions.
+The output retains capped solves; it does not convert their elapsed times into
+completed-solve speedups. Reference construction and the shared setup are
+reported separately from the kernel intervals. Use complete optimization
+sequences to assess the eventual computational benefit.
+
 The [saved-trajectory and forward-replay example](replay/README.md) checks every
 time slab and varies the forward stopping target while preserving the source.
 
