@@ -53,6 +53,15 @@ temperature difference separately from the remaining coupled difference. Their
 maximum norms are not additive. This decomposition does not establish which
 nonlinear solution branch was reached.
 
+For a local initial-guess comparison, append `--local-slabs 0 15 27` and
+`--local-tolerance 1e-10` to the saved-equation command and select a new output
+directory. Each selected step uses the exact saved preceding temperature and
+velocity. One solve starts from the saved current fields; the other starts from
+the saved preceding fields. Both retain the same control and convergence rules.
+The output retains every local solve, its residual history, and the temperature
+and velocity differences. These local checks separate errors accumulated over
+earlier steps from sensitivity to the current initial guess.
+
 Compare the complete tolerance sequence before interpreting temperature-bound
 violations or tracking changes. Small equation residuals alone do not bound
 trajectory error. A remaining unexplained discrepancy requires further diagnosis

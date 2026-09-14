@@ -19,7 +19,7 @@ from .coupled_optimize import load_problem
 from .coupled_resolution import forward_model
 from .coupled_saved import file_digest, load_saved_solution, require_matching_baseline
 from .reporting import environment, write_report
-from .validation import integer, real_array
+from .validation import integer, positive_real, real_array
 
 
 def check_saved_trajectory(problem, state, control, velocity, pressure, replay=None, callback=None):
@@ -106,6 +106,72 @@ def check_saved_trajectory(problem, state, control, velocity, pressure, replay=N
     return {"rows": rows, "seconds": time.perf_counter() - start}
 
 
+def check_local_steps(
+    problem, state, control, velocity, pressure, slabs, *, tolerance=1e-10, callback=None
+):
+    """Restart selected steps from saved data to isolate temporal propagation.
+
+    Both initial guesses use the exact saved previous temperature and velocity.
+    This is a local consistency diagnostic, not an independently evolved path.
+    """
+    tolerance = positive_real(tolerance, "Local coupled tolerance")
+    if tolerance > 1e-8:
+        raise ValueError("Local coupled tolerance may only tighten the original target")
+    indices = [integer(n, "Slab index", 0) for n in slabs]
+    if len(set(indices)) != len(indices) or any(n >= problem.slabs for n in indices):
+        raise ValueError("Local slab indices must be distinct and within the trajectory")
+    Y = np.asarray(state).reshape(problem.slabs, problem.spatial_size)
+    U = np.asarray(control).reshape(Y.shape)
+    model = forward_model(problem)
+    rows = []
+    for n in indices:
+        saved = problem.full_temperature(Y[n])
+        previous = problem.full_temperature(problem.initial if n == 0 else Y[n - 1])
+        prior_flow = (
+            problem.initial_flow
+            if n == 0
+            else FlowResult(velocity[n - 1], pressure[n - 1], "saved", [])
+        )
+        current_flow = FlowResult(velocity[n], pressure[n], "saved", [])
+        source = np.zeros_like(saved)
+        source[problem.free] = U[n]
+        for label, initial_state, initial_flow in (
+            ("saved_current", saved, current_flow),
+            ("saved_previous", previous, prior_flow),
+        ):
+            result = model.solve(
+                source,
+                initial_state,
+                initial_flow,
+                previous_state=previous,
+                previous_velocity=prior_flow.velocity,
+                time_step=float(problem.physical_steps[n]),
+                tolerance=tolerance,
+                max_iterations=100,
+                flow_cap=problem.flow_cap,
+                relaxation=0.5,
+            )
+            row = {
+                "slab_zero_based": n,
+                "initial_guess": label,
+                "status": result.status,
+                "tolerance": tolerance,
+                "momentum_internal_tolerance": tolerance * 0.1,
+                "temperature_difference_K": float(
+                    np.max(np.abs(result.state - saved)) * problem.temperature_scale
+                ),
+                "velocity_difference_l2_m_s": float(
+                    np.linalg.norm(result.flow.velocity - current_flow.velocity)
+                ),
+                "seconds": result.seconds,
+                "history": result.history,
+            }
+            rows.append(row)
+            if callback is not None:
+                callback(row)
+    return rows
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", type=Path, required=True)
@@ -119,6 +185,14 @@ def main():
     )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--threads", type=int, default=4)
+    parser.add_argument(
+        "--local-slabs",
+        type=int,
+        nargs="+",
+        default=[],
+        help="Zero-based steps for two local initial-guess comparisons",
+    )
+    parser.add_argument("--local-tolerance", type=float, default=1e-10)
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
@@ -177,6 +251,17 @@ def main():
             replay,
             callback=lambda row: write_report(args.output / "progress.json", row),
         )
+        if args.local_slabs:
+            result["local_steps"] = check_local_steps(
+                problem,
+                fields["state"],
+                fields["control"],
+                velocity,
+                pressure,
+                args.local_slabs,
+                tolerance=args.local_tolerance,
+                callback=lambda row: write_report(args.output / "local-progress.json", row),
+            )
         write_report(args.output / "record.json", {**metadata, **result, "status": "complete"})
 
 

@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from deflation_example.coupled_replay_check import check_saved_trajectory
+from deflation_example.coupled_replay_check import check_local_steps, check_saved_trajectory
 from test_coupled_derivatives import small_coupled_problem
 
 
@@ -73,3 +73,24 @@ def test_incomplete_or_nonfinite_replay_is_rejected(replay):
     problem, fields = saved_case()
     with pytest.raises(ValueError, match="Replay"):
         check_saved_trajectory(problem, *fields, replay=replay)
+
+
+def test_local_restarts_use_saved_previous_data_and_recover_both_steps():
+    problem, fields = saved_case()
+    originals = [v.copy() for v in fields]
+    rows = check_local_steps(problem, *fields, [0, 1])
+    assert len(rows) == 4
+    assert {r["initial_guess"] for r in rows} == {"saved_current", "saved_previous"}
+    for row in rows:
+        assert row["status"] == "converged"
+        assert row["temperature_difference_K"] < 1e-8
+        assert row["velocity_difference_l2_m_s"] < 1e-8
+    for original, field in zip(originals, fields, strict=True):
+        np.testing.assert_array_equal(original, field)
+
+
+@pytest.mark.parametrize("indices", [[-1], [2], [0, 0]])
+def test_invalid_local_slab_selection_is_rejected(indices):
+    problem, fields = saved_case()
+    with pytest.raises(ValueError):
+        check_local_steps(problem, *fields, indices)
