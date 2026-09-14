@@ -47,6 +47,54 @@ def test_rank_zero_and_initial_guard_do_not_upload_factors(monkeypatch):
 
 
 @pytest.mark.gpu
+@pytest.mark.parametrize("method", ["jacobi", "reference", "recycling"])
+def test_complete_hybrid_runner_records_device_memory_and_costs(monkeypatch, tmp_path, method):
+    pytest.importorskip("cupy")
+    pytest.importorskip("pynvml")
+    from omegaconf import OmegaConf
+    from deflation_example import coupled_sequence as sequence
+    from deflation_example.coupled_report import validate_record
+    from test_coupled_sequence import configuration
+
+    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+    config = configuration(problem)
+    config.update(
+        method=method,
+        device="hybrid",
+        memory_interval=0.01,
+        repetition=0,
+        rank=3,
+        recycle_window=6,
+        inner_tolerance=1e-11,
+        inner_cap=1000,
+        threads=1,
+        evaluation_progress=True,
+        linear_progress=True,
+        output=str(tmp_path / method),
+    )
+    monkeypatch.setattr(
+        sequence,
+        "load_problem",
+        lambda cfg: (
+            problem,
+            {"baseline_sha256": "test", "configuration": {}, "input_sha256": {}, "seconds": 0.25},
+        ),
+    )
+    monkeypatch.setattr(
+        sequence,
+        "configured_reference",
+        lambda *args: ArrayReference(np.eye(problem.size)[:, :3], {"construction": "test"}),
+    )
+    report = sequence.run(OmegaConf.create(config))
+    assert report["status"] == "complete", report.get("error_type")
+    assert report["all_problems_verified"]
+    assert validate_record(report)
+    assert "CPU vectors" in report["device"]["operator_policy"]
+    assert report["memory"]["peak_gpu_process_bytes"] > 0
+    assert sum(report["components_seconds"].values()) == pytest.approx(report["sequence_seconds"])
+
+
+@pytest.mark.gpu
 @pytest.mark.parametrize("method", ["reference", "recycling"])
 def test_gpu_blocks_preserve_original_residual_and_reuse_factors(method):
     pytest.importorskip("cupy")
