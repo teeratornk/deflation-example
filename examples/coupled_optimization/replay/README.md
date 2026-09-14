@@ -127,4 +127,10 @@ difference from the optimized trajectory. Its implementation and cost remain
 separate from the segregated replays and the optimization timings. Include its
 output directory in the replay-summary command to compare both forward
 procedures. Agreement on the original grid still requires a separate physical
-time-resolution assessment.
+time-resolution assessment. Add `--subdivision 2` or `--subdivision 4` for
+the declared forward time refinements. The source remains piecewise constant
+on each original interval and is copied into its substeps. The output compares
+original endpoints and the piecewise-linear original trajectory separately,
+and evaluates tracking against the same physical target at every new time
+level. It reports the predeclared 0.05 K and 1% resolution checks for complete
+refined trajectories, while retaining every unsuccessful solve.

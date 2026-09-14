@@ -20,6 +20,7 @@ from .coupled_optimize import load_problem
 from .coupled_resolution import forward_model
 from .coupled_saved import load_saved_solution, require_matching_baseline
 from .coupled_step_spectrum import step_linearization
+from .coupled_targets import desired_temperature
 from .reporting import environment, write_fields, write_report
 from .validation import integer, positive_real, real_array
 
@@ -223,19 +224,33 @@ def main():
     parser.add_argument("--target-position", type=int)
     parser.add_argument("--tolerance", type=float, default=1e-12)
     parser.add_argument("--cap", type=int, default=30)
+    parser.add_argument("--subdivision", type=int, default=1)
     parser.add_argument("--threads", type=int, default=8)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    subdivision = integer(args.subdivision, "Time subdivision", 1)
     if args.output.exists():
         raise FileExistsError(args.output)
     with threadpool_limits(integer(args.threads, "Threads", 1)):
         record, cfg, fields, digest = load_saved_solution(
             args.optimization, args.method, args.target_position
         )
-        problem, baseline = load_problem({**cfg, "baseline_directory": str(args.baseline)})
+        original_slabs = integer(cfg["slabs"], "Original slabs", 1)
+        if not cfg["transient"]:
+            raise ValueError("Temporal replay requires a saved transient optimization")
+        problem, baseline = load_problem(
+            {**cfg, "baseline_directory": str(args.baseline), "slabs": original_slabs * subdivision}
+        )
         require_matching_baseline(record, baseline)
-        controls = fields["control"].reshape(problem.slabs, problem.spatial_size)
-        expected = fields["state"].reshape(controls.shape)
+        controls = fields["control"].reshape(original_slabs, problem.spatial_size)
+        original = fields["state"].reshape(controls.shape)
+        starts = np.vstack((problem.initial[None, :], original[:-1]))
+        fraction = np.arange(1, subdivision + 1) / subdivision
+        expected = (
+            starts[:, None, :] + fraction[None, :, None] * (original - starts)[:, None, :]
+        ).reshape(problem.slabs, problem.spatial_size)
+        expected[subdivision - 1 :: subdivision] = original
+        controls = np.repeat(controls, subdivision, axis=0)
         args.output.mkdir(parents=True, exist_ok=False)
         metadata = {
             "schema": "coupled-fixed-source-newton-replay-v1",
@@ -244,7 +259,8 @@ def main():
             "baseline_sha256": baseline["baseline_sha256"],
             "tolerance": args.tolerance,
             "newton_cap": args.cap,
-            "subdivision": 1,
+            "subdivision": subdivision,
+            "forward_slabs": problem.slabs,
             "forward_solver": {
                 "procedure": "monolithic_newton",
                 "tolerance": args.tolerance,
@@ -262,7 +278,9 @@ def main():
                 for k, v in cfg.items()
                 if k not in {"baseline_directory", "reference_baseline_directory", "output"}
             },
-            "scope": "Same-grid forward verification with the saved source fixed; distinct from optimization and physical time-resolution evidence.",
+            "control_representation": "Piecewise constant on each original time interval; each saved value is copied unchanged into its subdivisions.",
+            "trajectory_comparison": "Forward states versus piecewise-linear interpolation of the optimized states, including the initial condition.",
+            "scope": "Forward verification of the fixed saved source, with the declared temporal subdivision; no reoptimization or clipping.",
         }
         write_report(args.output / "record.json", {**metadata, "status": "running", "steps": []})
         state, flow = problem.full_temperature(problem.initial), problem.initial_flow
@@ -305,6 +323,51 @@ def main():
         )
         complete = len(rows) == problem.slabs and all(row["status"] == "converged" for row in rows)
         temperatures = problem.temperature_offset + problem.temperature_scale * np.stack(states)
+        resolution = {}
+        if complete:
+            computed = np.stack(states)
+            mass = problem.assembly.mass[problem.free]
+            original_steps = problem.physical_steps.reshape(original_slabs, subdivision).sum(axis=1)
+            original_tracking = float(
+                np.sum(
+                    original_steps[:, None]
+                    * mass
+                    * (
+                        problem.temperature_scale
+                        * (original - fields["desired"].reshape(original.shape))
+                    )
+                    ** 2
+                )
+            )
+            desired = desired_temperature(
+                problem, cfg["query"], cfg["target_count"], cfg.get("target_startup_s", 0.0)
+            ).reshape(computed.shape)
+            refined_tracking = float(
+                np.sum(
+                    problem.physical_steps[:, None]
+                    * mass
+                    * (problem.temperature_scale * (computed - desired)) ** 2
+                )
+            )
+            tracking_change = abs(refined_tracking - original_tracking) / max(
+                original_tracking, np.finfo(float).tiny
+            )
+            trajectory_error = float(
+                np.max(np.abs(computed - expected)) * problem.temperature_scale
+            )
+            resolution = {
+                "maximum_endpoint_difference_K": float(
+                    np.max(np.abs(computed[subdivision - 1 :: subdivision] - original))
+                    * problem.temperature_scale
+                ),
+                "maximum_trajectory_difference_K": trajectory_error,
+                "tracking_integral_original_K2_m3_s": original_tracking,
+                "tracking_integral_refined_K2_m3_s": refined_tracking,
+                "tracking_relative_change": tracking_change,
+                "resolution_thresholds_met": None
+                if subdivision == 1
+                else trajectory_error <= 0.05 and tracking_change <= 0.01,
+            }
         write_report(
             args.output / "record.json",
             {
@@ -326,6 +389,7 @@ def main():
                 "maximum_recorded_lower_violation_K": float(
                     max(0, cfg["lower_K"] - temperatures.min())
                 ),
+                **resolution,
             },
         )
 

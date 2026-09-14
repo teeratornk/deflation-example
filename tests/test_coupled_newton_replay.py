@@ -157,3 +157,81 @@ def test_rejected_newton_trials_keep_the_initial_fields_and_metrics(monkeypatch)
     np.testing.assert_array_equal(result.flow.velocity, problem.initial_flow.velocity)
     for name, value in first.items():
         assert result.history[-1][name] == value
+
+
+@pytest.mark.parametrize("subdivision", [1, 2])
+def test_resolution_cli_preserves_source_history_and_recomputes_comparisons(
+    monkeypatch, tmp_path, subdivision
+):
+    import json
+    import sys
+    import deflation_example.coupled_newton_replay as module
+    from deflation_example.coupled_resolution import replay_controls
+    from deflation_example.coupled_targets import desired_temperature
+
+    original_problem, original_state, evaluation, _ = data()
+    desired = desired_temperature(original_problem, 0, 2)
+    config = {
+        "slabs": 2,
+        "transient": True,
+        "query": 0,
+        "target_count": 2,
+        "lower_K": 299.0,
+        "upper_K": 301.0,
+    }
+    fields = {"state": original_state, "control": evaluation.control.copy(), "desired": desired}
+    source_before = fields["control"].copy()
+    monkeypatch.setattr(
+        module,
+        "load_saved_solution",
+        lambda *args: ({"baseline_sha256": "test"}, config, fields, "saved-field-digest"),
+    )
+
+    def load(cfg):
+        assert cfg["slabs"] == 2 * subdivision
+        problem = small_coupled_problem(
+            np.repeat(np.array([0.2, 0.35]) / subdivision, subdivision), uniform_capacity=True
+        )
+        return problem, {"baseline_sha256": "test"}
+
+    monkeypatch.setattr(module, "load_problem", load)
+    output = tmp_path / "newton"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "replay",
+            "--baseline",
+            "baseline",
+            "--optimization",
+            "saved",
+            "--subdivision",
+            str(subdivision),
+            "--tolerance",
+            "1e-11",
+            "--output",
+            str(output),
+        ],
+    )
+    module.main()
+    report = json.loads((output / "record.json").read_text())
+    assert report["status"] == "converged"
+    assert report["subdivision"] == subdivision
+    assert report["forward_slabs"] == 2 * subdivision
+    np.testing.assert_array_equal(fields["control"], source_before)
+    comparison = replay_controls(
+        original_problem, source_before, subdivision=subdivision, tolerance=1e-10
+    )
+    assert comparison["status"] == "converged"
+    with np.load(output / "states.npz", allow_pickle=False) as arrays:
+        np.testing.assert_allclose(arrays["state"], comparison["states"], atol=1e-8)
+        endpoint_error = (
+            np.max(
+                np.abs(
+                    arrays["state"][subdivision - 1 :: subdivision] - original_state.reshape(2, -1)
+                )
+            )
+            * original_problem.temperature_scale
+        )
+    assert report["maximum_endpoint_difference_K"] == pytest.approx(endpoint_error)
+    assert (report["resolution_thresholds_met"] is None) == (subdivision == 1)
