@@ -107,3 +107,24 @@ discrete linearization. Changing time-step maps and nonnormal amplification
 require separate analysis; these local eigenvalues do not certify stability
 or instability of the physical system or the complete trajectory. Eigensolver
 iteration caps remain visible alongside any converged eigenpairs.
+
+## Monolithic Newton verification
+
+The separate `coupled_newton_replay` command uses the verified full step
+Jacobian with sparse LU and backtracking. It applies the saved source without
+reoptimization. An initial-residual check precedes Newton; rejected candidates
+leave the previous fields and their residuals intact. Row equilibration and at
+most two error corrections verify each linear Newton equation. Final coupled,
+mass and energy checks use the original equations.
+
+```bash
+uv run python -m deflation_example.coupled_newton_replay --baseline runs/stabilized-baseline --optimization runs/optimized --tolerance 1e-12 --output runs/newton-forward
+```
+
+This command checks the original temporal grid and saves all completed steps,
+including a terminating failed step. It reports each step's temperature
+difference from the optimized trajectory. Its implementation and cost remain
+separate from the segregated replays and the optimization timings. Include its
+output directory in the replay-summary command to compare both forward
+procedures. Agreement on the original grid still requires a separate physical
+time-resolution assessment.

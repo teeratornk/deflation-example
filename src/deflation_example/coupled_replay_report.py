@@ -146,7 +146,8 @@ def main():
         figure, axis = plt.subplots(figsize=(6.4, 3.8), layout="constrained")
         for trace in report["traces"]:
             row = next(r for r in report["rows"] if r["case"] == trace["case"])
-            label = f"Tolerance {row['forward_solver']['tolerance']:.0e} ({row['status']})"
+            procedure = row["forward_solver"].get("procedure", "segregated").replace("_", " ")
+            label = f"{procedure}, {row['forward_solver']['tolerance']:.0e} ({row['status']})"
             axis.plot(
                 trace["times_s"],
                 trace["maximum_difference_K"],
