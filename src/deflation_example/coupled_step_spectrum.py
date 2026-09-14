@@ -95,6 +95,9 @@ def main():
     parser.add_argument(
         "--method", choices=("reference", "jacobi", "recycling"), default="reference"
     )
+    parser.add_argument(
+        "--target-position", type=int, help="Position in a complete-sequence record"
+    )
     parser.add_argument("--slabs", type=int, nargs="+", default=[0, 15, 27])
     parser.add_argument("--modes", type=int, default=4)
     parser.add_argument("--threads", type=int, default=4)
@@ -103,11 +106,18 @@ def main():
     if args.output.exists():
         raise FileExistsError(args.output)
     with threadpool_limits(integer(args.threads, "Threads", 1)):
-        record, cfg, fields, digest = load_saved_solution(args.optimization, args.method)
+        record, cfg, fields, digest = load_saved_solution(
+            args.optimization, args.method, args.target_position
+        )
         problem, baseline = load_problem({**cfg, "baseline_directory": str(args.baseline)})
         require_matching_baseline(record, baseline)
         state = fields["state"].reshape(problem.slabs, problem.spatial_size)
-        with np.load(args.optimization / (args.method + "-fields.npz"), allow_pickle=False) as data:
+        filename = (
+            args.method + "-fields.npz"
+            if args.target_position is None
+            else f"target-{args.target_position:02d}.npz"
+        )
+        with np.load(args.optimization / filename, allow_pickle=False) as data:
             velocity = data["velocity"].copy()
         args.output.mkdir(parents=True, exist_ok=False)
         metadata = {
@@ -115,6 +125,7 @@ def main():
             "environment": environment(),
             "optimization_source": record["environment"]["git_head"],
             "optimization_field_sha256": digest,
+            "target_position": args.target_position,
             "scope": "Local linearized fixed-source propagation factors; no full-trajectory or physical stability certificate.",
         }
         rows = []
@@ -125,6 +136,11 @@ def main():
                 {
                     "slab_zero_based": n,
                     "coupled": amplification_spectrum(H, C, args.modes),
+                    "frozen_temperature_momentum": amplification_spectrum(
+                        H[: len(problem.flow_free), : len(problem.flow_free)],
+                        C[: len(problem.flow_free), : len(problem.flow_free)],
+                        args.modes,
+                    ),
                     "frozen_velocity_thermal": amplification_spectrum(B, T, args.modes),
                 }
             )
