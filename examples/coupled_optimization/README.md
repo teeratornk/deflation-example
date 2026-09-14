@@ -207,6 +207,12 @@ the solver intervals and must not be added to the total again. The threshold
 of twenty columns follows a measured block-product comparison; it is not a
 claim of an optimal threshold for other systems or hardware.
 
+For CPU and hybrid runs, the component named `iteration` is the aggregate
+CG-kernel interval, including orthogonalization and coarse-factor construction.
+A zero `coarse_or_hierarchy_setup` entry therefore does not mean that setup is
+free. Use the setup-inclusive solver intervals for backend comparisons;
+these CPU component labels do not separate setup from the recurrence.
+
 For a larger fixed-derivative check using a saved, verified optimization:
 
 ```bash
