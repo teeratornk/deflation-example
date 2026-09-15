@@ -67,6 +67,10 @@ def test_presentation_reports_split_ratios_and_screen(monkeypatch, tmp_path):
     ):
         text = (tmp_path / "tables" / name).read_text()
         assert text.strip() and text.count(r"\\") >= 1
+    macros = (tmp_path / "tables" / "macros.tex").read_text()
+    assert f"\\newcommand{{\\coupledWallRatio}}{{{ratios['wall_ratio']:.2f}}}" in macros
+    assert "\\newcommand{\\coupledReferenceVerified}{1}" in macros
+    assert "\\newcommand{\\coupledRecyclingMedianHours}{---}" in macros
     assert (tmp_path / "tables" / "cumulative.pdf").is_file()
     stored = json.loads((tmp_path / "tables" / "summary.json").read_text())
     assert "generator_environment" in stored

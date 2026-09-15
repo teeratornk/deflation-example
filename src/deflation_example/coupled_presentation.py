@@ -242,7 +242,65 @@ def _fmt(value, spec=".1f", missing="---"):
     return missing if value is None else format(value, spec)
 
 
+def macros(report):
+    """Prose numbers as LaTeX macros; every value comes from the summary."""
+    methods, ratios = report["methods"], report["ratios"] or {}
+    hours = {
+        m: None
+        if methods[m]["median_sequence_seconds"] is None
+        else methods[m]["median_sequence_seconds"] / 3600
+        for m in METHODS
+    }
+    values = {
+        "coupledWallRatio": _fmt(ratios.get("wall_ratio"), ".2f"),
+        "coupledWallRatioRestarts": _fmt(ratios.get("wall_ratio_with_restart_overheads"), ".2f"),
+        "coupledWallRatioPreparation": _fmt(ratios.get("wall_ratio_preparation_inclusive"), ".2f"),
+        "coupledInnerRatio": _fmt(ratios.get("inner_solve_ratio"), ".2f"),
+        "coupledCgRatio": _fmt(ratios.get("cg_iteration_ratio"), ".2f"),
+        "coupledAmdahlCeiling": _fmt(ratios.get("amdahl_ceiling"), ".1f"),
+        "coupledFastestAlternative": LABELS.get(ratios.get("fastest_tested_alternative"), "---"),
+        "coupledReferenceMedianHours": _fmt(hours["reference"], ".1f"),
+        "coupledJacobiMedianHours": _fmt(hours["jacobi"], ".1f"),
+        "coupledRecyclingMedianHours": _fmt(hours["recycling"], ".1f"),
+        "coupledReferenceVerified": str(methods["reference"]["verified"]),
+        "coupledJacobiVerified": str(methods["jacobi"]["verified"]),
+        "coupledRecyclingVerified": str(methods["recycling"]["verified"]),
+        "coupledRecyclingRecorded": str(methods["recycling"]["recorded"]),
+        "coupledReferenceRank": "---"
+        if methods["reference"]["deployed_rank_range"] is None
+        else "--".join(map(str, methods["reference"]["deployed_rank_range"])),
+        "coupledJacobiLinearPercent": _fmt(
+            None
+            if methods["jacobi"]["median_linear_fraction"] is None
+            else 100 * methods["jacobi"]["median_linear_fraction"],
+            ".0f",
+        ),
+        "coupledReferenceLinearPercent": _fmt(
+            None
+            if methods["reference"]["median_linear_fraction"] is None
+            else 100 * methods["reference"]["median_linear_fraction"],
+            ".0f",
+        ),
+        "coupledJacobiCgIterations": _fmt(methods["jacobi"]["median_cg_iterations"], ".0f"),
+        "coupledReferenceCgIterations": _fmt(methods["reference"]["median_cg_iterations"], ".0f"),
+        "coupledRestartMax": str(
+            max(
+                (r for m in METHODS for r in methods[m]["restart_counts"] if r is not None),
+                default="---",
+            )
+        ),
+    }
+    return values
+
+
+def write_macros(report, output):
+    lines = [f"\\newcommand{{\\{name}}}{{{value}}}" for name, value in macros(report).items()]
+    with atomic_output(output / "macros.tex") as stream:
+        stream.write("\n".join(lines) + "\n")
+
+
 def write_tables(report, output):
+    write_macros(report, output)
     end = r" \\"
     complete, split, accuracy_rows, memory_rows, execution_rows = [], [], [], [], []
     for method in METHODS:
