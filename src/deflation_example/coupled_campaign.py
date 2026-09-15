@@ -266,9 +266,94 @@ def discover_chains(root):
     return chains
 
 
+def hydra_value(value):
+    """Render a JSON value in Hydra override syntax."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if value is None:
+        return "null"
+    if isinstance(value, (int, float)):
+        return repr(value)
+    if isinstance(value, str):
+        if any(character in value for character in " ,=[]{}\"'"):
+            raise ValueError(f"Cannot render {value!r} as an unquoted Hydra value")
+        return value
+    if isinstance(value, list):
+        return "[" + ",".join(hydra_value(item) for item in value) + "]"
+    if isinstance(value, dict):
+        return "{" + ",".join(f"{key}:{hydra_value(item)}" for key, item in value.items()) + "}"
+    raise TypeError(f"Unsupported override value {value!r}")
+
+
+def stage_overrides(
+    protocol,
+    plan,
+    method,
+    repetition,
+    positions,
+    output,
+    restore=None,
+    resume=None,
+    rank=None,
+    window=None,
+    refresh=None,
+):
+    """Hydra overrides for one stage: protocol common settings plus the frozen selection.
+
+    Before the freeze (``frozen_selection`` null) the rank, window and refresh
+    interval must be supplied explicitly; afterwards they come from the plan
+    and explicit values are rejected so a screen cannot silently drift.
+    """
+    if method not in protocol["methods"]:
+        raise ValueError("Unknown method for this protocol")
+    integer(repetition, "Repetition", 0)
+    positions = [integer(p, "Stage position", 0) for p in positions]
+    settings = dict(protocol["common"])
+    frozen = plan.get("frozen_selection")
+    if frozen is None:
+        if method != "jacobi" and (rank is None or window is None):
+            raise ValueError("Before the freeze, screen stages declare rank and window explicitly")
+        if refresh is None:
+            raise ValueError("Before the freeze, screen stages declare inner_refresh explicitly")
+        settings.update(rank=0 if method == "jacobi" else rank, recycle_window=window or 1)
+        settings["inner_refresh"] = refresh
+    else:
+        if rank is not None or window is not None or refresh is not None:
+            raise ValueError("A frozen plan fixes rank, window and refresh; do not override them")
+        policy = frozen["ranks"][method]
+        settings.update(rank=policy["rank"], recycle_window=policy["recycle_window"])
+        settings["inner_refresh"] = frozen["inner_refresh"]
+    settings.update(
+        slabs=plan["grid"]["slabs"],
+        method=method,
+        repetition=repetition,
+        baseline_directory=plan["baseline"]["directory"],
+        output=str(output),
+    )
+    if "slabs" in protocol["common"]:
+        raise ValueError("The grid is fixed by the frozen plan, not the protocol common block")
+    overrides = [f"{key}={hydra_value(value)}" for key, value in settings.items()]
+    overrides.append(f"stage.positions={hydra_value(positions)}")
+    overrides.append(f"stage.restore={hydra_value(None if restore is None else str(restore))}")
+    overrides.append(f"stage.resume={hydra_value(None if resume is None else str(resume))}")
+    return overrides
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
+    stage = sub.add_parser("overrides", help="Print the Hydra overrides of one stage")
+    stage.add_argument("--protocol", type=Path, required=True)
+    stage.add_argument("--plan", type=Path, required=True)
+    stage.add_argument("--method", required=True)
+    stage.add_argument("--repetition", type=int, required=True)
+    stage.add_argument("--positions", type=int, nargs="+", required=True)
+    stage.add_argument("--output", type=Path, required=True)
+    stage.add_argument("--restore", type=Path)
+    stage.add_argument("--resume", type=Path)
+    stage.add_argument("--rank", type=int)
+    stage.add_argument("--window", type=int)
+    stage.add_argument("--refresh", type=int)
     one = sub.add_parser("assemble", help="Assemble the stage directories of one chain")
     one.add_argument("stages", type=Path, nargs="+")
     one.add_argument("--attempt", type=Path, action="append", default=[])
@@ -282,6 +367,27 @@ def main():
     many.add_argument("--execution-status", type=Path)
     many.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    if args.action == "overrides":
+        protocol = json.loads(args.protocol.read_text())
+        plan = json.loads(args.plan.read_text())
+        print(
+            " ".join(
+                stage_overrides(
+                    protocol,
+                    plan,
+                    args.method,
+                    args.repetition,
+                    args.positions,
+                    args.output,
+                    args.restore,
+                    args.resume,
+                    args.rank,
+                    args.window,
+                    args.refresh,
+                )
+            )
+        )
+        return
     if args.output.exists():
         raise FileExistsError(args.output)
     status = json.loads(args.execution_status.read_text()) if args.execution_status else None

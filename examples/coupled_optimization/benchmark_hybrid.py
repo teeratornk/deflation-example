@@ -30,9 +30,24 @@ from deflation_example.study_solvers import StudySolver
 from deflation_example.validation import integer
 
 
-def check_policy(H, diagonal, systems, reference, backend, method, rank, cap):
+def check_policy(
+    H,
+    diagonal,
+    systems,
+    reference,
+    backend,
+    method,
+    rank,
+    cap,
+    refresh=1000,
+    coarse_device="cpu",
+    block_min_columns=20,
+):
     """Charge solver creation, transfer, coarse processing and cleanup together."""
     solver_class = HybridCoupledSolver if backend == "hybrid" else StudySolver
+    options = {"refresh": refresh}
+    if backend == "hybrid":
+        options.update(coarse_device=coarse_device, block_min_columns=block_min_columns)
     rows = []
     start = time.perf_counter()
     solver = solver_class(
@@ -44,6 +59,7 @@ def check_policy(H, diagonal, systems, reference, backend, method, rank, cap):
         cg_factor=0.1,
         maxiter=cap,
         residual_policy="refine",
+        **options,
     )
     try:
         for indices, exact, rhs in systems:
@@ -77,6 +93,9 @@ def check_policy(H, diagonal, systems, reference, backend, method, rank, cap):
         "backend": backend,
         "method": method,
         "requested_rank": 0 if method == "jacobi" else rank,
+        "refresh": refresh,
+        "coarse_device": coarse_device if backend == "hybrid" else "cpu",
+        "block_min_columns": block_min_columns if backend == "hybrid" else None,
         "seconds": time.perf_counter() - start,
         "systems": rows,
     }
@@ -94,11 +113,24 @@ def main():
     parser.add_argument("--cap", type=int, default=500)
     parser.add_argument("--repeats", type=int, default=2)
     parser.add_argument("--threads", type=int, default=8)
+    parser.add_argument("--refresh", type=int, default=1000)
+    parser.add_argument("--coarse-device", choices=("cpu", "cuda"), default="cpu")
+    parser.add_argument("--block-min-columns", type=int, default=20)
+    parser.add_argument("--backends", default="cpu,hybrid")
+    parser.add_argument("--methods", default="jacobi,reference,recycling")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     rank = integer(args.rank, "Requested rank", 1)
     cap = integer(args.cap, "Shared inner iteration cap", 1)
     repeats = integer(args.repeats, "Repetitions", 1)
+    refresh = integer(args.refresh, "Residual refresh interval", 1)
+    block_min_columns = integer(args.block_min_columns, "CUDA block threshold", 2)
+    backends = args.backends.split(",")
+    methods = args.methods.split(",")
+    if set(backends) - {"cpu", "hybrid"} or set(methods) - {"jacobi", "reference", "recycling"}:
+        raise ValueError(
+            "Choose backends among cpu,hybrid and methods among jacobi,reference,recycling"
+        )
     args.output.mkdir(parents=True, exist_ok=False)
     with threadpool_limits(integer(args.threads, "Threads", 1)):
         import cupy as cp
@@ -165,6 +197,11 @@ def main():
             "repetitions": repeats,
             "seed": 782,
             "threads": args.threads,
+            "refresh": refresh,
+            "coarse_device": args.coarse_device,
+            "block_min_columns": block_min_columns,
+            "backends": backends,
+            "methods": methods,
             "gpu": cp.cuda.runtime.getDeviceProperties(0)["name"].decode(),
             "cupy": cp.__version__,
             "state_dofs": problem.size,
@@ -175,15 +212,23 @@ def main():
             "scope": "Manufactured fixed-derivative kernel checks with zero initial guesses; no nonlinear optimization speedup. Each policy includes transfer, setup, iteration, independent verification and cleanup. Shared model assembly, reference construction and warmup are outside those intervals.",
         }
         rows = []
-        order = [
-            (backend, method)
-            for method in ("jacobi", "reference", "recycling")
-            for backend in ("cpu", "hybrid")
-        ]
+        order = [(backend, method) for method in methods for backend in backends]
         write_report(args.output / "record.json", {**metadata, "status": "running", "rows": rows})
         for repetition in range(repeats):
             for backend, method in order if repetition % 2 == 0 else order[::-1]:
-                row = check_policy(H, diagonal, systems, reference, backend, method, rank, cap)
+                row = check_policy(
+                    H,
+                    diagonal,
+                    systems,
+                    reference,
+                    backend,
+                    method,
+                    rank,
+                    cap,
+                    refresh=refresh,
+                    coarse_device=args.coarse_device,
+                    block_min_columns=block_min_columns,
+                )
                 rows.append({"repetition": repetition, **row})
                 write_report(
                     args.output / "record.json", {**metadata, "status": "running", "rows": rows}

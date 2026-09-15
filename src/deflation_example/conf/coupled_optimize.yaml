@@ -42,6 +42,10 @@ inner_cap: 50000
 inner_refresh: 1000
 hybrid_block_min_columns: 20
 hybrid_coarse_device: cpu
+initial_control_directory: null
+initial_control_method: reference
+initial_control_position: null
+initial_control_repeat: 1
 threads: 4
 hydra:
   run:

@@ -71,12 +71,14 @@ def assess_resolution(rows, pairs):
     }
 
 
-def summarize(directories, temperature_scale, initial_value=None):
+def summarize(directories, temperature_scale, initial_value=None, cross_scheme=False):
     """Retain every run and compute endpoint differences between complete refinements.
 
     This comparison uses the saved fields rather than the original-optimization
     differences printed by each run. Tracking integrals use the separately
-    recorded physical quadrature for each temporal resolution.
+    recorded physical quadrature for each temporal resolution. With
+    ``cross_scheme`` the forward time-integration policy may differ between
+    runs; each run's policy stays in its row and the summary says so.
     """
     scale = positive_real(temperature_scale, "Temperature scale")
     if initial_value is not None:
@@ -92,7 +94,7 @@ def summarize(directories, temperature_scale, initial_value=None):
             record["optimization_field_sha256"],
             record["baseline_sha256"],
             record["configuration"],
-            record["forward_solver"],
+            None if cross_scheme else record["forward_solver"],
         )
         if identity is not None and key != identity:
             raise ValueError(

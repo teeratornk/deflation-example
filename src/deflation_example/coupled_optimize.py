@@ -20,6 +20,7 @@ from .coupled_control import CoupledControlProblem, FlowEvaluationError
 from .coupled_optimizer import NUMERICAL_POLICY, minimize_coupled
 from .coupled_pilot import transformer_inputs
 from .coupled_reference import configured_reference
+from .coupled_saved import load_saved_solution, require_matching_baseline
 from .coupled_targets import desired_temperature
 from .oil_properties import momentum_reference
 from .reporting import environment, write_fields, write_report
@@ -189,6 +190,45 @@ def observe_linear_solves(solver, destination):
     solver.solve = observed
 
 
+def prolonged_initial_state(cfg, problem, baseline_record):
+    """A saved optimum on a coarser time grid, repeated per original slab.
+
+    The saved trajectory is piecewise constant in time on its own slabs; each
+    slab value is repeated over the finer slabs it covers. Flows are recomputed
+    from the isothermal baseline, so this is only an initial iterate. The saved
+    problem must be the same declared target, bounds, horizon and startup.
+    """
+    repeat = integer(cfg.get("initial_control_repeat", 1), "Temporal repetition", 1)
+    position = cfg.get("initial_control_position")
+    record, saved_cfg, arrays, digest = load_saved_solution(
+        cfg["initial_control_directory"], cfg["initial_control_method"], position
+    )
+    require_matching_baseline(record, baseline_record)
+    saved_slabs = integer(saved_cfg.get("slabs", 1), "Saved slabs", 1)
+    if not saved_cfg.get("transient", cfg["transient"]) == cfg["transient"]:
+        raise ValueError("A saved initial control must share the transient setting")
+    if saved_slabs * repeat != integer(cfg["slabs"], "Slabs", 1):
+        raise ValueError("The temporal repetition must map the saved slabs onto the declared slabs")
+    for key in ("query", "upper_K", "lower_K", "horizon_s", "target_count"):
+        if key in saved_cfg and saved_cfg[key] != cfg[key]:
+            raise ValueError(f"A saved initial control must share the declared {key}")
+    if saved_cfg.get("target_startup_s", 0.0) != cfg.get("target_startup_s", 0.0):
+        raise ValueError("A saved initial control must share the declared target startup")
+    state = np.asarray(arrays["state"], dtype=float).reshape(saved_slabs, -1)
+    prolonged = np.repeat(state, repeat, axis=0).ravel()
+    if prolonged.shape != (problem.size,):
+        raise ValueError("The prolonged initial control does not match the problem size")
+    return prolonged, {
+        "directory": str(cfg["initial_control_directory"]),
+        "method": cfg["initial_control_method"],
+        "position": position,
+        "field_sha256": digest,
+        "saved_slabs": saved_slabs,
+        "temporal_repetition": repeat,
+        "scope": "Initial iterate only; flows are recomputed from the isothermal baseline and every optimality check applies to the new optimum.",
+    }
+
+
 def solver_options(cfg, solver_class):
     """Runner-level inner-solver settings that every method shares.
 
@@ -263,6 +303,12 @@ def run(config):
                 return
             lower = (cfg["lower_K"] - problem.temperature_offset) / problem.temperature_scale
             upper = (cfg["upper_K"] - problem.temperature_offset) / problem.temperature_scale
+            initial_state = None
+            if cfg.get("initial_control_directory"):
+                initial_state, metadata["initial_control"] = prolonged_initial_state(
+                    cfg, problem, baseline_record
+                )
+                write_report(output / "record.json", {**metadata, "status": "running"})
             results = []
             for method in cfg["methods"]:
                 tick = time.perf_counter()
@@ -299,6 +345,7 @@ def run(config):
                         lower,
                         upper,
                         solver,
+                        initial=initial_state,
                         tolerance=cfg["nonlinear_tolerance"],
                         max_iterations=cfg["nonlinear_cap"],
                         backtracking=cfg["backtracking"],

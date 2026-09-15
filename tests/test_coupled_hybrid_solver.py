@@ -177,16 +177,23 @@ def test_gpu_blocks_preserve_original_residual_and_reuse_factors(method, coarse_
             assert sum(timing["components_seconds"].values()) == pytest.approx(
                 timing["total_seconds"]
             )
-            if coarse_device == "cuda" and result.rank:
-                # The operator-basis product runs inside the resident coarse space,
-                # so block calls appear only for the factor upload itself.
+            if coarse_device == "cuda":
                 coarse = timing["hybrid_coarse_correction"]
-                assert coarse["device"] == "cuda" and coarse["applications"] >= 1
+                assert coarse["device"] == "cuda"
                 assert coarse["seconds"] <= timing["callback_seconds"]
-                assert coarse["resident_operator_product_bytes"] > 0
-                assert timing["cached_operator_product_bytes"] == 0
-                assert coarse["spaces"][-1]["rank"] == result.rank
-                assert all(row["kind"] == "factor_upload" for row in log["calls"])
+                if result.rank:
+                    assert coarse["applications"] >= 1
+                    assert coarse["resident_operator_product_bytes"] > 0
+                    assert timing["cached_operator_product_bytes"] == 0
+                    assert coarse["spaces"][-1]["rank"] == result.rank
+                    if method == "reference":
+                        # The operator-basis product runs inside the resident coarse
+                        # space, so block calls appear only for the factor upload.
+                        assert all(row["kind"] == "factor_upload" for row in log["calls"])
+                else:
+                    # Recycling's first solve has no basis; its selection products
+                    # still use the device block path.
+                    assert coarse["applications"] == 0 and log["calls"]
             else:
                 assert log["calls"] and log["seconds"] > 0
                 assert "hybrid_coarse_correction" not in timing
