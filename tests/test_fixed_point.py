@@ -93,6 +93,29 @@ def test_momentum_zero_initial_guard():
     assert len(result.history) == 1
 
 
+def test_forward_native_target_matches_final_momentum_criterion(monkeypatch):
+    model, temperature, _, initial, args = manufactured(True)
+    original = model.flow.solve
+    calls = []
+
+    def checked(*a, **kw):
+        calls.append(kw["tolerance"])
+        assert kw["tolerance"] == 1e-10
+        return original(*a, **kw)
+
+    monkeypatch.setattr(model.flow, "solve", checked)
+    result = solve_forward(
+        model,
+        np.full_like(temperature, 2),
+        np.zeros_like(temperature),
+        initial,
+        tolerance=1e-10,
+        **args,
+    )
+    assert calls and result.status == "converged"
+    assert result.history[-1]["momentum_relative_residual"] <= 1e-10
+
+
 def test_rejected_acceleration_uses_relaxed_step(monkeypatch):
     model, temperature, _, initial, args = manufactured(True)
     original = Anderson.propose

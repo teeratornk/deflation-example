@@ -68,6 +68,7 @@ def prepare(args, subdivision):
         controls, _ = transfer_source(coarse, problem, controls)
     metadata = {
         "schema": "coupled-fixed-point-study-v1",
+        "numerical_policy": "matched-momentum-target-and-initial-guard-v2",
         "environment": environment(),
         "configuration": config,
         "policy": args.policy,
@@ -84,6 +85,7 @@ def prepare(args, subdivision):
         "temperature_scale_K": problem.temperature_scale,
         "slabs": problem.slabs,
         "tolerance": 1e-12,
+        "internal_momentum_tolerance": 1e-12,
         "flow_cap": 100,
         "coupling_cap": 300,
         "newton_cap": 100,

@@ -88,6 +88,14 @@ Forward acceptance requires momentum, continuity and thermal residuals at most
 inner residual `1e-10` and KKT threshold `1e-8`. Returned states and residuals
 always correspond. An already-converged initial guess needs no nonlinear solve.
 
+Version 2 also uses `1e-12` for the forward momentum subsolve and checks its
+initial flow before iterating. In the retained version-1 ordinary-step diagnostic,
+Newton reached approximately `8e-13` in one update but continued toward an
+unnecessary `1e-13` internal margin. All ten diagnostic updates satisfied the
+outer momentum threshold. The correction leaves final coupled acceptance
+unchanged. Version-1 smoke outputs remain separate; its unstarted screen tasks
+do not contribute numerical outcomes or timing comparisons.
+
 Report step time, complete-trajectory time, complete optimization time, sampled
 memory, tracking and temperature-bound violation separately. Preserve the
 original spatial/temporal resolution requirements. Faster nonlinear convergence

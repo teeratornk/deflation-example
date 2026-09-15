@@ -121,18 +121,28 @@ def solve_forward(
     mixer = None
     status = "coupling_iteration_cap"
     for iteration in range(1, max_iterations + 1):
-        candidate_flow = model.flow.solve(
-            model._force(state, feedback),
-            model.velocity_boundary,
-            model.velocity_values,
-            initial=flow,
-            previous=previous_velocity,
-            time_step=time_step,
-            pressure_gauge=model.pressure_gauge,
-            tolerance=tolerance * 0.1,
-            max_iterations=flow_cap,
-            method="newton",
+        # The same original momentum criterion applies inside and outside the
+        # coupling loop. A stricter native margin can sit below the attainable
+        # residual floor on the refined mesh; it is not required for acceptance.
+        flow_initial_verified = (
+            max(current["momentum_relative_residual"], current["continuity_relative_residual"])
+            <= tolerance
         )
+        if flow_initial_verified:
+            candidate_flow = FlowResult(flow.velocity.copy(), flow.pressure.copy(), "converged", [])
+        else:
+            candidate_flow = model.flow.solve(
+                model._force(state, feedback),
+                model.velocity_boundary,
+                model.velocity_values,
+                initial=flow,
+                previous=previous_velocity,
+                time_step=time_step,
+                pressure_gauge=model.pressure_gauge,
+                tolerance=tolerance,
+                max_iterations=flow_cap,
+                method="newton",
+            )
         if candidate_flow.status != "converged":
             history.append(
                 {
@@ -187,6 +197,8 @@ def solve_forward(
             **metrics,
             "flow_status": flow.status,
             "flow_history": flow.history,
+            "flow_initial_verified": flow_initial_verified,
+            "flow_internal_tolerance": tolerance,
             "elapsed_seconds": time.perf_counter() - start,
         }
         history.append(entry)

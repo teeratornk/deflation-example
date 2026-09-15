@@ -1,6 +1,7 @@
 {
-  "schema": "coupled-fixed-point-protocol-v1",
-  "source_parent": "fac30851267774257b7b23822fd5835c5b71b5e7",
+  "schema": "coupled-fixed-point-protocol-v2",
+  "source_parent": "48c0c5b5606703b24b625eb7166bbb3b21f7d7cc",
+  "revision_reason": "The ordinary finer-mesh first flow solve stagnated near 8e-13 while pursuing the optional 1e-13 inner target. Version 2 uses the unchanged 1e-12 final momentum target internally and verifies the current flow before solving. Retain v1 smoke and diagnostic records; its other screen tasks were withheld before execution. All cases, controls, global acceptance criteria and comparison populations are unchanged.",
   "scope": "Separate forward and internal momentum policies; existing optimization and timing sources are unchanged.",
   "baseline": "coupled-graddiv-189974",
   "fine_baseline": "coupled-refined-control-190029-0",
