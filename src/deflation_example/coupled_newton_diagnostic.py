@@ -133,17 +133,24 @@ def main():
         record, cfg, fields, digest = load_saved_solution(
             args.optimization, args.method, args.target_position
         )
-        coarse, baseline = load_problem({**cfg, "baseline_directory": str(args.baseline)})
-        fine, fine_baseline = load_problem({**cfg, "baseline_directory": str(args.fine_baseline)})
-        require_matching_baseline(record, baseline)
         replay = json.loads((args.replay / "record.json").read_text())
+        subdivision = integer(replay.get("subdivision", 1), "Time subdivision", 1)
+        comparison_cfg = {**cfg, "slabs": cfg["slabs"] * subdivision}
+        coarse, baseline = load_problem(
+            {**comparison_cfg, "baseline_directory": str(args.baseline)}
+        )
+        fine, fine_baseline = load_problem(
+            {**comparison_cfg, "baseline_directory": str(args.fine_baseline)}
+        )
+        require_matching_baseline(record, baseline)
         if (
             replay["optimization_field_sha256"] != digest
             or replay["fine_baseline_sha256"] != fine_baseline["baseline_sha256"]
             or replay["baseline_sha256"] != baseline["baseline_sha256"]
         ):
             raise ValueError("The saved replay must use the specified control and baselines")
-        controls, _ = transfer_source(coarse, fine, fields["control"])
+        repeated = np.repeat(fields["control"].reshape(cfg["slabs"], -1), subdivision, axis=0)
+        controls, _ = transfer_source(coarse, fine, repeated)
         with np.load(args.replay / "states.npz", allow_pickle=False) as data:
             n = len(data["state"]) - 1 if args.step is None else integer(args.step, "Step", 0)
             if n >= len(data["state"]) or n >= fine.slabs:

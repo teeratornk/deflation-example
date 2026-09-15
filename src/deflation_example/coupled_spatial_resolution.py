@@ -1,6 +1,7 @@
 """Replay a fixed coupled source on the immediate nested spatial refinement."""
 
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
@@ -15,7 +16,7 @@ from .coupled_resolution import (
     forward_protocol,
     replay_controls,
 )
-from .coupled_saved import load_saved_solution, require_matching_baseline
+from .coupled_saved import file_digest, load_saved_solution, require_matching_baseline
 from .coupled_targets import desired_temperature
 from .reporting import environment, write_fields, write_report
 from .validation import integer
@@ -42,6 +43,44 @@ def transfer_source(coarse, fine, controls):
     return np.asarray(P @ source.T).T, P
 
 
+def coarse_replay_states(directory, problem, baseline_digest, source_digest, configuration):
+    """Require a complete same-source coarse trajectory on the comparison time grid."""
+    directory = Path(directory)
+    record = json.loads((directory / "record.json").read_text())
+    clean_cfg = {
+        k: v
+        for k, v in configuration.items()
+        if k not in {"output", "baseline_directory", "reference_baseline_directory"}
+    }
+    if (
+        record["optimization_field_sha256"] != source_digest
+        or record["baseline_sha256"] != baseline_digest
+        or record["configuration"] != clean_cfg
+    ):
+        raise ValueError("The coarse replay must use the same saved source and physical inputs")
+    if record["status"] != "converged" or not all(
+        r["status"] == "converged" for r in record["steps"]
+    ):
+        raise ValueError("The coarse replay must be a complete converged trajectory")
+    with np.load(directory / "states.npz", allow_pickle=False) as data:
+        states, times = data["state"].copy(), data["times_s"].copy()
+    expected_times = np.cumsum(problem.physical_steps)
+    if (
+        states.shape != (problem.slabs, problem.spatial_size)
+        or not np.isfinite(states).all()
+        or times.shape != expected_times.shape
+        or not np.allclose(times, expected_times, rtol=1e-12, atol=1e-12)
+        or len(record["steps"]) != problem.slabs
+        or not np.allclose([r["time_s"] for r in record["steps"]], times, rtol=1e-12, atol=1e-12)
+    ):
+        raise ValueError("The coarse replay must match every comparison time level")
+    return states, {
+        "record_sha256": file_digest(directory / "record.json"),
+        "field_sha256": file_digest(directory / "states.npz"),
+        "forward_solver": record["forward_solver"],
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", type=Path, required=True)
@@ -57,8 +96,13 @@ def main():
         "--procedure", choices=("segregated", "monolithic_newton"), default="segregated"
     )
     parser.add_argument("--newton-cap", type=int, default=30)
+    parser.add_argument("--subdivision", type=int, default=1)
+    parser.add_argument("--coarse-replay", type=Path)
     add_forward_options(parser)
     args = parser.parse_args()
+    subdivision = integer(args.subdivision, "Time subdivision", 1)
+    if subdivision > 1 and args.coarse_replay is None:
+        parser.error("Temporal subdivision requires a matching --coarse-replay")
     options = forward_options(args)
     if args.output.exists():
         raise FileExistsError(args.output)
@@ -66,8 +110,16 @@ def main():
         record, cfg, fields, digest = load_saved_solution(
             args.optimization, args.method, args.target_position
         )
-        coarse, baseline = load_problem({**cfg, "baseline_directory": str(args.baseline)})
-        fine, fine_baseline = load_problem({**cfg, "baseline_directory": str(args.fine_baseline)})
+        if not cfg["transient"]:
+            raise ValueError("Spatial trajectory replay requires a transient optimization")
+        original_slabs = integer(cfg["slabs"], "Original time slabs", 1)
+        comparison_cfg = {**cfg, "slabs": original_slabs * subdivision}
+        coarse, baseline = load_problem(
+            {**comparison_cfg, "baseline_directory": str(args.baseline)}
+        )
+        fine, fine_baseline = load_problem(
+            {**comparison_cfg, "baseline_directory": str(args.fine_baseline)}
+        )
         require_matching_baseline(record, baseline)
         for key in (
             "properties",
@@ -82,8 +134,17 @@ def main():
             != fine_baseline["configuration"]["convection_form"]
         ):
             raise ValueError("The momentum discretization must match across refinement")
-        source, P = transfer_source(coarse, fine, fields["control"])
-        original = fields["state"].reshape(coarse.slabs, coarse.spatial_size)
+        controls = np.repeat(
+            fields["control"].reshape(original_slabs, coarse.spatial_size), subdivision, axis=0
+        )
+        source, P = transfer_source(coarse, fine, controls)
+        comparison = None
+        if args.coarse_replay is None:
+            original = fields["state"].reshape(coarse.slabs, coarse.spatial_size)
+        else:
+            original, comparison = coarse_replay_states(
+                args.coarse_replay, coarse, baseline["baseline_sha256"], digest, cfg
+            )
         interpolated = np.asarray(P @ original.T).T
         args.output.mkdir(parents=True, exist_ok=False)
         metadata = {
@@ -100,9 +161,11 @@ def main():
             "fine_baseline_sha256": fine_baseline["baseline_sha256"],
             "coarse_state_dofs": coarse.size,
             "fine_state_dofs": fine.size,
+            "subdivision": subdivision,
+            "coarse_replay": comparison,
             "forward_solver": forward_protocol(fine, options),
-            "control_transfer": "Nested P1 interpolation with zero source at prescribed-temperature nodes; identical piecewise-constant temporal source intervals.",
-            "scope": "Fixed-source spatial resolution with unchanged physical time steps; no reoptimization or temperature clipping.",
+            "control_transfer": "Nested P1 interpolation with zero source at prescribed-temperature nodes; each saved source is copied unchanged into its temporal subintervals.",
+            "scope": "Fixed-source spatial comparison at matching physical time steps on both meshes; no reoptimization or temperature clipping.",
         }
         if args.procedure == "monolithic_newton":
             metadata["forward_solver"] = {
@@ -145,7 +208,13 @@ def main():
             report["maximum_temperature_difference_K"] = float(
                 np.max(np.abs(states - interpolated)) * fine.temperature_scale
             )
-            coarse_target = fields["desired"].reshape(original.shape)
+            coarse_target = (
+                fields["desired"].reshape(original.shape)
+                if args.coarse_replay is None
+                else desired_temperature(
+                    coarse, cfg["query"], cfg["target_count"], cfg.get("target_startup_s", 0.0)
+                ).reshape(original.shape)
+            )
             fine_target = desired_temperature(
                 fine, cfg["query"], cfg["target_count"], cfg.get("target_startup_s", 0.0)
             ).reshape(states.shape)

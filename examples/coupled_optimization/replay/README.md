@@ -162,6 +162,24 @@ interpolation. It retains the computed temperatures, velocities, pressures,
 conservation checks and any unsuccessful step. Its default segregated
 procedure remains available for reproducing earlier computations.
 
+To compare meshes with smaller time steps, supply a complete coarse-mesh
+forward trajectory at the same subdivision. For example:
+
+```bash
+uv run python -m deflation_example.coupled_spatial_resolution \
+  --baseline runs/stabilized-baseline --fine-baseline runs/refined-baseline \
+  --optimization runs/optimized --procedure monolithic_newton \
+  --subdivision 2 --coarse-replay runs/newton-subdivision2 \
+  --tolerance 1e-12 --newton-cap 30 --output runs/newton-spatial-subdivision2
+```
+
+The source remains constant within each original control interval. Both meshes
+use the same smaller time steps, and the comparison uses the computed coarse
+forward trajectory. The driver checks its source hash, configuration, complete
+convergence and saved time levels. Thus the temperature difference compares
+spatial resolutions at a fixed time grid. Compare temporal resolutions on each
+mesh separately. Earlier coarse-time failures remain separate outputs.
+
 ## Diagnose a stopped spatial replay
 
 The following read-only check uses the saved temperature, velocity, pressure,

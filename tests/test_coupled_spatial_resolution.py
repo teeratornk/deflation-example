@@ -42,3 +42,40 @@ def test_spatial_source_transfer_rejects_changed_physical_scaling():
     fine = SimpleNamespace(physical_steps=np.ones(2), temperature_scale=10)
     with pytest.raises(ValueError, match="physical scales"):
         transfer_source(coarse, fine, np.zeros(2 * len(mesh.free)))
+
+
+@pytest.mark.parametrize(
+    "corruption", ["source", "configuration", "status", "step", "times", "shape", "nan"]
+)
+def test_coarse_replay_rejects_unmatched_or_incomplete_comparisons(tmp_path, corruption):
+    import json
+    from deflation_example.coupled_spatial_resolution import coarse_replay_states
+
+    problem = SimpleNamespace(slabs=2, spatial_size=3, physical_steps=np.array([0.2, 0.3]))
+    record = {
+        "optimization_field_sha256": "source",
+        "baseline_sha256": "baseline",
+        "configuration": {"slabs": 1},
+        "status": "converged",
+        "steps": [{"time_s": 0.2, "status": "converged"}, {"time_s": 0.5, "status": "converged"}],
+        "forward_solver": {"tolerance": 1e-12},
+    }
+    times, states = np.array([0.2, 0.5]), np.zeros((2, 3))
+    if corruption == "source":
+        record["optimization_field_sha256"] = "changed"
+    elif corruption == "configuration":
+        record["configuration"]["slabs"] = 2
+    elif corruption == "status":
+        record["status"] = "newton_iteration_cap"
+    elif corruption == "step":
+        record["steps"][-1]["status"] = "newton_line_search_stagnation"
+    elif corruption == "times":
+        times[-1] = 0.6
+    elif corruption == "shape":
+        states = states[:1]
+    elif corruption == "nan":
+        states[0, 0] = np.nan
+    (tmp_path / "record.json").write_text(json.dumps(record))
+    np.savez(tmp_path / "states.npz", state=states, times_s=times)
+    with pytest.raises(ValueError):
+        coarse_replay_states(tmp_path, problem, "baseline", "source", {"slabs": 1})

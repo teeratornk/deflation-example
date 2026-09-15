@@ -254,7 +254,10 @@ def test_newton_trajectory_replays_saved_controls_and_retains_partial_failure():
     assert len(failed["steps"]) == 1
 
 
-def test_newton_spatial_cli_preserves_forward_protocol_and_fields(tmp_path, monkeypatch):
+@pytest.mark.parametrize("subdivision", [1, 2])
+def test_newton_spatial_cli_preserves_forward_protocol_and_fields(
+    tmp_path, monkeypatch, subdivision
+):
     import json
     import sys
     from scipy import sparse
@@ -279,16 +282,51 @@ def test_newton_spatial_cli_preserves_forward_protocol_and_fields(tmp_path, monk
     monkeypatch.setattr(
         module, "load_saved_solution", lambda *a: (baseline, config, fields, "fields")
     )
-    monkeypatch.setattr(module, "load_problem", lambda *a: (problem, baseline))
+    comparison = small_coupled_problem(
+        np.repeat(np.array([0.2, 0.35]) / subdivision, subdivision), uniform_capacity=True
+    )
+
+    def load(cfg):
+        assert cfg["slabs"] == 2 * subdivision
+        return comparison, baseline
+
+    monkeypatch.setattr(module, "load_problem", load)
     monkeypatch.setattr(
         module,
         "transfer_source",
         lambda c, f, u: (
-            u.reshape(problem.slabs, -1).copy(),
+            u.reshape(comparison.slabs, -1).copy(),
             sparse.eye(problem.spatial_size, format="csr"),
         ),
     )
     output = tmp_path / "spatial"
+    extra = []
+    expected = state.reshape(2, -1)
+    if subdivision > 1:
+        from deflation_example.coupled_newton_replay import newton_trajectory
+
+        repeated = np.repeat(evaluation.control.reshape(2, -1), subdivision, axis=0)
+        replay = newton_trajectory(comparison, repeated, tolerance=1e-12)
+        assert replay["status"] == "converged"
+        expected = replay["states"]
+        directory = tmp_path / "coarse-replay"
+        directory.mkdir()
+        (directory / "record.json").write_text(
+            json.dumps(
+                {
+                    "configuration": config,
+                    "optimization_field_sha256": "fields",
+                    "baseline_sha256": "test",
+                    "status": "converged",
+                    "steps": replay["steps"],
+                    "forward_solver": {"tolerance": 1e-12},
+                }
+            )
+        )
+        np.savez(
+            directory / "states.npz", state=expected, times_s=np.cumsum(comparison.physical_steps)
+        )
+        extra = ["--subdivision", str(subdivision), "--coarse-replay", str(directory)]
     monkeypatch.setattr(
         sys,
         "argv",
@@ -306,6 +344,7 @@ def test_newton_spatial_cli_preserves_forward_protocol_and_fields(tmp_path, monk
             "1e-12",
             "--output",
             str(output),
+            *extra,
         ],
     )
     module.main()
@@ -314,6 +353,8 @@ def test_newton_spatial_cli_preserves_forward_protocol_and_fields(tmp_path, monk
     assert report["forward_solver"]["procedure"] == "monolithic_newton"
     assert report["forward_solver"]["tolerance"] == 1e-12
     assert report["maximum_temperature_difference_K"] < 1e-8
+    assert report["subdivision"] == subdivision
+    assert (report["coarse_replay"] is not None) == (subdivision > 1)
     with np.load(output / "states.npz") as arrays:
         assert {"velocity", "pressure", "state", "times_s"} <= set(arrays.files)
-        np.testing.assert_allclose(arrays["state"].ravel(), state, atol=1e-8)
+        np.testing.assert_allclose(arrays["state"], expected, atol=1e-8)
