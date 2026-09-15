@@ -53,6 +53,34 @@ def fixed_matrix_comparison(matrix, rhs, initial, fixed, verify, corrections=5):
     return histories
 
 
+def nonlinear_comparison(matrix_at, rhs, initial, fixed, verify, iterations=10):
+    """Compare algebraically equivalent Oseen maps at identical final accuracy."""
+    free = np.setdiff1d(np.arange(len(initial)), fixed)
+    histories = {}
+    for route in ("state", "correction"):
+        start = time.perf_counter()
+        x = initial.copy()
+        checks = verify(x)
+        rows = [{"iteration": 0, "checks": checks}]
+        for iteration in range(1, iterations + 1):
+            if max(checks.values()) <= 1e-12:
+                break
+            matrix = matrix_at(x)
+            factor = splu(matrix[free][:, free].tocsc())
+            if route == "state":
+                x[free] = factor.solve(rhs[free] - matrix[free][:, fixed] @ x[fixed])
+            else:
+                x[free] += factor.solve((rhs - matrix @ x)[free])
+            checks = verify(x)
+            rows.append({"iteration": iteration, "checks": checks})
+        histories[route] = {
+            "status": "converged" if max(checks.values()) <= 1e-12 else "diagnostic_iteration_cap",
+            "history": rows,
+            "seconds": time.perf_counter() - start,
+        }
+    return histories
+
+
 def run(data_root, output, threads):
     protocol = json.loads((HERE / "protocol.json").read_text())
     args = SimpleNamespace(
@@ -106,17 +134,29 @@ def run(data_root, output, threads):
         start = time.perf_counter()
         matrix = flow.operator(initial.velocity, dt)
         histories = fixed_matrix_comparison(matrix, rhs, x, fixed, verify)
+        report = {
+            **metadata,
+            "status": "diagnostic_running",
+            "diagnostic_source_sha256": file_sha256(Path(__file__)),
+            "initial_equations": verify(x),
+            "time_s": dt,
+            "histories": histories,
+        }
+        write_report(output / "record.json", report)
+
+        def matrix_at(vector):
+            velocity = np.column_stack((vector[: flow.nv], vector[flow.nv : 2 * flow.nv]))
+            return flow.operator(velocity, dt)
+
+        sequences = nonlinear_comparison(matrix_at, rhs, x, fixed, verify)
         write_report(
             output / "record.json",
             {
-                **metadata,
+                **report,
                 "status": "diagnostic_complete",
-                "diagnostic_source_sha256": file_sha256(Path(__file__)),
-                "initial_equations": verify(x),
-                "time_s": dt,
-                "histories": histories,
+                "nonlinear_sequences": sequences,
                 "seconds": time.perf_counter() - start,
-                "scope": "One frozen Oseen matrix, identical factorization and physical data. Corrections reduce its linear residual; the nonlinear momentum equations are evaluated separately. This is neither a nonlinear policy screen nor complete optimization evidence.",
+                "scope": "One frozen Oseen matrix with an identical factorization, followed by at most ten Oseen updates for each algebraically equivalent map. Physical data and final original-equation tolerance are unchanged. This diagnosis does not replace any declared screen or complete optimization result.",
             },
         )
 

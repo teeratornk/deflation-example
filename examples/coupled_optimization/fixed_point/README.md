@@ -172,5 +172,6 @@ uv run python examples/coupled_optimization/fixed_point/momentum_precision.py \
 ```
 
 The diagnostic does not change the screening policies or their final accuracy
-criteria. A small frozen-matrix residual alone does not establish a nonlinear
-momentum solution.
+criteria. It also compares at most ten successive Oseen updates using the two
+algebraically equivalent maps, starting from the same initial flow. A small
+frozen-matrix residual alone does not establish a nonlinear momentum solution.

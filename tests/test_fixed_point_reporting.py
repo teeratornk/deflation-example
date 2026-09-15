@@ -376,3 +376,10 @@ def test_oseen_precision_diagnostic_preserves_matrix_boundary_and_initial_state(
     for route in ("state", "correction"):
         assert len(rows[route]) == 3
         assert max(r["original_nonlinear_equations"]["error"] for r in rows[route]) < 1e-14
+    sequences = example("momentum_precision").nonlinear_comparison(
+        lambda x: matrix, matrix @ exact, initial, fixed, verify
+    )
+    for route in ("state", "correction"):
+        assert sequences[route]["status"] == "converged"
+        assert len(sequences[route]["history"]) == 2
+    assert np.array_equal(initial, saved)
