@@ -58,15 +58,105 @@ def test_failed_or_unfinished_repetition_has_no_median():
     assert group["statuses"] == ["complete", "iteration_cap", "missing"]
 
 
+def equation_checks():
+    return {
+        "momentum_relative_residual": 5e-13,
+        "continuity_relative_residual": 1e-16,
+        "thermal_relative_residual": 2e-14,
+        "mass_relative_imbalance": 1e-14,
+        "energy_relative_defect": 1e-14,
+    }
+
+
 def optimizer_record():
     return {
         "status": "complete",
         "all_problems_verified": True,
-        "configuration": {"queries": [{"target": 7}]},
-        "cases": [{"status": "converged", "verified": True}],
+        "configuration": {
+            "queries": [{"target": 7}],
+            "slabs": 1,
+            "nonlinear_tolerance": 1e-8,
+            "inner_tolerance": 1e-10,
+        },
+        "cases": [
+            {
+                "status": "converged",
+                "verified": True,
+                "equations": [equation_checks()],
+                "kkt": dict.fromkeys(
+                    (
+                        "primal_absolute",
+                        "stationarity",
+                        "dual_feasibility",
+                        "lower_complementarity",
+                        "upper_complementarity",
+                    ),
+                    1e-9,
+                ),
+                "adjoint": {"maximum_momentum_adjoint_relative_residual": 5e-13},
+            }
+        ],
         "sequence_seconds": 12,
         "components_seconds": {"setup": 3, "solve": 9},
     }
+
+
+@pytest.mark.parametrize("metric", list(equation_checks()))
+def test_verified_screen_requires_its_recorded_equation_values(tmp_path, metric):
+    path = tmp_path / "record.json"
+    record = {
+        "status": "complete",
+        "family": "forward",
+        "row": {"status": "converged", "verified": True, "checks": equation_checks()},
+    }
+    write_report(path, record)
+    row, _ = module().outcome(path, {"phase": "screen"})
+    assert row["maximum_equation_relative_residual"] == 5e-13
+    record["row"]["checks"][metric] = 0.01
+    write_report(path, record)
+    with pytest.raises(ValueError, match="Verified record violates"):
+        module().outcome(path, {"phase": "screen"})
+    record["row"].update(verified=False, status="iteration_cap")
+    write_report(path, record)
+    row, _ = module().outcome(path, {"phase": "screen"})
+    assert not row["verified"] and row["status"] == "iteration_cap"
+
+
+@pytest.mark.parametrize("value", [None, float("nan"), float("inf"), -1, 1e-7])
+def test_verified_optimizer_requires_each_kkt_component(tmp_path, value):
+    path = tmp_path / "record.json"
+    record = optimizer_record()
+    record["cases"][0]["kkt"]["stationarity"] = value
+    write_report(path, record)
+    with pytest.raises(ValueError, match="stationarity"):
+        module().outcome(path, {"phase": "optimize"})
+
+
+def test_verified_optimizer_requires_every_time_slab(tmp_path):
+    path = tmp_path / "record.json"
+    record = optimizer_record()
+    record["configuration"]["slabs"] = 2
+    write_report(path, record)
+    with pytest.raises(ValueError, match="time slab"):
+        module().outcome(path, {"phase": "optimize"})
+
+
+def test_verified_derivative_gate_requires_recorded_values(tmp_path):
+    path = tmp_path / "record.json"
+    record = {
+        "status": "verified",
+        "derivatives": {
+            "relative_dot_product_error": 1e-12,
+            "taylor_orders": [2.0, 2.0],
+            "equations": [equation_checks()],
+        },
+    }
+    write_report(path, record)
+    assert module().outcome(path, {"phase": "derivatives"})[0]["verified"]
+    record["derivatives"]["taylor_orders"][0] = 1.2
+    write_report(path, record)
+    with pytest.raises(ValueError, match="Taylor-order"):
+        module().outcome(path, {"phase": "derivatives"})
 
 
 def test_optimizer_checks_component_sum_and_resumed_cost(tmp_path):

@@ -71,6 +71,86 @@ def duration(value):
     return float(value)
 
 
+def bounded_metric(value, limit, name):
+    if (
+        not isinstance(value, (int, float))
+        or not math.isfinite(value)
+        or value < 0
+        or value > limit
+    ):
+        raise ValueError(f"Verified record violates {name}: {value!r}")
+    return float(value)
+
+
+def equation_metrics(checks, tolerance, *, momentum_only=False):
+    """Check stored independent evaluations; this does not rerun the PDE."""
+    names = ["momentum_relative_residual", "continuity_relative_residual"]
+    if not momentum_only:
+        names.append("thermal_relative_residual")
+    maximum = max(bounded_metric(checks.get(k), tolerance, k) for k in names)
+    if not momentum_only:
+        bounded_metric(checks.get("mass_relative_imbalance"), 1e-6, "mass balance")
+        energy = checks.get(
+            "energy_relative_defect", checks.get("energy", {}).get("relative_defect")
+        )
+        bounded_metric(energy, 1e-6, "energy balance")
+    return maximum
+
+
+def verified_metrics(record, phase):
+    """Refuse verified labels inconsistent with their recorded numerical values."""
+    if phase in {"screen", "trajectory"}:
+        steps = [record["row"]] if phase == "screen" else record["steps"]
+        maximum = max(
+            equation_metrics(
+                step["checks"],
+                1e-12,
+                momentum_only=phase == "screen" and record["family"] == "momentum",
+            )
+            for step in steps
+        )
+        return {"maximum_equation_relative_residual": maximum}
+    if phase == "derivatives":
+        report = record["derivatives"]
+        bounded_metric(report.get("relative_dot_product_error"), 1e-9, "adjoint dot product")
+        orders = report.get("taylor_orders", [])
+        if not orders or any(not math.isfinite(v) or v <= 1.9 for v in orders):
+            raise ValueError("Verified record violates the Taylor-order criterion")
+        equations = report["equations"]
+    else:
+        cfg = record["configuration"]
+        if cfg["nonlinear_tolerance"] != 1e-8 or cfg["inner_tolerance"] != 1e-10:
+            raise ValueError("Optimization tolerances differ from the declared protocol")
+        equations = []
+        components = (
+            "primal_absolute",
+            "stationarity",
+            "dual_feasibility",
+            "lower_complementarity",
+            "upper_complementarity",
+        )
+        kkt_maximum = 0.0
+        for case in record["cases"]:
+            if len(case["equations"]) != cfg["slabs"]:
+                raise ValueError("Verified optimization omits a declared time slab")
+            equations.extend(case["equations"])
+            for name in components:
+                kkt_maximum = max(kkt_maximum, bounded_metric(case["kkt"].get(name), 1e-8, name))
+            bounded_metric(
+                case["adjoint"].get("maximum_momentum_adjoint_relative_residual"),
+                1e-8,
+                "momentum adjoint",
+            )
+    if not equations:
+        raise ValueError("Verified record has no independently evaluated equations")
+    result = {
+        "maximum_equation_relative_residual": max(equation_metrics(r, 1e-8) for r in equations)
+    }
+    if phase == "optimize":
+        result["maximum_kkt_component"] = kkt_maximum
+    return result
+
+
 def outcome(path, spec):
     row = {**spec, "status": "missing", "verified": False, "seconds": None}
     if not path.exists():
@@ -137,6 +217,8 @@ def outcome(path, spec):
         if row["resumed"]:
             row["seconds"] = None
             row["timing_status"] = "requires_complete_attempt_accounting"
+    if row["verified"]:
+        row.update(verified_metrics(record, phase))
     return row, record
 
 

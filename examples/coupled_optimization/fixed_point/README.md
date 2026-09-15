@@ -126,7 +126,11 @@ uv run python examples/coupled_optimization/fixed_point/audit.py \
 
 The audit lists missing, failed and verified outcomes separately. It verifies
 field checksums for both sides of each local-root comparison and checks the
-optimizer timer partition. Complete-time medians require all three declared
+optimizer timer partition. It also checks the recorded equation residuals,
+conservation defects, derivative diagnostics and final KKT components against
+their declared thresholds. These checks inspect the independent evaluations
+stored by each solver; they do not rerun the differential equations.
+Complete-time medians require all three declared
 repetitions to meet the criteria. The figures retain each verified repetition
 and show the number verified out of the declared population. For interrupted
 optimization attempts, the stage interval alone does not supply the all-attempt
