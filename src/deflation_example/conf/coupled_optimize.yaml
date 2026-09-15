@@ -39,6 +39,9 @@ qp_tolerance: 1.0e-10
 qp_cap: 100
 inner_tolerance: 1.0e-10
 inner_cap: 50000
+inner_refresh: 1000
+hybrid_block_min_columns: 20
+hybrid_coarse_device: cpu
 threads: 4
 hydra:
   run:

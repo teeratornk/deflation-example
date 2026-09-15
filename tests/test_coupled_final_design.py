@@ -37,4 +37,40 @@ def test_final_design_matches_the_public_runner_and_remains_unfrozen():
     assert len(protocol["method_order_by_repetition"]) == protocol["repetitions"] == 5
     for order in protocol["method_order_by_repetition"]:
         assert sorted(order) == sorted(protocol["methods"])
-    assert protocol["rank_selection"]["candidate_ranks"] == [20, 100, 200]
+    assert protocol["rank_selection"]["candidate_ranks"] == [200, 300, 400]
+    prior = protocol["rank_selection"]["prior_screen"]
+    assert prior["candidate_ranks"] == [20, 100, 200] and prior["device"] == "cpu"
+    assert {row["rank"] for row in prior["outcomes"] if row["method"] == "reference"} == {
+        20,
+        100,
+        200,
+    }
+
+
+def test_v2_amendment_keeps_v1_resolution_and_declares_headline_population():
+    root = Path(__file__).parents[1]
+    protocol = json.loads(
+        (root / "examples/coupled_optimization/final_study/protocol.json").read_text()
+    )
+    assert protocol["schema"] == "coupled-final-study-design-v2"
+    resolution = protocol["resolution"]
+    assert resolution["temperature_change_K"] == 0.05
+    assert resolution["tracking_relative_change"] == 0.01
+    assert resolution["forward_procedure"] == "monolithic_newton"
+    assert resolution["forward_tolerance"] == 1e-12 and resolution["forward_newton_cap"] == 30
+    assert protocol["methods"] == ["jacobi", "reference", "recycling"]
+    assert protocol["headline_population"] == ["jacobi", "reference"]
+    assert set(protocol["headline_population"]) < set(protocol["methods"])
+    assert protocol["screen_population"]["recycling"]["complete_sequences"] == 2
+    assert protocol["common"]["device"] == "hybrid"
+    assert protocol["common"]["hybrid_block_min_columns"] == 20
+    assert protocol["device_policy"]["headline_device"] == "hybrid"
+    v2 = protocol["resolution_v2"]["criteria"]
+    assert v2["tracking_relative_change"]["threshold"] == 0.01
+    assert v2["mass_weighted_space_time_rms_K"]["threshold"] == 0.05
+    assert v2["pointwise_maximum_K"]["threshold"] == 0.05
+    assert "not met" in protocol["resolution_v2"]["status_of_v1"]
+    assert protocol["bdf2_interpretation_rule"]["declared_before_reading"] is True
+    assert protocol["feasibility_v2"]["margin"].startswith("No safety margin")
+    assert protocol["amendment"]["date"] == "2026-09-15"
+    assert "inner_refresh" not in protocol["common"]

@@ -189,6 +189,21 @@ def observe_linear_solves(solver, destination):
     solver.solve = observed
 
 
+def solver_options(cfg, solver_class):
+    """Runner-level inner-solver settings that every method shares.
+
+    The residual-refresh interval applies to all methods. Hybrid-only settings
+    reach only the hybrid backend, so CPU and CUDA-resident solvers are unchanged.
+    """
+    options = {"refresh": integer(cfg.get("inner_refresh", 1000), "Residual refresh interval", 1)}
+    if solver_class.__name__ == "HybridCoupledSolver":
+        options["block_min_columns"] = integer(
+            cfg.get("hybrid_block_min_columns", 20), "CUDA block threshold", 2
+        )
+        options["coarse_device"] = cfg.get("hybrid_coarse_device", "cpu")
+    return options
+
+
 def run(config):
     cfg = OmegaConf.to_container(config, resolve=True)
     if not cfg["baseline_directory"]:
@@ -273,6 +288,7 @@ def run(config):
                     maxiter=cfg["inner_cap"],
                     cg_factor=0.1,
                     residual_policy="refine",
+                    **solver_options(cfg, solver_class),
                 )
                 if cfg["linear_progress"]:
                     observe_linear_solves(solver, output / (method + "-linear-progress.json"))

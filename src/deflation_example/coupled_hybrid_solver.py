@@ -20,11 +20,14 @@ from .validation import integer
 class HybridCoupledSolver(StudySolver):
     """Retain CPU vectors and accelerate blocks of at least twenty columns."""
 
-    def __init__(self, method, *, block_min_columns=20, **kwargs):
+    def __init__(self, method, *, block_min_columns=20, coarse_device="cpu", **kwargs):
         if method not in {"jacobi", "reference", "recycling"}:
             raise ValueError("Hybrid coupled policies are jacobi, reference and recycling")
+        if coarse_device not in {"cpu", "cuda"}:
+            raise ValueError("The hybrid coarse-space correction runs on cpu or cuda")
         super().__init__(method, device="cpu", **kwargs)
         self.block_min_columns = integer(block_min_columns, "CUDA block threshold", 2)
+        self.coarse_device = coarse_device
         self.cpu_jacobian = self.device_jacobian = None
         self.block_records = []
 
@@ -64,6 +67,7 @@ class HybridCoupledSolver(StudySolver):
                 return B @ vectors
             start = time.perf_counter()
             uploaded = False
+            upload_seconds = 0.0
             if self.cpu_jacobian is not parent.jacobian:
                 if self.device_jacobian is not None:
                     self.device_jacobian.close()
@@ -71,6 +75,10 @@ class HybridCoupledSolver(StudySolver):
                 self.device_jacobian = CudaControlJacobian(parent.jacobian)
                 self.cpu_jacobian = parent.jacobian
                 uploaded = True
+                # Factor upload and triangular analyses recur once per nonlinear
+                # iterate; keep them visible rather than folded into block time.
+                self.device_jacobian.cp.cuda.get_current_stream().synchronize()
+                upload_seconds = time.perf_counter() - start
             if normal is None:
                 normal = CudaGaussNewton(
                     self.device_jacobian,
@@ -84,8 +92,10 @@ class HybridCoupledSolver(StudySolver):
             cp.cuda.get_current_stream().synchronize()
             self.block_records.append(
                 {
+                    "kind": "operator_block",
                     "columns": vectors.shape[1],
                     "factor_upload": uploaded,
+                    "upload_and_analysis_seconds": upload_seconds,
                     "seconds": time.perf_counter() - start,
                 }
             )

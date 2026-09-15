@@ -15,7 +15,12 @@ from omegaconf import OmegaConf
 from threadpoolctl import threadpool_limits
 
 from .coupled_control import FlowEvaluationError
-from .coupled_optimize import equations_verified, load_problem, observe_linear_solves
+from .coupled_optimize import (
+    equations_verified,
+    load_problem,
+    observe_linear_solves,
+    solver_options,
+)
 from .coupled_optimizer import NUMERICAL_POLICY, minimize_coupled
 from .memory import ProcessMemory
 from .coupled_reference import configured_reference
@@ -262,6 +267,7 @@ def run(config):
                 maxiter=cfg["inner_cap"],
                 cg_factor=0.1,
                 residual_policy="refine",
+                **solver_options(cfg, solver_class),
             )
             if cfg.get("linear_progress", False):
                 observe_linear_solves(solver, output / "linear-progress.json")

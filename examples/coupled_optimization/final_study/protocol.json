@@ -1,6 +1,6 @@
 {
-  "schema": "coupled-final-study-design-v1",
-  "status": "awaiting resolution, reoptimization and rank selection",
+  "schema": "coupled-final-study-design-v2",
+  "status": "v2 amended 2026-09-15: timing on the 64-slab discrete problem; awaiting the hybrid rank screen and freeze; resolution assessed under resolution_v2 with the v1 outcome reported in full",
   "scope": "Complete coupled nonlinear trajectory optimization on the axisymmetric transformer. The prescribed-flow manuscript and its timings remain separate.",
   "physical_policy": {
     "geometry": "axisymmetric transformer",
@@ -22,7 +22,9 @@
     "target_count": 16,
     "alpha": 1e-14,
     "lower_K": 337.3,
-    "device": "cpu",
+    "device": "hybrid",
+    "hybrid_block_min_columns": 20,
+    "hybrid_coarse_device": "cuda",
     "threads": 8,
     "flow_tolerance": 1e-12,
     "flow_cap": 40,
@@ -64,7 +66,22 @@
   ],
   "rank_selection": {
     "nominal_query": {"target": 7, "upper_K": 357.3},
-    "candidate_ranks": [20, 100, 200],
+    "candidate_ranks": [200, 300, 400],
+    "selection_metric": "preparation_inclusive_seconds",
+    "prior_screen": {
+      "device": "cpu",
+      "candidate_ranks": [20, 100, 200],
+      "nominal_query": {"target": 7, "upper_K": 357.3},
+      "baseline_sha256_prefix": "7d7344d22282",
+      "outcomes": [
+        {"method": "jacobi", "rank": 0, "sequence_seconds": 141992.60144691262, "preparation_inclusive_seconds": 142185.71283474937, "record": "coupled-ablations-v1-cpu/baseline-jacobi/rep-0/sequence/record.json", "record_sha256": "7423d221147dc70f3918dc0dbd4664e0142cf67d1838ffcff1f4234f901e06ad"},
+        {"method": "reference", "rank": 20, "sequence_seconds": 138140.8307424374, "preparation_inclusive_seconds": 138332.65970522352, "record": "coupled-ablations-v1-cpu/rank20-reference/rep-0/sequence/record.json", "record_sha256": "3ab0639ac3e8c7f96fda69f94b83fd7f2aec23d4e64cf985d79cc06d22f5e742"},
+        {"method": "reference", "rank": 100, "sequence_seconds": 106056.61688891891, "preparation_inclusive_seconds": 106246.99837237038, "record": "coupled-ablations-v1-cpu/baseline-reference/rep-0/sequence/record.json", "record_sha256": "2139ec7bb5ab9714a4dcac92e20d76f5964f67f30b9728fe664b0791859629d6"},
+        {"method": "reference", "rank": 200, "sequence_seconds": 101872.34748294856, "preparation_inclusive_seconds": 102064.22809124365, "record": "coupled-ablations-v1-cpu/rank200-reference/rep-0/sequence/record.json", "record_sha256": "9ee31e053ca5ea64947d008aad399a293220fe2e47ac25547206b50050dcd782"},
+        {"method": "recycling", "rank": 100, "status": "execution_timeout_48h", "record": "coupled-ablations-v1-cpu/baseline-recycling", "note": "Ranks 20 and 200 also timed out at 48 h; no completed 64-slab recycling problem exists."}
+      ],
+      "interpretation": "Single-target, single-repetition CPU screen at 64 slabs. Rank 200 was fastest; rank 20 gave no gain. The per-solve CPU construction of the operator-basis product limits higher ranks, which motivates the hybrid device policy and the higher candidate ranks of this amendment."
+    },
     "policy": "Select each coarse solver's lowest verified setup-inclusive screening cost on the resolved nominal problem, then freeze. Retain all ranks and failures. Include matched-rank supporting comparisons if the selected ranks differ.",
     "jacobi_rank": 0,
     "recycling_window": "Equal to the selected rank; retain existing coarse vectors and new directions with selection in the common preconditioned coordinates."
@@ -90,5 +107,120 @@
   "execution_policy": "Use fresh processes with equivalent isolated resources, the same CPU and numerical backends, and the declared rotated solver order. Warm-start only from each method's own preceding verified problem. Charge the reference on the first problem.",
   "timing_boundary": "Model assembly, reference construction, solver resources, every nonlinear and active-set solve, transfers, independent verification and cleanup. Report common calibration and process preparation separately and also give preparation-inclusive totals. Field serialization follows the sequence timer.",
   "failure_policy": "Retain every declared attempt and scheduler termination. Compute a complete-population speedup only when every method has all five complete verified sequence repetitions. Do not convert caps, failures or missing runs into completed-solve speedups.",
+    "headline_population": [
+      "jacobi",
+      "reference"
+    ],
+    "screen_population": {
+      "recycling": {
+        "complete_sequences": 2,
+        "reporting": "Two complete recycling sequences (repetitions 0 and 1) run under identical settings, the selected recycling rank and window, and the same staged execution. They appear in the same summary table with their own status and never enter the completeness test of the headline population. Single-target recycling ablations are retained alongside."
+      },
+      "tested_deployments": "Pure-CPU jacobi and the CUDA-resident deployments of every method remain reported as tested alternatives with their measured or terminated outcomes."
+    },
+    "device_policy": {
+      "headline_device": "hybrid",
+      "definition": "CPU vectors, CPU single-vector operator applies and CPU original-residual verification for every method; CUDA is used only for operator products with at least hybrid_block_min_columns columns and, for the coarse methods when hybrid_coarse_device is cuda, for the resident coarse-space correction.",
+      "control": "The rank-zero jacobi control never uploads factors or performs device work under this policy; its record must contain no block calls and no coarse-device applications, which the reporter checks. Its hybrid timing must agree with the pure-CPU jacobi record within run-to-run noise, and both are reported.",
+      "fairness": "All methods share hybrid_block_min_columns, threads, inner_refresh, tolerances and the same node class. GPU reductions differ from CPU reductions at roundoff, so CG counts and the nonlinear path may differ slightly between devices; every sequence is verified independently and the outer path is reported from records, never assumed identical."
+    },
+    "staging_policy": {
+      "reason": "The 48 h scheduler wall limit is shorter than one five-problem sequence, and the seven-day class admits two concurrent jobs. Each sequence therefore runs as five consecutive stage jobs, one declared problem per stage, plus automatic resume of an interrupted stage from its last accepted Gauss-Newton iterate.",
+      "restore": "A stage restores the preceding verified target's accepted state and converged flows from the saved arrays; the first evaluation is then the same computation the single-process runner performs. An unverified preceding target supplies no warm start, exactly as in the single-process runner. Recycling history is exported and imported; the reference is rebuilt in every stage and charged in every stage.",
+      "resume": "An interrupted stage resumes from the checkpoint written after the last accepted Gauss-Newton iterate: state, slab flows, secant pairs, damping, iteration count, history and recycling basis. The resumed process re-evaluates the flows once; that re-evaluation is timed inside the stage. Work after the last checkpoint is recorded as discarded_seconds and is not counted. At most three resumes per stage.",
+      "timing_definition": "complete_sequence_seconds is the sum of the stage timers over the completed algorithmic path (assembly, reference construction, solver resources, solves, verification, checkpoint serialization, resume re-evaluation, cleanup). Process preparation, calibration and restore loading are recorded outside the timers and reported in preparation-inclusive totals. Wall elapsed time from first stage start to last stage end is also reported. The speedup claim must hold under stage-sum, stage-sum plus all restart overheads, and wall elapsed time.",
+      "provenance": "Every stage records its predecessor's final-array SHA-256, source tag and SHA-256, baseline SHA-256, node, job id, wall limit and a read-only co-tenancy snapshot at start and end. The assembler verifies the hash chain and refuses gaps, duplicates or mixed sources. Staged records carry assembly policy staged-v1 and are never pooled silently with single-process records."
+    },
+    "relaunch_policy": "A sequence terminated by the infrastructure (node failure, scheduler cancellation, or timeout after the resume cap) may be relaunched once per method under a new repetition index; the terminated attempt is retained. A sequence that fails numerically (nonconvergence, verification failure, iteration cap, flow failure) is never relaunched or replaced.",
+    "inner_refresh_policy": "The CG residual-refresh interval is exposed as inner_refresh and must be identical for all methods. Its value is chosen from a pre-screen microbenchmark on one saved system (jacobi with 1000 versus 50000) before the rank screen and recorded in frozen_selection. Acceptance remains the independent original residual at inner_tolerance.",
+    "contingency": {
+      "trigger": "The nominal jacobi screen problem on the frozen grid exceeds 60 h of stage time.",
+      "action": "The sequence becomes the three-query subset {(0, 357.3), (7, 357.3), (15, 357.3)} for all methods; the bound variants become single-target screens. Declared before any campaign timing."
+    },
+    "resolution_v2": {
+      "status_of_v1": "The v1 pointwise criterion is not met on the 64-slab optimum: fixed-source backward-Euler refinement gives maximum pointwise differences of 1.690, 1.243 and 1.323 K for 128-256, 256-512 and 512-1024 steps, non-monotone, located at five oil-winding interface nodes (r 0.600-0.657 m, z 2.508 m) as a phase shift of a slow oscillation of about 1 K. The v1 block above is retained verbatim and its verdict is reported in every assessment.",
+      "criteria": {
+        "tracking_relative_change": {
+          "threshold": 0.01,
+          "trend": "non-increasing over the last two comparisons",
+          "values_at_amendment": [
+            0.00392,
+            0.000757,
+            0.000239
+          ]
+        },
+        "mass_weighted_space_time_rms_K": {
+          "threshold": 0.05,
+          "trend": "non-increasing over the last two comparisons",
+          "values_at_amendment": [
+            0.038,
+            0.025,
+            0.021
+          ]
+        },
+        "pointwise_maximum_K": {
+          "threshold": 0.05,
+          "role": "reported with location, time and the counts of nodes ever exceeding 0.05 K and 0.5 K; explicitly stated as not met when it is not",
+          "values_at_amendment": [
+            1.69,
+            1.243,
+            1.323
+          ]
+        },
+        "pointwise_99_9_percentile_K": {
+          "role": "reported; the 2048-step replay tests whether it falls below 0.05 K",
+          "values_at_amendment": [
+            0.141,
+            0.086,
+            0.06
+          ]
+        },
+        "bound_excess": {
+          "role": "reported with magnitude, time, node, coordinates, material and whether the time is an original level; Richardson limit reported",
+          "values_at_amendment_K": [
+            0.152,
+            0.231,
+            0.272,
+            0.292
+          ],
+          "richardson_limit_K": 0.31
+        }
+      },
+      "exclusions": "No time window is excluded from any statistic. The weighted spatial RMS maximized over time is reported but is not a criterion because it is non-monotone.",
+      "comparison": "All refined time levels against linear interpolation of the coarse trajectory, unchanged from v1.",
+      "out_of_sample": "The 2048-step backward-Euler replay (job 192521, report 192523) and the BDF2 replays (jobs 192657_0-2, summary 192660) had not been read when this amendment was committed; they test these criteria out of sample.",
+      "spatial": "Fine-mesh fixed-source replays at 128, 256 and 512 steps with the fixed-scaled Newton line search; report maximum, mass-weighted RMS, tracking change and bound excess per grid and the globalization used. If the spatial criterion is not met, state it, with the cost table that places a fine-mesh optimization outside the available compute.",
+      "timed_problem": "The timed comparison concerns the discrete 64-slab problem with bounds enforced at its time levels, the same scoping as the prescribed-flow results. Resolution statistics characterize that discrete optimum; they are not continuum feasibility certificates."
+    },
+    "feasibility_v2": {
+      "reoptimization": "One 128-slab reoptimization of the nominal problem (target 7, upper 357.3 K) with the reference method, warm-started from the temporally prolonged 64-slab optimum, followed by same-grid and 256/512/1024-step forward checks with bound-excess location. The timed population remains at 64 slabs with unchanged bounds. The expected excess after reoptimization is about half the 64-slab value; the pointwise criterion is not expected to be met and this run is not presented as meeting it.",
+      "fallback": "If the reoptimization cannot complete within the scheduler limits, report the Richardson extrapolation and state explicitly that the v1 refine-and-reoptimize clause was not satisfied.",
+      "margin": "No safety margin is applied to the timed population. A margin study, if run, is a separately declared feasibility demonstration."
+    },
+    "bdf2_interpretation_rule": {
+      "declared_before_reading": true,
+      "attribution_to_temporal_error": "The BDF2 pointwise maxima fall by at least a factor of three per halving over the last two comparisons and the BDF2 512-step trajectory differs from the backward-Euler 2048-step trajectory by no more than the backward-Euler 1024-2048 difference.",
+      "otherwise": "Report the difference as dynamical sensitivity of the coupled model at the interface; neither outcome changes the timed problem.",
+      "note": "Subdivision 2 restarts with backward Euler on half of its steps and is supporting evidence only; the trend uses subdivisions 4, 8 and 16."
+    },
+    "amendment": {
+      "date": "2026-09-15",
+      "reason": "The predeclared v1 pointwise resolution criterion failed on the 64-slab optimum while the tracking functional and the field-wide RMS converged; the single-repetition CPU screen showed rank saturation caused by CPU construction of the operator-basis product; recycling did not complete any 64-slab problem; the scheduler wall limits cannot hold one unstaged sequence.",
+      "changes": [
+        "schema v2",
+        "headline population jacobi and reference with recycling as a declared screen",
+        "hybrid device policy with a verified no-device-work jacobi control",
+        "candidate ranks 200, 300 and 400 with the prior CPU screen retained",
+        "staged execution with per-iterate checkpoints and a stage-sum timing definition",
+        "relaunch, refresh-interval and three-query contingency policies",
+        "resolution_v2, feasibility_v2 and the BDF2 interpretation rule"
+      ],
+      "unchanged": [
+        "physical model, bounds, horizon, target startup, queries, tolerances, verification criteria",
+        "the v1 resolution block and its reported verdict",
+        "frozen_selection remains null until the screen"
+      ],
+      "post_hoc_disclosure": "This amendment was written after the v1 temporal outcome for 128-1024 steps was known. It is disclosed as post hoc for those grids; the 2048-step and BDF2 results remain out of sample."
+    },
   "frozen_selection": null
 }

@@ -18,13 +18,12 @@ class SpaceTimeReference:
         self.description = description
 
     def restrict(self, indices):
-        time_rows, space_rows = np.divmod(indices, self.spatial.shape[0])
-        result = np.empty((len(indices), self.rank))
-        for column, spatial_column in enumerate(self.spatial_columns):
-            result[:, column] = (
-                self.spatial[space_rows, spatial_column] * self.temporal[time_rows, column]
-            )
-        return result
+        # One gather per factor; identical values to the former per-column loop.
+        time_rows, space_rows = np.divmod(np.asarray(indices), self.spatial.shape[0])
+        return (
+            self.spatial[space_rows[:, None], self.spatial_columns[None, :]]
+            * self.temporal[time_rows]
+        )
 
     def storage(self):
         return {
