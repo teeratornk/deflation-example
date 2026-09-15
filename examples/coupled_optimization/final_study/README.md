@@ -10,6 +10,9 @@ Each sequence contains five constrained optimization problems and three distinct
 desired trajectories. The lower bound is 337.3 K. The nominal upper bound is
 357.3 K, with 353.3 K and 361.3 K variants of target 7. All methods use the same
 600-second horizon and smooth 60-second startup. No safety margin is applied.
+All methods use the positive frozen-velocity preconditioning diagonal, including
+damping. The rank-zero method is identified as `jacobi` in the configuration.
+The same diagonal defines the coordinates used for recycling selection.
 
 ## Resolution and feasibility
 
@@ -59,7 +62,7 @@ Before timed sequences, record the resolved mesh and time grid, baseline hashes,
 derivative checks, source version, numerical backends, memory measurements and
 rank-screen outputs in a versioned selection record. The declared rank screen
 uses the nominal problem with ranks 20, 100 and 200, together with rank-zero
-Jacobi-CG. Select each coarse method by verified setup-inclusive time and retain
+diagonally preconditioned CG. Select each coarse method by verified setup-inclusive time and retain
 all screening outcomes. If different ranks are selected, retain a matched-rank
 comparison as supporting evidence.
 
@@ -88,7 +91,7 @@ Append the other twelve run directories when they are available. With only
 three records, this command explicitly reports an incomplete population and
 gives no complete-population speedup. The rank-policy JSON must name `jacobi`,
 `reference` and `recycling`, each with integer `rank` and `recycle_window`.
-Jacobi has rank zero; its positive window setting is unused. The two coarse
+The `jacobi` method has rank zero; its positive window setting is unused. The two coarse
 methods require positive ranks. The reporter permits only these two declared
 budget differences. Sources, hardware, physical inputs, tolerances, starts and
 timing boundaries must still match. It stores the policy's checksum with the

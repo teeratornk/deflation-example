@@ -16,6 +16,12 @@ Both temporal couplings and velocity-dependent streamline diffusion are included
 The stabilization formula is differentiable within each branch; exact branch
 switches are rejected during linearization.
 
+All three CG methods use the positive diagonal of the frozen-velocity reduced
+operator, including the current damping term. This supplies an approximation to
+the coupled Gauss--Newton diagonal. The configuration name `jacobi` selects
+rank-zero CG with this preconditioner; recycling uses the same diagonal to
+define its scaled coordinates.
+
 ## Verification
 
 From the repository root, run on an allocated compute node:

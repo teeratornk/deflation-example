@@ -52,6 +52,7 @@
     ]
   },
   "methods": ["jacobi", "reference", "recycling"],
+  "preconditioning": "All three methods use the positive diagonal of the frozen-velocity reduced operator, including damping. It approximates the coupled Gauss-Newton diagonal. The configuration name jacobi denotes rank-zero CG with this preconditioner, and the same diagonal defines recycling's scaled coordinates.",
   "population": "Five optimization problems using three distinct desired trajectories. Bound variants are distinct constrained problems, not additional distinct targets.",
   "repetitions": 5,
   "method_order_by_repetition": [
@@ -66,7 +67,7 @@
     "candidate_ranks": [20, 100, 200],
     "policy": "Select each coarse solver's lowest verified setup-inclusive screening cost on the resolved nominal problem, then freeze. Retain all ranks and failures. Include matched-rank supporting comparisons if the selected ranks differ.",
     "jacobi_rank": 0,
-    "recycling_window": "Equal to the selected rank; retain existing coarse vectors and new directions with Jacobi-scaled selection."
+    "recycling_window": "Equal to the selected rank; retain existing coarse vectors and new directions with selection in the common preconditioned coordinates."
   },
   "resolution": {
     "temperature_change_K": 0.05,
