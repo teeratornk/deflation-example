@@ -161,3 +161,24 @@ physical scales, then transfers the saved signed source by nested P1
 interpolation. It retains the computed temperatures, velocities, pressures,
 conservation checks and any unsuccessful step. Its default segregated
 procedure remains available for reproducing earlier computations.
+
+## Diagnose a stopped spatial replay
+
+The following read-only check uses the saved temperature, velocity, pressure,
+preceding fields and applied source at the last stored time step:
+
+```bash
+uv run python -m deflation_example.coupled_newton_diagnostic \
+  --baseline runs/stabilized-baseline --fine-baseline runs/refined-baseline \
+  --optimization runs/optimized --replay runs/newton-spatial \
+  --output runs/newton-step-diagnostic
+```
+
+It checks the analytic Jacobian against centered differences in a random
+direction and the Newton direction. It also reports the original linear
+residual, the proposed temperature and velocity increments, and the residual
+along that direction. The fixed row-scaled residual and the solver's normalized
+merit are reported separately. These quantities help distinguish derivative
+errors, inaccurate linear solves and difficulties with nonlinear steps. The
+command neither changes a saved field nor continues an unsuccessful trajectory.
+Use `--step` to inspect a different stored step.
