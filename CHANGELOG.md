@@ -8,6 +8,9 @@
 
 ## Unreleased coupled-optimization verification
 
+- Predeclare the final coupled comparison with unchanged physics and bounds; leave grid and rank choices open until resolution and reoptimization checks pass.
+- Check refinement trends and compare every finer time level with the interpolated coarse trajectory; retain bound excesses and unsuccessful forward attempts separately from resolution.
+- Require all five optimality components in coupled timing summaries and support explicitly predeclared method-specific rank budgets while matching physical inputs, sources and numerical backends.
 - Add temperature-based elimination with exact discrete buoyancy, transport and stabilization derivatives.
 - Verify coupled steady and nonuniform-step transient tangents, adjoints and recovered controls.
 - Add two-sided active-set Gauss--Newton optimization with independent nonlinear optimality checks.

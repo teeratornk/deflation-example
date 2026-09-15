@@ -40,7 +40,13 @@ def record(method, repetition, seconds):
                 "upper_K": 357.3,
                 "status": "converged",
                 "verified": True,
-                "kkt": {"primal_absolute": 0.0, "stationarity": 1e-9},
+                "kkt": {
+                    "primal_absolute": 0.0,
+                    "stationarity": 1e-9,
+                    "dual_feasibility": 0.0,
+                    "lower_complementarity": 0.0,
+                    "upper_complementarity": 0.0,
+                },
                 "equations": [equation_row()],
                 "adjoint": {"maximum_momentum_adjoint_relative_residual": 1e-12},
             }
@@ -112,3 +118,83 @@ def test_original_and_ramped_targets_cannot_be_pooled():
     data[0]["configuration"]["target_startup_s"] = 0.0
     with pytest.raises(ValueError, match="matched sources"):
         summarize(data, repetitions=3)
+
+
+def test_predeclared_ranks_allow_only_the_two_explicit_budget_differences():
+    data = population()
+    policy = {
+        "jacobi": {"rank": 0, "recycle_window": 100},
+        "reference": {"rank": 100, "recycle_window": 100},
+        "recycling": {"rank": 200, "recycle_window": 200},
+    }
+    for row in data:
+        row["configuration"].update(policy[row["configuration"]["method"]])
+    with pytest.raises(ValueError, match="matched sources"):
+        summarize(data, repetitions=3)
+    result = summarize(data, repetitions=3, rank_policy=policy)
+    assert result["fastest_tested_alternative_over_reference"] == pytest.approx(1.5)
+    assert result["matched_protocol"]["method_specific_rank_policy"] == policy
+    assert result["rank_comparison"] == "predeclared method-specific ranks"
+    data[0]["configuration"]["rank"] = 1
+    with pytest.raises(ValueError, match="predeclared"):
+        summarize(data, repetitions=3, rank_policy=policy)
+    data[0]["configuration"]["rank"] = 0
+    data[0]["configuration"]["inner_tolerance"] = 1e-8
+    with pytest.raises(ValueError, match="matched sources"):
+        summarize(data, repetitions=3, rank_policy=policy)
+
+
+@pytest.mark.parametrize(
+    "failure", ["missing_method", "extra_setting", "nonzero_jacobi", "zero_reference"]
+)
+def test_rank_policy_cannot_silently_change_the_comparison(failure):
+    policy = {
+        method: {"rank": 0 if method == "jacobi" else 100, "recycle_window": 100}
+        for method in ("jacobi", "reference", "recycling")
+    }
+    if failure == "missing_method":
+        del policy["jacobi"]
+    elif failure == "extra_setting":
+        policy["reference"]["inner_tolerance"] = 1e-8
+    elif failure == "nonzero_jacobi":
+        policy["jacobi"]["rank"] = 100
+    else:
+        policy["reference"]["rank"] = 0
+    with pytest.raises(ValueError):
+        summarize(population(), repetitions=3, rank_policy=policy)
+
+
+@pytest.mark.parametrize("value", [None, -1e-9, float("nan")])
+def test_verified_labels_require_all_five_valid_kkt_components(value):
+    data = record("reference", 0, 2)
+    if value is None:
+        del data["cases"][0]["kkt"]["dual_feasibility"]
+    else:
+        data["cases"][0]["kkt"]["dual_feasibility"] = value
+    with pytest.raises(ValueError):
+        validate_record(data)
+
+
+def test_different_numerical_backends_cannot_be_pooled():
+    data = population()
+    for row in data:
+        row["environment"]["blas"] = [{"internal_api": "openblas", "num_threads": 8}]
+    data[0]["environment"]["blas"][0]["internal_api"] = "mkl"
+    with pytest.raises(ValueError, match="matched sources"):
+        summarize(data, repetitions=3)
+
+
+@pytest.mark.parametrize("tolerance", [float("nan"), 0, -1e-8, 1e-6])
+def test_invalid_or_relaxed_kkt_target_cannot_support_the_comparison(tolerance):
+    data = record("reference", 0, 2)
+    data["configuration"]["nonlinear_tolerance"] = tolerance
+    with pytest.raises(ValueError):
+        validate_record(data)
+
+
+def test_an_empty_population_is_not_a_complete_sequence():
+    data = record("reference", 0, 2)
+    data["configuration"]["queries"] = []
+    data.update(cases=[], verified_problems=0)
+    with pytest.raises(ValueError, match="nonempty"):
+        validate_record(data)

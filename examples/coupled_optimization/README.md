@@ -249,6 +249,11 @@ temperature bounds, targets, temporal size, nonlinear policy and reference
 construction. It preserves every outcome and uses complete one-target intervals
 for the initial screen.
 
+The [final-study design](final_study/README.md) specifies the unchanged physical
+bounds, resolution and reoptimization requirements, rank-selection rule and
+five repeated complete comparisons. The selected grid and ranks remain open
+until their verification is complete.
+
 After freezing a verified operating point, discretization and nonlinear policy,
 run each method and repetition in a fresh process:
 

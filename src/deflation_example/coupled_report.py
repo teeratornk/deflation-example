@@ -6,21 +6,25 @@ from pathlib import Path
 
 import numpy as np
 
+from .coupled_convergence import maximum_kkt
 from .coupled_optimize import equations_verified
 from .coupled_saved import file_digest
 from .reporting import write_report
-from .validation import integer
+from .validation import integer, positive_real
 
 METHODS = ("jacobi", "reference", "recycling")
 LABELS = {"jacobi": "Diagonal CG", "reference": "Reference deflation", "recycling": "Recycling CG"}
 
 
-def matched_identity(record):
-    config = {
-        key: value
-        for key, value in record["configuration"].items()
-        if key not in {"method", "repetition"}
-    }
+def matched_identity(record, rank_policy=None):
+    excluded = {"method", "repetition"}
+    if rank_policy is not None:
+        cfg = record["configuration"]
+        expected = rank_policy[cfg["method"]]
+        if any(cfg.get(key) != value for key, value in expected.items()):
+            raise ValueError("Recorded ranks differ from the predeclared method-specific policy")
+        excluded.update(expected)
+    config = {key: value for key, value in record["configuration"].items() if key not in excluded}
     env = record["environment"]
     return {
         "configuration": config,
@@ -30,8 +34,10 @@ def matched_identity(record):
         "cpu_model": env["cpu_model"],
         "numpy": env["numpy"],
         "scipy": env["scipy"],
+        "blas": env.get("blas"),
         "device": record["device"],
         "timing_boundary": record["timing_boundary"],
+        "method_specific_rank_policy": rank_policy,
     }
 
 
@@ -41,6 +47,11 @@ def validate_record(record):
     cfg = record["configuration"]
     if cfg["method"] not in METHODS:
         raise ValueError("Unknown coupled solver")
+    if not cfg["queries"]:
+        raise ValueError("A complete sequence requires a nonempty problem population")
+    kkt_tolerance = positive_real(cfg["nonlinear_tolerance"], "Nonlinear tolerance")
+    if kkt_tolerance > 1e-8:
+        raise ValueError("The coupled comparison requires a nonlinear tolerance at most 1e-8")
     total = record["sequence_seconds"]
     components = np.asarray(list(record["components_seconds"].values()), dtype=float)
     if (
@@ -65,12 +76,11 @@ def validate_record(record):
         if row["target"] != query["target"] or row["upper_K"] != query["upper_K"]:
             raise ValueError("Target or bound differs from the declared sequence")
         if row["verified"]:
-            kkt = np.asarray(list(row["kkt"].values()))
+            kkt = maximum_kkt(row["kkt"])
             adjoint = row["adjoint"]["maximum_momentum_adjoint_relative_residual"]
             if (
                 row["status"] != "converged"
-                or not np.isfinite(kkt).all()
-                or kkt.max() > cfg["nonlinear_tolerance"]
+                or kkt > kkt_tolerance
                 or not equations_verified(row["equations"])
                 or not np.isfinite(adjoint)
                 or adjoint > 1e-8
@@ -83,16 +93,38 @@ def validate_record(record):
     return whole
 
 
-def summarize(records, repetitions=5):
+def checked_rank_policy(policy):
+    """Only ranks and recycling-window budgets may differ in this comparison."""
+    if policy is None:
+        return None
+    if set(policy) != set(METHODS):
+        raise ValueError("Declare a rank policy for each of the three methods")
+    result = {}
+    for method in METHODS:
+        row = policy[method]
+        if set(row) != {"rank", "recycle_window"}:
+            raise ValueError("A method-specific policy contains only rank and recycle_window")
+        rank = integer(row["rank"], "Rank", 0 if method == "jacobi" else 1)
+        if method == "jacobi" and rank != 0:
+            raise ValueError("The Jacobi control must have rank zero")
+        result[method] = {
+            "rank": rank,
+            "recycle_window": integer(row["recycle_window"], "Recycling window", 1),
+        }
+    return result
+
+
+def summarize(records, repetitions=5, rank_policy=None):
     repetitions = integer(repetitions, "Declared repetitions", 1)
     if not records:
         raise ValueError("Supply at least one complete-sequence record")
-    identity = matched_identity(records[0])
+    rank_policy = checked_rank_policy(rank_policy)
+    identity = matched_identity(records[0], rank_policy)
     grouped = {method: [] for method in METHODS}
     seen = set()
     for record in records:
         validate_record(record)
-        if matched_identity(record) != identity:
+        if matched_identity(record, rank_policy) != identity:
             raise ValueError(
                 "Comparisons require matched sources, hardware, accuracy and problem settings"
             )
@@ -159,6 +191,9 @@ def summarize(records, repetitions=5):
         "matched_protocol": identity,
         "all_declared_sequences_verified": complete,
         "fastest_tested_alternative_over_reference": speedup,
+        "rank_comparison": "predeclared method-specific ranks"
+        if rank_policy is not None
+        else "identical configured ranks and windows",
         "scope": "Median complete-sequence timings for this fixed discrete coupled protocol. Physical resolution requires separate fixed-source studies. Failed and missing sequences remain visible; a complete-population ratio requires every declared sequence to meet the final checks.",
         "methods": rows,
     }
@@ -168,13 +203,21 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("runs", type=Path, nargs="+")
     parser.add_argument("--repetitions", type=int, default=5)
+    parser.add_argument(
+        "--rank-policy",
+        type=Path,
+        help="Optional frozen JSON mapping each method to rank and recycle_window; otherwise both settings must match.",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
     paths = [root / "record.json" for root in args.runs]
     records = [json.loads(path.read_text()) for path in paths]
-    report = summarize(records, args.repetitions)
+    rank_policy = json.loads(args.rank_policy.read_text()) if args.rank_policy else None
+    report = summarize(records, args.repetitions, rank_policy)
+    if args.rank_policy:
+        report["rank_policy_sha256"] = file_digest(args.rank_policy)
     report["input_records"] = [
         {"run": path.parent.name, "sha256": file_digest(path)} for path in paths
     ]

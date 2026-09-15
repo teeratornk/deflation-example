@@ -146,6 +146,16 @@ Use the temperature scale declared for the saved optimization. This command
 checks the common source and physical configuration, recomputes differences
 at shared time levels, and compares the tracking integrals using the finer
 integral as denominator. It preserves missing and unsuccessful computations.
+The resolution assessment requires three complete grids to check that the last
+two temperature and tracking changes decrease. The finest pair must satisfy
+both thresholds. Recorded bound excesses remain visible even if these resolution
+checks pass. Include every declared refinement in the command; a failed or
+missing run prevents a passing assessment.
+For the transformer model, add `--initial-value 0` to compare every finer time
+level against linear interpolation of the coarse trajectory from its uniform
+341.3 K initial condition. This comparison is used by the
+[final-study design](../final_study/README.md); an endpoint-only comparison
+cannot detect a difference confined to an intermediate fine time level.
 Agreement at these time levels does not certify feasibility at every
 intermediate physical time.
 

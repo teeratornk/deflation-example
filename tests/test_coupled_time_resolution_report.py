@@ -36,7 +36,9 @@ def change(directory, key, value):
     path = directory / "record.json"
     record = json.loads(path.read_text())
     record[key] = value
-    write_report(path, record)
+    # Deliberately allow malformed external JSON values in rejection tests;
+    # the normal writer converts nonfinite measurements to null.
+    path.write_text(json.dumps(record))
 
 
 def test_nested_comparison_samples_shared_times_and_recomputes_error(tmp_path):
@@ -70,7 +72,10 @@ def test_partial_and_missing_computations_remain_visible(tmp_path):
         ("optimization_field_sha256", "different"),
         ("baseline_sha256", "different"),
         ("configuration", {"slabs": 3}),
+        ("forward_solver", {"procedure": "monolithic_newton", "tolerance": 1e-8}),
         ("tracking_integral_refined_K2_m3_s", -1),
+        ("maximum_recorded_upper_violation_K", -1),
+        ("maximum_recorded_lower_violation_K", float("nan")),
     ],
 )
 def test_mismatched_inputs_or_invalid_integral_rejected(tmp_path, key, value):
@@ -132,3 +137,77 @@ def test_cli_writes_pairwise_figure_and_summary(tmp_path, monkeypatch):
     report = json.loads((output / "summary.json").read_text())
     assert len(report["pairs"]) == 1
     assert (output / "time_resolution.pdf").stat().st_size > 0
+
+
+def test_resolution_requires_three_complete_grids_and_retains_bound_excess(tmp_path):
+    runs = [case(tmp_path, n) for n in (1, 2, 4)]
+    change(runs[-1], "maximum_recorded_upper_violation_K", 0.23)
+    report = summarize(runs, 20)
+    assert report["resolution_assessment"]["discrete_time_resolution_met"]
+    assert report["rows"][-1]["maximum_recorded_upper_violation_K"] == 0.23
+    assert report["rows"][0]["maximum_recorded_upper_violation_K"] is None
+    # Temperature resolution does not imply constraint feasibility.
+    pair = summarize(runs[:2], 20)["resolution_assessment"]
+    assert pair["status"] == "insufficient_refinements_for_trend"
+    assert not pair["discrete_time_resolution_met"]
+    missing = summarize([*runs, tmp_path / "missing"], 20)["resolution_assessment"]
+    assert missing["status"] == "incomplete_declared_refinements"
+    assert not missing["discrete_time_resolution_met"]
+
+
+@pytest.mark.parametrize("quantity", ["temperature", "tracking"])
+def test_increasing_refinement_changes_fail_even_below_threshold(tmp_path, quantity):
+    runs = [case(tmp_path, n) for n in (1, 2, 4)]
+    if quantity == "tracking":
+        for directory, integral in zip(runs, (3.0, 3.001, 3.01), strict=True):
+            change(directory, "tracking_integral_refined_K2_m3_s", integral)
+    else:
+        for directory, offset in zip(runs, (0.0, 0.0001, 0.001), strict=True):
+            with np.load(directory / "states.npz") as fields:
+                state, times = fields["state"].copy(), fields["times_s"].copy()
+            write_fields(directory / "states.npz", state=state + offset, times_s=times)
+    result = summarize(runs, 20)["resolution_assessment"]
+    assert result["last_pair_thresholds_met"]
+    assert result["status"] == "refinement_trend_not_decreasing"
+    assert not result["discrete_time_resolution_met"]
+
+
+def test_failed_finest_run_cannot_be_omitted_by_the_resolution_assessment(tmp_path):
+    runs = [case(tmp_path, n) for n in (1, 2, 4)]
+    runs.append(case(tmp_path, 8, "newton_iteration_cap"))
+    result = summarize(runs, 20)["resolution_assessment"]
+    assert result["last_pair_thresholds_met"]
+    assert result["last_two_changes_nonincreasing"]
+    assert not result["discrete_time_resolution_met"]
+
+
+def test_intermediate_time_differences_can_fail_despite_identical_endpoints(tmp_path):
+    runs = [case(tmp_path, n) for n in (1, 2, 4)]
+    endpoints = summarize(runs, 1)
+    assert endpoints["resolution_assessment"]["discrete_time_resolution_met"]
+    whole = summarize(runs, 1, initial_value=0)
+    pair = whole["pairs"][-1]
+    assert pair["maximum_shared_time_difference_K"] == 0
+    assert pair["maximum_all_refined_time_difference_K"] == pytest.approx(0.0625)
+    assert not whole["resolution_assessment"]["discrete_time_resolution_met"]
+    assert whole["resolution_assessment"]["temperature_comparison"] == (
+        "all refined times versus linear coarse interpolation"
+    )
+
+
+def test_all_time_comparison_includes_initial_interval_and_has_decreasing_error(tmp_path):
+    runs = [case(tmp_path, n) for n in (2, 4, 8)]
+    result = summarize(runs, 1, initial_value=0)
+    assert result["resolution_assessment"]["discrete_time_resolution_met"]
+    pair = result["pairs"][-1]
+    assert pair["maximum_all_refined_time_difference_K"] == pytest.approx(0.015625)
+    assert pair["maximum_interpolated_difference_K"][0] == pytest.approx(0.015625)
+    assert len(pair["refined_times_s"]) == 16
+    changed_initial = summarize(runs, 1, initial_value=1)
+    assert changed_initial["pairs"][-1]["maximum_all_refined_time_difference_K"] > 0.49
+    assert not changed_initial["resolution_assessment"]["discrete_time_resolution_met"]
+
+
+def test_nonfinite_initial_value_is_rejected(tmp_path):
+    with pytest.raises(ValueError, match="initial"):
+        summarize([case(tmp_path, 1)], 20, initial_value=float("nan"))
