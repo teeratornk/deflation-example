@@ -299,13 +299,15 @@ class AxisymmetricFlow:
         The pressure gauge is (P1 index, kinematic pressure); use it for a fully
         Dirichlet velocity problem. An open natural boundary determines pressure.
         Return every iteration and an explicit termination status.
+        ``picard_correction`` solves the same Oseen map through its residual
+        equation, avoiding a large state solve near a converged initial field.
         """
         tolerance = positive_real(tolerance, "Flow tolerance")
         max_iterations = integer(max_iterations, "Flow iteration cap", 1)
         relaxation = positive_real(relaxation, "Flow relaxation")
         if relaxation > 1:
             raise ValueError("Flow relaxation must not exceed one")
-        if method not in {"picard", "newton"}:
+        if method not in {"picard", "picard_correction", "newton"}:
             raise ValueError("Unknown flow iteration")
         fixed = np.asarray(boundary_indices)
         values = np.asarray(boundary_values, dtype=float)
@@ -352,6 +354,9 @@ class AxisymmetricFlow:
             A = self.operator(velocity, time_step, convection)
             if method == "newton" and convection:
                 linear_operator = A + self.convection_derivative(velocity)
+                linear_rhs = (rhs - A @ x)[free]
+            elif method == "picard_correction":
+                linear_operator = A
                 linear_rhs = (rhs - A @ x)[free]
             else:
                 linear_operator = A
@@ -417,6 +422,8 @@ class AxisymmetricFlow:
                         "converged" if max(metrics.values()) <= tolerance else "line_search_failed"
                     )
                     break
+            elif method == "picard_correction":
+                x[free] += damping * proposal
             else:
                 x[free] = damping * proposal + (1 - damping) * x[free]
             velocity = np.column_stack((x[: self.nv], x[self.nv : 2 * self.nv]))

@@ -68,7 +68,9 @@ def prepare(args, subdivision):
         controls, _ = transfer_source(coarse, problem, controls)
     metadata = {
         "schema": "coupled-fixed-point-study-v1",
-        "numerical_policy": "matched-momentum-target-and-initial-guard-v2",
+        "numerical_policy": "residual-equation-oseen-map-v3"
+        if args.family == "momentum"
+        else "matched-momentum-target-and-initial-guard-v2",
         "environment": environment(),
         "configuration": config,
         "policy": args.policy,

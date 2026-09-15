@@ -193,6 +193,8 @@ def command(args, protocol):
     if frozen["environment"]["source_sha256"] != environment()["source_sha256"]:
         raise ValueError("Frozen selection belongs to different numerical source")
     family = "forward" if args.phase == "trajectory" else "momentum"
+    if family not in protocol["families"]:
+        raise ValueError("The forward trajectory phase belongs to the retained version-2 study")
     selected = frozen["families"][family]["selected"]
     if selected is None:
         raise ValueError("No fixed-point policy passed the screen")
@@ -244,7 +246,7 @@ def main():
         "--task",
         type=int,
         default=0,
-        help="screen 0..59; trajectory 0..11; derivatives 0..1; optimize 0..17",
+        help="momentum screen 0..29; derivatives 0..1; optimize 0..17; forward trajectories retain version 2",
     )
     parser.add_argument("--data-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)

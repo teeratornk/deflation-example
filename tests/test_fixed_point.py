@@ -93,6 +93,65 @@ def test_momentum_zero_initial_guard():
     assert len(result.history) == 1
 
 
+@pytest.mark.parametrize("transient", [False, True])
+@pytest.mark.parametrize("relaxation", [0.5, 1.0])
+def test_residual_oseen_map_matches_state_map_and_keeps_boundary(transient, relaxation):
+    model, temperature, _, initial, args = manufactured(transient)
+    flow = model.flow
+    options = dict(
+        initial=initial,
+        previous=args.get("previous_velocity"),
+        time_step=args.get("time_step"),
+        pressure_gauge=model.pressure_gauge,
+        max_iterations=1,
+        tolerance=1e-12,
+        relaxation=relaxation,
+    )
+    force = model._force(temperature, True)
+    before_velocity, before_pressure = initial.velocity.copy(), initial.pressure.copy()
+    state = flow.solve(
+        force, model.velocity_boundary, model.velocity_values, method="picard", **options
+    )
+    correction = flow.solve(
+        force, model.velocity_boundary, model.velocity_values, method="picard_correction", **options
+    )
+    np.testing.assert_allclose(correction.velocity, state.velocity, rtol=1e-10, atol=1e-12)
+    np.testing.assert_allclose(correction.pressure, state.pressure, rtol=1e-10, atol=1e-12)
+    np.testing.assert_array_equal(
+        correction.velocity[model.velocity_boundary], model.velocity_values
+    )
+    np.testing.assert_array_equal(initial.velocity, before_velocity)
+    np.testing.assert_array_equal(initial.pressure, before_pressure)
+    assert correction.history[0]["method"] == "picard_correction"
+    metrics = flow.verify(
+        correction,
+        force,
+        model.velocity_boundary,
+        model.velocity_values,
+        previous=options["previous"],
+        time_step=options["time_step"],
+        pressure_gauge=model.pressure_gauge,
+    )
+    for key, value in metrics.items():
+        assert correction.history[-1][key] == value
+
+
+def test_momentum_acceleration_requests_residual_equation_map(monkeypatch):
+    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+    problem.flow_method = "anderson"
+    original = problem.flow.solve
+    methods = []
+
+    def observed(*args, **kwargs):
+        methods.append(kwargs["method"])
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(problem.flow, "solve", observed)
+    result = problem.evaluate(np.full(problem.size, 0.015))
+    assert np.isfinite(result.control).all()
+    assert methods and set(methods) == {"picard_correction"}
+
+
 def test_forward_native_target_matches_final_momentum_criterion(monkeypatch):
     model, temperature, _, initial, args = manufactured(True)
     original = model.flow.solve

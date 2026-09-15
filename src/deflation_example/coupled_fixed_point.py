@@ -230,7 +230,12 @@ def solve_picard_momentum(
     relaxation=0.5,
     depth=3,
 ):
-    """Verified Oseen fixed points; all derivative factors remain exact Jacobians."""
+    """Verified residual-equation Oseen maps with exact derivative factors.
+
+    The residual form is algebraically equivalent to a full state Oseen solve.
+    It reduces the finite-precision error of that solve near a converged field.
+    Original nonlinear momentum and continuity checks still govern acceptance.
+    """
     tolerance = positive_real(tolerance, "Momentum tolerance")
     max_iterations = integer(max_iterations, "Momentum cap", 1)
     if method not in {"picard", "anderson"}:
@@ -273,7 +278,7 @@ def solve_picard_momentum(
             initial=current,
             tolerance=tolerance,
             max_iterations=1,
-            method="picard",
+            method="picard_correction",
             **args,
         )
         if mapped.status not in {"converged", "iteration_cap"}:
