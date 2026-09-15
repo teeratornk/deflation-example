@@ -47,6 +47,8 @@ def coarse_replay_states(directory, problem, baseline_digest, source_digest, con
     """Require a complete same-source coarse trajectory on the comparison time grid."""
     directory = Path(directory)
     record = json.loads((directory / "record.json").read_text())
+    if record["forward_solver"].get("time_scheme", "backward_euler") != "backward_euler":
+        raise ValueError("This spatial replay requires backward-Euler trajectories on both meshes")
     clean_cfg = {
         k: v
         for k, v in configuration.items()

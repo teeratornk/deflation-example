@@ -21,6 +21,7 @@ from .coupled_resolution import forward_model
 from .coupled_saved import load_saved_solution, require_matching_baseline
 from .coupled_step_spectrum import step_linearization
 from .coupled_targets import desired_temperature
+from .coupled_time_integration import effective_step
 from .reporting import environment, write_fields, write_report
 from .validation import integer, positive_real, real_array
 
@@ -228,7 +229,16 @@ def newton_step(
     return CoupledResult(state, flow, status, history, time.perf_counter() - start)
 
 
-def newton_trajectory(problem, controls, *, tolerance=1e-12, cap=30, callback=None):
+def newton_trajectory(
+    problem,
+    controls,
+    *,
+    tolerance=1e-12,
+    cap=30,
+    callback=None,
+    time_scheme="backward_euler",
+    restart_interval=None,
+):
     """Replay a signed source history using the problem's unchanged time grid."""
     values = real_array(controls, "Fixed source history").copy()
     if values.size != problem.size or not np.isfinite(values).all():
@@ -236,13 +246,34 @@ def newton_trajectory(problem, controls, *, tolerance=1e-12, cap=30, callback=No
     values = values.reshape(problem.slabs, problem.spatial_size)
     values.flags.writeable = False
     state, flow = problem.full_temperature(problem.initial), problem.initial_flow
+    older_state, older_flow = None, None
+    if restart_interval is not None:
+        restart_interval = integer(restart_interval, "Source interval in time steps", 1)
     states, velocities, pressures, rows = [], [], [], []
     start = time.perf_counter()
     for n, current in enumerate(values):
         source = np.zeros(len(problem.mesh.nodes))
         source[problem.free] = current
+        effective, history_state, history_flow, coefficients = effective_step(
+            problem,
+            n,
+            state,
+            flow,
+            older_state,
+            older_flow,
+            time_scheme,
+            restart=restart_interval is not None and n % restart_interval == 0,
+        )
         result = newton_step(
-            problem, source, state, flow, n, tolerance=tolerance, max_iterations=cap
+            effective,
+            source,
+            history_state,
+            history_flow,
+            n,
+            tolerance=tolerance,
+            max_iterations=cap,
+            initial_state=state,
+            initial_flow=flow,
         )
         states.append(result.state[problem.free].copy())
         velocities.append(result.flow.velocity.copy())
@@ -253,12 +284,14 @@ def newton_trajectory(problem, controls, *, tolerance=1e-12, cap=30, callback=No
             "status": result.status,
             "seconds": result.seconds,
             "history": result.history,
+            "storage_derivative_coefficients_s_inverse": coefficients.tolist(),
         }
         rows.append(row)
         if callback is not None:
             callback(row.copy())
         if result.status != "converged":
             break
+        older_state, older_flow = state, flow
         state, flow = result.state, result.flow
     return {
         "status": result.status,
@@ -281,6 +314,9 @@ def main():
     parser.add_argument("--tolerance", type=float, default=1e-12)
     parser.add_argument("--cap", type=int, default=30)
     parser.add_argument("--subdivision", type=int, default=1)
+    parser.add_argument(
+        "--time-scheme", choices=("backward_euler", "bdf2"), default="backward_euler"
+    )
     parser.add_argument(
         "--line-search", choices=("equation_max", "fixed_scaled"), default="equation_max"
     )
@@ -333,6 +369,8 @@ def main():
                 "energy_tolerance": 1e-6,
                 "line_search": args.line_search,
                 "backtrack_cap": args.backtrack_cap,
+                "time_scheme": args.time_scheme,
+                "time_integrator_restart": "Backward Euler on the first substep of every original piecewise-constant source interval",
             },
             "target_position": args.target_position,
             "configuration": {
@@ -346,21 +384,34 @@ def main():
         }
         write_report(args.output / "record.json", {**metadata, "status": "running", "steps": []})
         state, flow = problem.full_temperature(problem.initial), problem.initial_flow
+        older_state, older_flow = None, None
         states, velocities, pressures, rows = [], [], [], []
         start = time.perf_counter()
         for n, values in enumerate(controls):
             source = np.zeros(len(problem.mesh.nodes))
             source[problem.free] = values
-            result = newton_step(
+            effective, history_state, history_flow, coefficients = effective_step(
                 problem,
-                source,
+                n,
                 state,
                 flow,
+                older_state,
+                older_flow,
+                args.time_scheme,
+                restart=n % subdivision == 0,
+            )
+            result = newton_step(
+                effective,
+                source,
+                history_state,
+                history_flow,
                 n,
                 tolerance=args.tolerance,
                 max_iterations=args.cap,
                 line_search=args.line_search,
                 backtrack_cap=args.backtrack_cap,
+                initial_state=state,
+                initial_flow=flow,
             )
             states.append(result.state[problem.free].copy())
             velocities.append(result.flow.velocity.copy())
@@ -372,6 +423,7 @@ def main():
                     "status": result.status,
                     "seconds": result.seconds,
                     "history": result.history,
+                    "storage_derivative_coefficients_s_inverse": coefficients.tolist(),
                     "maximum_temperature_difference_K": float(
                         np.max(np.abs(states[-1] - expected[n])) * problem.temperature_scale
                     ),
@@ -382,6 +434,7 @@ def main():
             )
             if result.status != "converged":
                 break
+            older_state, older_flow = state, flow
             state, flow = result.state, result.flow
         elapsed = time.perf_counter() - start
         write_fields(

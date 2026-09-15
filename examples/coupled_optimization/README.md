@@ -354,6 +354,24 @@ requires a separate complete replay before supporting a trajectory claim.
 The original Newton replay retains `--line-search equation_max` and
 `--backtrack-cap 21` as its defaults.
 
+For a separate temporal-discretization study, the same forward driver accepts
+`--time-scheme bdf2`. Momentum and thermal storage use the same second-order
+backward-differentiation coefficients. Backward Euler initializes the first
+substep of each saved piecewise-constant source interval, so a multistep history
+does not straddle a source discontinuity. The physical time grid, source values,
+and equation tolerances remain unchanged:
+
+```bash
+uv run python -m deflation_example.coupled_newton_replay --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --subdivision 4 --time-scheme bdf2 --tolerance 1e-12 --output runs/newton-bdf2-256
+```
+
+The default optimization and forward discretization remains backward Euler.
+The BDF2 option currently evaluates a fixed saved control; it provides no
+optimization timing or optimality evidence. The tests check nonuniform-step
+coefficients, both storage histories, source-interval restarts, and second-order
+convergence for a manufactured thermal trajectory. Compare BDF2 refinements
+with each other using the same final accuracy and resolution thresholds.
+
 ```bash
 uv run python -m deflation_example.coupled_resolution --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --method reference --subdivision 1 --output runs/replay-original
 uv run python -m deflation_example.coupled_resolution --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --method reference --subdivision 2 --output runs/replay-refined

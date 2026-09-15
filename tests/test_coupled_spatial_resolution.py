@@ -45,7 +45,7 @@ def test_spatial_source_transfer_rejects_changed_physical_scaling():
 
 
 @pytest.mark.parametrize(
-    "corruption", ["source", "configuration", "status", "step", "times", "shape", "nan"]
+    "corruption", ["source", "configuration", "status", "step", "times", "shape", "nan", "scheme"]
 )
 def test_coarse_replay_rejects_unmatched_or_incomplete_comparisons(tmp_path, corruption):
     import json
@@ -75,6 +75,8 @@ def test_coarse_replay_rejects_unmatched_or_incomplete_comparisons(tmp_path, cor
         states = states[:1]
     elif corruption == "nan":
         states[0, 0] = np.nan
+    elif corruption == "scheme":
+        record["forward_solver"]["time_scheme"] = "bdf2"
     (tmp_path / "record.json").write_text(json.dumps(record))
     np.savez(tmp_path / "states.npz", state=states, times_s=times)
     with pytest.raises(ValueError):

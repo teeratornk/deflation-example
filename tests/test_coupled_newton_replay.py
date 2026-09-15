@@ -192,8 +192,9 @@ def test_rejected_newton_trials_keep_the_initial_fields_and_metrics(monkeypatch)
 
 
 @pytest.mark.parametrize("subdivision", [1, 2])
+@pytest.mark.parametrize("time_scheme", ["backward_euler", "bdf2"])
 def test_resolution_cli_preserves_source_history_and_recomputes_comparisons(
-    monkeypatch, tmp_path, subdivision
+    monkeypatch, tmp_path, subdivision, time_scheme
 ):
     import json
     import sys
@@ -239,6 +240,8 @@ def test_resolution_cli_preserves_source_history_and_recomputes_comparisons(
             "saved",
             "--subdivision",
             str(subdivision),
+            "--time-scheme",
+            time_scheme,
             "--tolerance",
             "1e-11",
             "--output",
@@ -250,10 +253,21 @@ def test_resolution_cli_preserves_source_history_and_recomputes_comparisons(
     assert report["status"] == "converged"
     assert report["subdivision"] == subdivision
     assert report["forward_slabs"] == 2 * subdivision
+    assert report["forward_solver"]["time_scheme"] == time_scheme
     np.testing.assert_array_equal(fields["control"], source_before)
-    comparison = replay_controls(
-        original_problem, source_before, subdivision=subdivision, tolerance=1e-10
-    )
+    if time_scheme == "backward_euler":
+        comparison = replay_controls(
+            original_problem, source_before, subdivision=subdivision, tolerance=1e-10
+        )
+    else:
+        problem, _ = load({"slabs": 2 * subdivision})
+        comparison = module.newton_trajectory(
+            problem,
+            np.repeat(source_before.reshape(2, -1), subdivision, axis=0),
+            tolerance=1e-11,
+            time_scheme="bdf2",
+            restart_interval=subdivision,
+        )
     assert comparison["status"] == "converged"
     with np.load(output / "states.npz", allow_pickle=False) as arrays:
         np.testing.assert_allclose(arrays["state"], comparison["states"], atol=1e-8)

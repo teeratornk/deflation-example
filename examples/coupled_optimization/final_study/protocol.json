@@ -80,6 +80,12 @@
     "feasibility": "Report upper and lower bound excesses in kelvin, location and time, alongside the resolution estimates. A small refinement change is not a continuous-space or continuous-time feasibility certificate.",
     "after_reoptimization": "Repeat independent same-grid and finer-grid forward checks of the newly optimized source before final performance runs."
   },
+  "numerical_development": {
+    "policy": "Targeted changes to time integration, Newton globalization and memory use are permitted before the final numerical procedure is frozen. Preserve the physical model, bounds, horizon and target startup. Reverify changed equations and derivatives; keep all original attempts.",
+    "forward_bdf2": "Separate fixed-source assessment with matched second-order momentum and thermal storage. Restart with backward Euler at each original piecewise-constant source interval. The optimization implementation remains backward Euler until a separately verified optimization extension is selected.",
+    "newton_globalization": "Compare the original merit with a fixed row-scaled norm at identical saved unsuccessful steps under unchanged final equation criteria. A local repair requires a complete forward replay.",
+    "submission_gate": "The coupled example must meet the resolution, accuracy and complete-comparison requirements before submission."
+  },
   "memory_policy": "Measure a feasible reference construction and representative linearization before complete optimization on each candidate grid. Report sampled process memory and retain memory-limited attempts.",
   "execution_policy": "Use fresh processes with equivalent isolated resources, the same CPU and numerical backends, and the declared rotated solver order. Warm-start only from each method's own preceding verified problem. Charge the reference on the first problem.",
   "timing_boundary": "Model assembly, reference construction, solver resources, every nonlinear and active-set solve, transfers, independent verification and cleanup. Report common calibration and process preparation separately and also give preparation-inclusive totals. Field serialization follows the sequence timer.",
