@@ -13,6 +13,19 @@ from .axisymmetric_flow import FlowResult
 from .validation import integer, real_array
 
 
+def replay_time_scheme(record):
+    """Identify the supported saved scheme without silently changing its restart policy."""
+    protocol = record.get("forward_solver", {})
+    scheme = protocol.get("time_scheme", "backward_euler")
+    if scheme not in {"backward_euler", "bdf2"}:
+        raise ValueError("Saved replay uses an unsupported time scheme")
+    if scheme == "bdf2" and protocol.get("time_integrator_restart") != (
+        "Backward Euler on the first substep of every original piecewise-constant source interval"
+    ):
+        raise ValueError("Saved BDF2 replay must identify its source-interval restarts")
+    return scheme
+
+
 def derivative_coefficients(steps, slab, scheme="backward_euler", *, restart=False):
     steps = real_array(steps, "Physical time steps")
     slab = integer(slab, "Slab index", 0)
@@ -56,3 +69,41 @@ def effective_step(problem, slab, state, flow, older_state, older_flow, scheme, 
         [],
     )
     return effective, history, history_flow, coefficients
+
+
+def saved_history(problem, states, velocities, pressures, slab, scheme, *, restart=False):
+    """Recover both storage histories for a diagnostic at an unchanged saved step."""
+    slab = integer(slab, "Saved slab", 0)
+    states = real_array(states, "Saved temperatures")
+    velocities = real_array(velocities, "Saved velocities")
+    pressures = real_array(pressures, "Saved pressures")
+    count = len(states)
+    if (
+        states.shape != (count, problem.spatial_size)
+        or velocities.shape != (count, problem.flow.nv, 2)
+        or pressures.shape != (count, problem.flow.np)
+        or slab >= count
+        or count > problem.slabs
+        or not all(np.isfinite(a).all() for a in (states, velocities, pressures))
+    ):
+        raise ValueError("Saved temperature and flow histories must match the declared trajectory")
+
+    def preceding(index):
+        if index < 0:
+            return problem.full_temperature(problem.initial), problem.initial_flow
+        return problem.full_temperature(states[index]), FlowResult(
+            velocities[index].copy(), pressures[index].copy(), "saved", []
+        )
+
+    previous_state, previous_flow = preceding(slab - 1)
+    older_state, older_flow = preceding(slab - 2)
+    return effective_step(
+        problem,
+        slab,
+        previous_state,
+        previous_flow,
+        older_state,
+        older_flow,
+        scheme,
+        restart=restart,
+    )

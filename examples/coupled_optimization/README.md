@@ -404,6 +404,17 @@ coefficients, both storage histories, source-interval restarts, and second-order
 convergence for a manufactured thermal trajectory. Compare BDF2 refinements
 with each other using the same final accuracy and resolution thresholds.
 
+Use the same time scheme and source-interval restarts for a spatial comparison:
+
+```bash
+uv run python -m deflation_example.coupled_spatial_resolution --baseline runs/stabilized-baseline --fine-baseline runs/refined-baseline --optimization runs/startup60-reference-pilot --procedure monolithic_newton --subdivision 4 --time-scheme bdf2 --coarse-replay runs/newton-bdf2-256 --line-search fixed_scaled --backtrack-cap 40 --tolerance 1e-12 --output runs/fine-mesh-bdf2-256
+```
+
+The driver requires a converged coarse-mesh trajectory with the same source,
+time levels, integration scheme, and restart policy. Each mesh starts from its
+original initial fields. The source is interpolated in space and remains
+unchanged within each original time interval.
+
 ```bash
 uv run python -m deflation_example.coupled_resolution --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --method reference --subdivision 1 --output runs/replay-original
 uv run python -m deflation_example.coupled_resolution --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --method reference --subdivision 2 --output runs/replay-refined

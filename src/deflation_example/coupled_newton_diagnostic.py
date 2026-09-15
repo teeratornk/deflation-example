@@ -15,6 +15,7 @@ from threadpoolctl import threadpool_limits
 
 from .axisymmetric_flow import FlowResult
 from .coupled_newton_replay import equation_merit, step_equations
+from .coupled_time_integration import replay_time_scheme, saved_history
 from .coupled_optimize import load_problem
 from .coupled_resolution import forward_model
 from .coupled_saved import load_saved_solution, require_matching_baseline
@@ -159,17 +160,19 @@ def main():
                 raise ValueError("The saved time does not match the problem")
             state = fine.full_temperature(data["state"][n])
             flow = FlowResult(data["velocity"][n].copy(), data["pressure"][n].copy(), "saved", [])
-            previous_state = fine.full_temperature(data["state"][n - 1] if n else fine.initial)
-            previous_flow = (
-                FlowResult(
-                    data["velocity"][n - 1].copy(), data["pressure"][n - 1].copy(), "saved", []
-                )
-                if n
-                else fine.initial_flow
+            scheme = replay_time_scheme(replay)
+            effective, previous_state, previous_flow, coefficients = saved_history(
+                fine,
+                data["state"],
+                data["velocity"],
+                data["pressure"],
+                n,
+                scheme,
+                restart=n % subdivision == 0,
             )
         source = np.zeros(len(fine.mesh.nodes))
         source[fine.free] = controls[n]
-        result = inspect_step(fine, source, previous_state, previous_flow, state, flow, n)
+        result = inspect_step(effective, source, previous_state, previous_flow, state, flow, n)
         args.output.mkdir(parents=True, exist_ok=False)
         write_report(
             args.output / "record.json",
@@ -179,6 +182,8 @@ def main():
                 "optimization_field_sha256": digest,
                 "fine_baseline_sha256": fine_baseline["baseline_sha256"],
                 "replay_status": replay["status"],
+                "time_scheme": scheme,
+                "storage_derivative_coefficients_s_inverse": coefficients.tolist(),
                 "scope": "Derivative and direction checks at unchanged saved fields; no continuation or reoptimization.",
                 **result,
             },

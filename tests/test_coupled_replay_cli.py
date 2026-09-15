@@ -123,3 +123,79 @@ def test_replay_options_only_allow_finite_positive_tighter_targets(tolerance):
         temporal.forward_options(
             SimpleNamespace(relaxation=0.5, coupling_cap=100, tolerance=tolerance)
         )
+
+
+def test_spatial_newton_cli_matches_bdf2_and_restart_policy(tmp_path, monkeypatch):
+    problem = small_coupled_problem([0.1] * 4, uniform_capacity=True)
+    config = {"query": 0, "target_count": 16, "transient": True, "slabs": 2}
+    controls = np.linspace(-1, 2, 2 * problem.spatial_size)
+    fields = {"control": controls, "state": np.zeros_like(controls)}
+    baseline = {
+        "baseline_sha256": "baseline",
+        "configuration": {"convection_form": "advective"},
+    }
+    monkeypatch.setattr(spatial, "load_saved_solution", lambda *args: ({}, config, fields, "hash"))
+    monkeypatch.setattr(spatial, "load_problem", lambda cfg: (problem, baseline))
+    monkeypatch.setattr(spatial, "require_matching_baseline", lambda *args: None)
+    monkeypatch.setattr(spatial, "environment", lambda: {"test": True})
+    monkeypatch.setattr(
+        spatial, "transfer_source", lambda c, f, u: (u, sparse.eye(problem.spatial_size))
+    )
+
+    def comparator(directory, p, baseline_digest, source_digest, cfg, **kwargs):
+        assert kwargs == {"time_scheme": "bdf2"}
+        assert baseline_digest == "baseline" and source_digest == "hash"
+        return np.zeros((4, problem.spatial_size)), {"test": True}
+
+    monkeypatch.setattr(spatial, "coarse_replay_states", comparator)
+
+    def replay(p, source, **kwargs):
+        np.testing.assert_array_equal(source, np.repeat(controls.reshape(2, -1), 2, axis=0))
+        assert kwargs["time_scheme"] == "bdf2"
+        assert kwargs["restart_interval"] == 2
+        assert kwargs["line_search"] == "fixed_scaled"
+        assert kwargs["backtrack_cap"] == 40
+        assert kwargs["tolerance"] == 1e-12
+        return {
+            "status": "newton_iteration_cap",
+            "states": np.zeros((1, p.spatial_size)),
+            "steps": [{"time_s": 0.1, "status": "newton_iteration_cap"}],
+            "seconds": 1.0,
+        }
+
+    monkeypatch.setattr(spatial, "newton_trajectory", replay)
+    output = tmp_path / "replay"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "spatial",
+            "--baseline",
+            "baseline",
+            "--fine-baseline",
+            "fine",
+            "--optimization",
+            "optimization",
+            "--coarse-replay",
+            "coarse",
+            "--subdivision",
+            "2",
+            "--procedure",
+            "monolithic_newton",
+            "--time-scheme",
+            "bdf2",
+            "--line-search",
+            "fixed_scaled",
+            "--backtrack-cap",
+            "40",
+            "--tolerance",
+            "1e-12",
+            "--output",
+            str(output),
+        ],
+    )
+    spatial.main()
+    record = json.loads((output / "record.json").read_text())
+    assert record["status"] == "newton_iteration_cap"
+    assert record["forward_solver"]["time_scheme"] == "bdf2"
+    assert "resolution_thresholds_met" not in record

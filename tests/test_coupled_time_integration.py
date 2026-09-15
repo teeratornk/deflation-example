@@ -97,3 +97,53 @@ def test_manufactured_thermal_trajectory_converges_at_second_order():
         errors.append(np.max(np.abs(replay["states"] - expected)))
     assert errors[0] / errors[1] > 3.5
     assert errors[1] / errors[2] > 3.5
+
+
+def test_saved_bdf2_histories_reproduce_both_equations_at_each_recorded_step():
+    from deflation_example.axisymmetric_flow import FlowResult
+    from deflation_example.coupled_time_integration import saved_history
+    from deflation_example.coupled_newton_replay import criteria_met, step_equations
+    from deflation_example.coupled_resolution import forward_model
+
+    problem = small_coupled_problem([0.1, 0.15, 0.08, 0.08], uniform_capacity=True)
+    controls = problem.evaluate(np.linspace(0.04, 0.1, problem.size)).control.reshape(4, -1)
+    replay = newton_trajectory(
+        problem, controls, time_scheme="bdf2", restart_interval=2, tolerance=1e-11
+    )
+    assert replay["status"] == "converged"
+    steps = problem.physical_steps.copy()
+    for n in range(problem.slabs):
+        effective, previous, previous_flow, coefficients = saved_history(
+            problem,
+            replay["states"],
+            replay["velocities"],
+            replay["pressures"],
+            n,
+            "bdf2",
+            restart=n % 2 == 0,
+        )
+        np.testing.assert_array_equal(
+            coefficients, replay["steps"][n]["storage_derivative_coefficients_s_inverse"]
+        )
+        current = problem.full_temperature(replay["states"][n])
+        flow = FlowResult(replay["velocities"][n], replay["pressures"][n], "saved", [])
+        source = np.zeros(len(problem.mesh.nodes))
+        source[problem.free] = controls[n]
+        _, metrics = step_equations(
+            effective, forward_model(effective), current, flow, source, previous, previous_flow, n
+        )
+        assert criteria_met(metrics, 1e-11)
+    np.testing.assert_array_equal(problem.physical_steps, steps)
+    with pytest.raises(ValueError, match="histories"):
+        saved_history(
+            problem, replay["states"][:-1], replay["velocities"], replay["pressures"], 0, "bdf2"
+        )
+
+
+def test_saved_time_policy_rejects_unknown_scheme_or_undeclared_bdf2_restarts():
+    from deflation_example.coupled_time_integration import replay_time_scheme
+
+    assert replay_time_scheme({}) == "backward_euler"
+    for scheme in ("bdf2", "unknown"):
+        with pytest.raises(ValueError):
+            replay_time_scheme({"forward_solver": {"time_scheme": scheme}})

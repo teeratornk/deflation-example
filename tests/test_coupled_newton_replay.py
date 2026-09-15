@@ -49,14 +49,28 @@ def test_fixed_scaled_merit_uses_the_original_equations_for_final_acceptance():
 
     problem, _, _, source = data()
     previous = problem.full_temperature(problem.initial)
+    snapshots = []
     rows, fields = compare_step(
-        problem, source, previous, problem.initial_flow, previous, problem.initial_flow, 0
+        problem,
+        source,
+        previous,
+        problem.initial_flow,
+        previous,
+        problem.initial_flow,
+        0,
+        callback=lambda rows, fields: snapshots.append((rows, fields)),
     )
     assert all(row["status"] == "converged" and row["independent_criteria_met"] for row in rows)
     np.testing.assert_allclose(
         fields["equation_max_state"], fields["fixed_scaled_state"], atol=1e-11
     )
     assert rows[1]["backtrack_cap"] == 40
+    assert [len(rows) for rows, _ in snapshots] == [1, 2]
+    assert set(snapshots[0][1]) == {
+        "equation_max_state",
+        "equation_max_velocity",
+        "equation_max_pressure",
+    }
 
 
 @pytest.mark.parametrize("options", [{"line_search": "unknown"}, {"backtrack_cap": 0}])

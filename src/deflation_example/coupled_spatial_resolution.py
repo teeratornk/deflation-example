@@ -18,6 +18,7 @@ from .coupled_resolution import (
 )
 from .coupled_saved import file_digest, load_saved_solution, require_matching_baseline
 from .coupled_targets import desired_temperature
+from .coupled_time_integration import replay_time_scheme
 from .reporting import environment, write_fields, write_report
 from .validation import integer
 
@@ -43,12 +44,22 @@ def transfer_source(coarse, fine, controls):
     return np.asarray(P @ source.T).T, P
 
 
-def coarse_replay_states(directory, problem, baseline_digest, source_digest, configuration):
+def coarse_replay_states(
+    directory,
+    problem,
+    baseline_digest,
+    source_digest,
+    configuration,
+    *,
+    time_scheme="backward_euler",
+):
     """Require a complete same-source coarse trajectory on the comparison time grid."""
     directory = Path(directory)
     record = json.loads((directory / "record.json").read_text())
-    if record["forward_solver"].get("time_scheme", "backward_euler") != "backward_euler":
-        raise ValueError("This spatial replay requires backward-Euler trajectories on both meshes")
+    if time_scheme not in {"backward_euler", "bdf2"}:
+        raise ValueError("Choose backward_euler or bdf2 time integration")
+    if replay_time_scheme(record) != time_scheme:
+        raise ValueError("Spatial replay requires the same time scheme on both meshes")
     clean_cfg = {
         k: v
         for k, v in configuration.items()
@@ -102,17 +113,24 @@ def main():
         "--line-search", choices=("equation_max", "fixed_scaled"), default="equation_max"
     )
     parser.add_argument("--backtrack-cap", type=int, default=21)
+    parser.add_argument(
+        "--time-scheme", choices=("backward_euler", "bdf2"), default="backward_euler"
+    )
     parser.add_argument("--subdivision", type=int, default=1)
     parser.add_argument("--coarse-replay", type=Path)
     add_forward_options(parser)
     args = parser.parse_args()
     if args.procedure != "monolithic_newton" and (
-        args.line_search != "equation_max" or args.backtrack_cap != 21
+        args.line_search != "equation_max"
+        or args.backtrack_cap != 21
+        or args.time_scheme != "backward_euler"
     ):
-        parser.error("Newton globalization options require --procedure monolithic_newton")
+        parser.error("Newton globalization and BDF2 options require --procedure monolithic_newton")
     subdivision = integer(args.subdivision, "Time subdivision", 1)
     if subdivision > 1 and args.coarse_replay is None:
         parser.error("Temporal subdivision requires a matching --coarse-replay")
+    if args.time_scheme != "backward_euler" and args.coarse_replay is None:
+        parser.error("BDF2 spatial assessment requires a matching --coarse-replay")
     options = forward_options(args)
     if args.output.exists():
         raise FileExistsError(args.output)
@@ -153,7 +171,12 @@ def main():
             original = fields["state"].reshape(coarse.slabs, coarse.spatial_size)
         else:
             original, comparison = coarse_replay_states(
-                args.coarse_replay, coarse, baseline["baseline_sha256"], digest, cfg
+                args.coarse_replay,
+                coarse,
+                baseline["baseline_sha256"],
+                digest,
+                cfg,
+                time_scheme=args.time_scheme,
             )
         interpolated = np.asarray(P @ original.T).T
         args.output.mkdir(parents=True, exist_ok=False)
@@ -190,6 +213,8 @@ def main():
                 "linear_residual": "Row-equilibrated original Jacobian equation",
                 "mass_tolerance": 1e-6,
                 "energy_tolerance": 1e-6,
+                "time_scheme": args.time_scheme,
+                "time_integrator_restart": "Backward Euler on the first substep of every original piecewise-constant source interval",
             }
         write_report(args.output / "record.json", {**metadata, "status": "running"})
 
@@ -205,6 +230,8 @@ def main():
                 callback=callback,
                 line_search=args.line_search,
                 backtrack_cap=args.backtrack_cap,
+                time_scheme=args.time_scheme,
+                restart_interval=subdivision,
             )
         else:
             result = replay_controls(fine, source, subdivision=1, **options, callback=callback)

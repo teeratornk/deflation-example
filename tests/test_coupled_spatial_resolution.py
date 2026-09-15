@@ -81,3 +81,73 @@ def test_coarse_replay_rejects_unmatched_or_incomplete_comparisons(tmp_path, cor
     np.savez(tmp_path / "states.npz", state=states, times_s=times)
     with pytest.raises(ValueError):
         coarse_replay_states(tmp_path, problem, "baseline", "source", {"slabs": 1})
+
+
+@pytest.mark.parametrize("scheme", ["backward_euler", "bdf2"])
+def test_matched_spatial_time_scheme_retains_all_times_and_source(tmp_path, scheme):
+    import json
+    from deflation_example.coupled_spatial_resolution import coarse_replay_states
+
+    problem = SimpleNamespace(slabs=4, spatial_size=3, physical_steps=np.full(4, 0.1))
+    times, states = np.cumsum(problem.physical_steps), np.arange(12).reshape(4, 3)
+    protocol = {
+        "time_scheme": scheme,
+        "time_integrator_restart": "Backward Euler on the first substep of every original piecewise-constant source interval",
+    }
+    record = {
+        "optimization_field_sha256": "source",
+        "baseline_sha256": "baseline",
+        "configuration": {"slabs": 2},
+        "status": "converged",
+        "steps": [{"time_s": float(t), "status": "converged"} for t in times],
+        "forward_solver": protocol,
+    }
+    (tmp_path / "record.json").write_text(json.dumps(record))
+    np.savez(tmp_path / "states.npz", state=states, times_s=times)
+    actual, metadata = coarse_replay_states(
+        tmp_path, problem, "baseline", "source", {"slabs": 2}, time_scheme=scheme
+    )
+    np.testing.assert_array_equal(actual, states)
+    assert metadata["forward_solver"] == protocol
+    if scheme == "bdf2":
+        del record["forward_solver"]["time_integrator_restart"]
+        (tmp_path / "record.json").write_text(json.dumps(record))
+        with pytest.raises(ValueError, match="restarts"):
+            coarse_replay_states(
+                tmp_path, problem, "baseline", "source", {"slabs": 2}, time_scheme=scheme
+            )
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--time-scheme", "bdf2"],
+        ["--time-scheme", "bdf2", "--procedure", "monolithic_newton"],
+        ["--subdivision", "2", "--procedure", "monolithic_newton"],
+    ],
+)
+def test_spatial_cli_rejects_missing_matching_time_protocol_before_data_access(
+    monkeypatch, options
+):
+    import sys
+    from deflation_example.coupled_spatial_resolution import main
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "coupled_spatial_resolution",
+            "--baseline",
+            "unused",
+            "--fine-baseline",
+            "unused",
+            "--optimization",
+            "unused",
+            "--output",
+            "unused",
+            *options,
+        ],
+    )
+    with pytest.raises(SystemExit) as error:
+        main()
+    assert error.value.code == 2

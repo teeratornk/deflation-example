@@ -18,11 +18,14 @@ from .coupled_optimize import load_problem
 from .coupled_resolution import forward_model
 from .coupled_saved import load_saved_solution, require_matching_baseline, file_digest
 from .coupled_spatial_resolution import transfer_source
+from .coupled_time_integration import replay_time_scheme, saved_history
 from .reporting import environment, write_fields, write_report
 from .validation import integer
 
 
-def compare_step(problem, source, previous_state, previous_flow, state, flow, slab, *, cap=100):
+def compare_step(
+    problem, source, previous_state, previous_flow, state, flow, slab, *, cap=100, callback=None
+):
     rows, fields = [], {}
     for policy, backtracks in (("equation_max", 21), ("fixed_scaled", 40)):
         result = newton_step(
@@ -64,6 +67,8 @@ def compare_step(problem, source, previous_state, previous_flow, state, flow, sl
         fields[f"{policy}_state"] = result.state
         fields[f"{policy}_velocity"] = result.flow.velocity
         fields[f"{policy}_pressure"] = result.flow.pressure
+        if callback is not None:
+            callback(rows.copy(), fields.copy())
     return rows, fields
 
 
@@ -126,9 +131,9 @@ def main():
             )
         state = fine.full_temperature(states[n])
         flow = FlowResult(velocities[n], pressures[n], "saved", [])
-        previous = fine.full_temperature(states[n - 1] if n else fine.initial)
-        previous_flow = (
-            FlowResult(velocities[n - 1], pressures[n - 1], "saved", []) if n else fine.initial_flow
+        scheme = replay_time_scheme(replay)
+        effective, previous, previous_flow, coefficients = saved_history(
+            fine, states, velocities, pressures, n, scheme, restart=n % subdivision == 0
         )
         source = np.zeros(len(fine.mesh.nodes))
         source[fine.free] = controls[n]
@@ -145,11 +150,28 @@ def main():
             "time_s": float(times[n]),
             "slab_zero_based": n,
             "spatial_state_degrees_of_freedom": fine.spatial_size,
+            "time_scheme": scheme,
+            "storage_derivative_coefficients_s_inverse": coefficients.tolist(),
             "scope": "Matched local Newton restarts from the saved unsuccessful candidate. The previous state and signed source are fixed; complete trajectory accuracy remains a separate check.",
         }
         write_report(args.output / "record.json", {**metadata, "status": "running"})
+
+        def completed_policy(rows, solutions):
+            write_fields(args.output / "states.npz", **solutions)
+            write_report(
+                args.output / "record.json", {**metadata, "status": "running", "rows": rows}
+            )
+
         rows, solutions = compare_step(
-            fine, source, previous, previous_flow, state, flow, n, cap=cap
+            effective,
+            source,
+            previous,
+            previous_flow,
+            state,
+            flow,
+            n,
+            cap=cap,
+            callback=completed_policy,
         )
         write_fields(args.output / "states.npz", **solutions)
         write_report(args.output / "record.json", {**metadata, "status": "complete", "rows": rows})
