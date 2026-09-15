@@ -34,8 +34,8 @@ def declared_records(protocol, selection=None):
         )
     if selection is None:
         return
-    forward = selection["families"]["forward"]["selected"]
-    momentum = selection["families"]["momentum"]["selected"]
+    forward = selection["families"].get("forward", {}).get("selected")
+    momentum = selection["families"].get("momentum", {}).get("selected")
     if forward is not None:
         for grid, policy, rep in itertools.product(
             protocol["trajectory_grids"],
@@ -256,12 +256,15 @@ def checked_fields(path, expected):
         return {key: data[key] for key in data.files}
 
 
-def root_agreement(root, reference_policy="newton"):
+def root_agreement(root, reference_policy="newton", *, family="forward", protocol=None):
     """Compare only verified local roots with identical inputs and sources."""
-    if reference_policy not in read(HERE / "protocol.json")["policies"]:
+    protocol = read(HERE / "protocol.json") if protocol is None else protocol
+    if reference_policy not in protocol["policies"]:
         raise ValueError("Choose a declared root-comparison policy")
+    if family not in protocol["families"]:
+        raise ValueError("Choose a declared equation family")
     rows = []
-    for reference_path in sorted(root.glob(f"screen/forward/*/{reference_policy}/record.json")):
+    for reference_path in sorted(root.glob(f"screen/{family}/*/{reference_policy}/record.json")):
         reference = read(reference_path)
         if not reference.get("row", {}).get("verified", False):
             continue
@@ -297,6 +300,7 @@ def root_agreement(root, reference_policy="newton"):
                     raise ValueError("Root comparison requires matching finite fields")
             rows.append(
                 {
+                    "family": family,
                     "case": path.parent.parent.name,
                     "policy": record["policy"],
                     "reference_policy": reference_policy,
@@ -361,14 +365,15 @@ def plot_comparisons(summary, output):
         plt.close(fig)
 
 
-def audit(root, output, plots=True, fields=True, root_policy="newton"):
-    protocol = read(HERE / "protocol.json")
+def audit(root, output, plots=True, fields=True, root_policy="newton", protocol_path=None):
+    protocol_path = HERE / "protocol.json" if protocol_path is None else Path(protocol_path)
+    protocol = read(protocol_path)
     selection = read(root / "selection.json") if (root / "selection.json").exists() else None
-    if selection is not None and selection["protocol_sha256"] != file_sha256(
-        HERE / "protocol.json"
-    ):
+    if selection is not None and selection["protocol_sha256"] != file_sha256(protocol_path):
         raise ValueError("Selection belongs to a different protocol")
     rows, sources = [], set()
+    if selection is not None:
+        sources.add(json.dumps(selection["environment"]["source_sha256"], sort_keys=True))
     for relative, spec in declared_records(protocol, selection):
         row, record = outcome(root / relative, spec)
         rows.append({"record": relative, **row})
@@ -378,11 +383,17 @@ def audit(root, output, plots=True, fields=True, root_policy="newton"):
         raise ValueError("Declared study records contain different numerical sources")
     summary = {
         "schema": "fixed-point-complete-audit-v1",
-        "protocol_sha256": file_sha256(HERE / "protocol.json"),
+        "protocol_sha256": file_sha256(protocol_path),
         "selection_complete": selection is not None,
         "rows": rows,
         "groups": groups(rows),
-        "root_agreement": root_agreement(root, root_policy) if fields else [],
+        "root_agreement": [
+            row
+            for family in protocol["families"]
+            for row in root_agreement(root, root_policy, family=family, protocol=protocol)
+        ]
+        if fields
+        else [],
         "scope": "The local screen, fixed-control trajectories and nonlinear optimization are distinct populations. Medians require every declared repetition to be verified and timed. Sampled process allocations are lower bounds on instantaneous peak memory. Root agreement is distinct from physical resolution.",
         "timing_boundaries": {
             "screen": "One equation solve including verification.",
@@ -413,13 +424,19 @@ def main():
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
+        "--protocol",
+        type=Path,
+        default=HERE / "protocol.json",
+        help="Use the exact protocol shipped with the numerical source being audited",
+    )
+    parser.add_argument(
         "--root-policy",
         choices=read(HERE / "protocol.json")["policies"],
         default="newton",
         help="Verified local root used only for field agreement; this does not select a numerical policy",
     )
     args = parser.parse_args()
-    audit(args.root, args.output, root_policy=args.root_policy)
+    audit(args.root, args.output, root_policy=args.root_policy, protocol_path=args.protocol)
 
 
 if __name__ == "__main__":

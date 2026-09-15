@@ -35,6 +35,23 @@ def test_declared_complete_population_has_correct_counts():
     assert len({p for p, _ in rows}) == len(rows)
 
 
+def test_momentum_only_protocol_keeps_its_own_population(tmp_path):
+    audit = module()
+    protocol = audit.read(audit.HERE / "protocol.json")
+    protocol.update(families=["momentum"], trajectory_grids=[], trajectory_repetitions=0)
+    selection = {"families": {"momentum": {"selected": "anderson3"}}}
+    rows = list(audit.declared_records(protocol, selection))
+    assert len(rows) == 30 + 2 + 18
+    assert all(spec["phase"] != "trajectory" for _, spec in rows)
+    path = tmp_path / "protocol.json"
+    write_report(path, protocol)
+    summary = audit.audit(
+        tmp_path / "inputs", tmp_path / "summary", plots=False, protocol_path=path
+    )
+    assert len(summary["rows"]) == 30
+    assert summary["protocol_sha256"] == file_sha256(path)
+
+
 def test_failed_or_unfinished_repetition_has_no_median():
     audit = module()
     rows = [

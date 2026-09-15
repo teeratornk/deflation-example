@@ -175,3 +175,9 @@ The diagnostic does not change the screening policies or their final accuracy
 criteria. It also compares at most ten successive Oseen updates using the two
 algebraically equivalent maps, starting from the same initial flow. A small
 frozen-matrix residual alone does not establish a nonlinear momentum solution.
+
+For the separate residual-equation momentum study, run `audit.py` with
+`--protocol` pointing to the exact version-3 protocol and `--root` pointing to
+its own outputs. This audits thirty momentum cases, two derivative gates and
+eighteen optimization tasks. The version-2 forward study retains its own source
+and records; the audit refuses mixed numerical sources in either population.
