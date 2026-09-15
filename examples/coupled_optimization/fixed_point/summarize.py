@@ -17,6 +17,14 @@ COLORS = {
     "anderson3": "#D55E00",
     "anderson5": "#CC79A7",
 }
+LABELS = {
+    "newton": "Newton",
+    "relaxed025": r"Relaxed, $\omega=0.25$",
+    "relaxed050": r"Relaxed, $\omega=0.5$",
+    "relaxed100": r"Relaxed, $\omega=1$",
+    "anderson3": "Anderson, depth 3",
+    "anderson5": "Anderson, depth 5",
+}
 
 
 def summarize(root, output, plots=True):
@@ -71,14 +79,20 @@ def summarize(root, output, plots=True):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    cases = sorted({p.parent.parent.name for p, r in records if "row" in r})
     for family in ("forward", "momentum"):
+        cases = sorted(
+            {p.parent.parent.name for p, r in records if "row" in r and r["family"] == family}
+        )
         if not cases:
             continue
+        columns = min(3, len(cases))
+        nrows = (len(cases) + columns - 1) // columns
         fig, axes = plt.subplots(
-            1, len(cases), figsize=(3.1 * len(cases), 3.5), squeeze=False, sharey=True
+            nrows, columns, figsize=(3.4 * columns, 3.1 * nrows), squeeze=False, sharey=True
         )
-        for ax, case in zip(axes[0], cases):
+        handles = {}
+        for ax, case in zip(axes.ravel(), cases):
+            physical_time = None
             for path, record in records:
                 if (
                     record["family"] != family
@@ -86,6 +100,7 @@ def summarize(root, output, plots=True):
                     or "row" not in record
                 ):
                     continue
+                physical_time = record["time_s"]
                 residuals = []
                 for row in record["row"]["history"]:
                     values = [
@@ -100,38 +115,75 @@ def summarize(root, output, plots=True):
                     if values:
                         residuals.append(max(values))
                 if residuals:
-                    ax.semilogy(
+                    (line,) = ax.semilogy(
                         np.maximum(residuals, 1e-16),
                         color=COLORS[record["policy"]],
-                        label=record["policy"],
+                        label=LABELS[record["policy"]],
                     )
+                    handles[record["policy"]] = line
+                    if not record["row"]["verified"]:
+                        ax.plot(
+                            len(residuals) - 1,
+                            max(residuals[-1], 1e-16),
+                            "x",
+                            color=COLORS[record["policy"]],
+                            markersize=7,
+                        )
             ax.axhline(1e-12, color="0.7", linewidth=0.7, linestyle="--")
-            ax.set_title(case.replace("_", " "))
+            scheme = "BDF2" if case.startswith("bdf2") else "Backward Euler"
+            ax.set_title(f"{scheme}, {physical_time:g} s")
             ax.set_xlabel("Nonlinear iteration")
-        axes[0, 0].set_ylabel("Maximum original-equation residual")
-        axes[0, -1].legend(fontsize=7)
-        fig.tight_layout()
+        for ax in axes[:, 0]:
+            ax.set_ylabel("Maximum original-equation residual")
+        for ax in axes.ravel()[len(cases) :]:
+            ax.set_visible(False)
+        if handles:
+            fig.legend(
+                handles.values(),
+                [line.get_label() for line in handles.values()],
+                loc="lower center",
+                ncol=3,
+                fontsize=9,
+            )
+        fig.tight_layout(rect=(0, 0.12 if nrows == 1 else 0.08, 1, 1))
         fig.savefig(output / f"{family}-residuals.pdf")
         plt.close(fig)
     trajectories = [(p, r) for p, r in records if "steps" in r]
     if trajectories:
+        definitions = {
+            (r["configuration"]["upper_K"], r["temperature_offset_K"], r["temperature_scale_K"])
+            for _, r in trajectories
+        }
+        if len(definitions) != 1:
+            raise ValueError("Temperature plots require matched bounds and temperature units")
         fig, ax = plt.subplots(figsize=(7, 4))
         for path, record in trajectories:
             times, peaks = [], []
             for row in record["steps"]:
-                with np.load(path.parent / row["fields"], allow_pickle=False) as data:
+                if not row["verified"]:
+                    break
+                field_path = path.parent / row["fields"]
+                if (
+                    field_path.resolve().parent != path.parent.resolve()
+                    or file_sha256(field_path) != row["field_sha256"]
+                ):
+                    raise ValueError("Trajectory field checksum or location differs")
+                with np.load(field_path, allow_pickle=False) as data:
                     # The frozen transformer normalization is read from model metadata.
                     peak = record["temperature_offset_K"] + record["temperature_scale_K"] * float(
                         data["state"].max()
                     )
                 times.append(row["time_s"])
                 peaks.append(peak)
+            if not times:
+                continue
             ax.plot(
                 times,
                 peaks,
                 color=COLORS[record["policy"]],
                 alpha=0.5,
-                label=f"{record['policy']}, {record['slabs']} slabs"
+                linestyle="-" if record["status"] == "converged" else "--",
+                label=f"{LABELS[record['policy']]}, {record['slabs']} slabs"
                 if record["repetition"] == 0
                 else None,
             )

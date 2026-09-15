@@ -131,3 +131,20 @@ cost; the audit leaves that comparison unavailable pending complete accounting.
 The forward-process interval includes input preparation and serialization,
 whereas the optimization-sequence interval excludes common calibration and
 process preparation. They appear in separate figures.
+
+For a complete verified forward trajectory, plot the desired temperature,
+computed temperature, unchanged signed heat source and fluid speed:
+
+```bash
+uv run python examples/coupled_optimization/fixed_point/trajectory_fields.py \
+  --trajectory "$TRAJECTORY_OUTPUT" --data-root "$DATA_ROOT" \
+  --output "$FIELD_FIGURES"
+```
+
+`--time-indices` selects declared stored time levels for the figure. The default
+shows the first, middle and last levels. Temperatures use kelvin, source density
+uses megawatts per cubic metre, and velocity uses metres per second. Radial and
+axial plotting scales are unequal. Each field archive is checked before plotting;
+incomplete trajectories produce no complete-trajectory field figure. The residual
+plots use crosses at the last recorded residual of failed local solves. Detailed
+termination labels remain in `outcomes.csv`.

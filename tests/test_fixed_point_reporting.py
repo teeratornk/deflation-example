@@ -178,3 +178,65 @@ def test_complete_time_figure_retains_failures(tmp_path):
     ]
     audit.plot_comparisons({"groups": audit.groups(rows)}, tmp_path)
     assert (tmp_path / "optimize-complete-times.pdf").stat().st_size > 100
+
+
+def example(name):
+    path = Path(__file__).parents[1] / "examples/coupled_optimization/fixed_point" / (name + ".py")
+    spec = importlib.util.spec_from_file_location("fixed_point_" + name, path)
+    result = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(result)
+    return result
+
+
+def test_partial_summary_skips_empty_family_and_plots_failure(tmp_path):
+    pytest.importorskip("matplotlib")
+    folder = tmp_path / "input/screen/forward/ordinary/newton"
+    folder.mkdir(parents=True)
+    write_report(
+        folder / "record.json",
+        {
+            "schema": "coupled-fixed-point-study-v1",
+            "status": "complete",
+            "family": "forward",
+            "policy": "newton",
+            "time_s": 1,
+            "row": {
+                "status": "iteration_cap",
+                "verified": False,
+                "history": [{"momentum_relative_residual": 1e-4}],
+            },
+        },
+    )
+    example("summarize").summarize(tmp_path / "input", tmp_path / "figure")
+    assert (tmp_path / "figure/forward-residuals.pdf").exists()
+    assert not (tmp_path / "figure/momentum-residuals.pdf").exists()
+
+
+def test_trajectory_field_reader_requires_complete_verified_hashes(tmp_path):
+    reader = example("trajectory_fields")
+    path = tmp_path / "step.npz"
+    np.savez(path, state=[0.1], velocity=[[1, 2]], pressure=[0])
+    record = {
+        "status": "converged",
+        "slabs": 1,
+        "steps": [
+            {
+                "slab_zero_based": 0,
+                "verified": True,
+                "fields": path.name,
+                "field_sha256": file_sha256(path),
+            }
+        ],
+    }
+    assert reader.verified_arrays(record, tmp_path)["velocity"].shape == (1, 1, 2)
+    record["status"] = "running"
+    with pytest.raises(ValueError, match="complete"):
+        reader.verified_arrays(record, tmp_path)
+    record["status"] = "converged"
+    record["steps"][0]["verified"] = False
+    with pytest.raises(ValueError, match="verified"):
+        reader.verified_arrays(record, tmp_path)
+    record["steps"][0]["verified"] = True
+    record["steps"][0]["field_sha256"] = "wrong"
+    with pytest.raises(ValueError, match="checksum"):
+        reader.verified_arrays(record, tmp_path)
