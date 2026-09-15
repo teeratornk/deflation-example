@@ -8,6 +8,8 @@
 
 ## Unreleased coupled-optimization verification
 
+- Add an optional two-pass tridiagonal temporal eigensolver with independently checked residuals; retain dense construction as the default used by existing measurements.
+- Provide fresh-process reference-construction and saved-field momentum-factor storage screens before large coupled optimizations; distinguish sampled memory from named array counts and extrapolations.
 - Predeclare the final coupled comparison with unchanged physics and bounds; leave grid and rank choices open until resolution and reoptimization checks pass.
 - Check refinement trends and compare every finer time level with the interpolated coarse trajectory; retain bound excesses and unsuccessful forward attempts separately from resolution.
 - Require all five optimality components in coupled timing summaries and support explicitly predeclared method-specific rank budgets while matching physical inputs, sources and numerical backends.

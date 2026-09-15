@@ -91,6 +91,7 @@ def build_mesh_reference(
     construction="mode_dependent",
     spatial_policy="diffusion",
     temporal_metric="euclidean",
+    temporal_solver="dense",
 ):
     """Build one full-domain reference before optimization, including all time levels."""
     rank = integer(rank, "Total reference rank", 1)
@@ -100,6 +101,10 @@ def build_mesh_reference(
         raise ValueError("Choose diffusion or scaled_schur spatial reference")
     if temporal_metric not in {"euclidean", "jacobi"}:
         raise ValueError("Choose euclidean or jacobi temporal selection coordinates")
+    if temporal_solver not in {"dense", "tridiagonal"}:
+        raise ValueError("Choose dense or tridiagonal temporal eigensolves")
+    if temporal_solver == "tridiagonal" and construction != "mode_dependent":
+        raise ValueError("Tridiagonal selection requires mode-dependent temporal factors")
     spatial_rank = min(rank, len(coarse_assembly.mesh.free) - 1)
     values, phi, residuals = spatial_reference(
         coarse_assembly,
@@ -128,12 +133,14 @@ def build_mesh_reference(
         return ArrayReference(phi, description)
     steps = problem.steps
     n = len(steps)
-    T = sparse.diags([1 / steps, -1 / steps[1:]], [0, -1], shape=(n, n)).toarray()
-    Wt = np.diag(steps / steps.mean())
     w = problem.assembly.mass[problem.free]
     w = w / w.mean()
     AP = problem.spatial_A @ phi
     CP = problem.nodal_capacity[:, None] * phi
+    if temporal_solver == "tridiagonal":
+        return _tridiagonal_reference(problem, phi, AP, CP, w, rank, temporal_metric, description)
+    T = sparse.diags([1 / steps, -1 / steps[1:]], [0, -1], shape=(n, n)).toarray()
+    Wt = np.diag(steps / steps.mean())
     factors, candidates = [], []
     common = linalg.eigh(Wt + problem.alpha * T.T @ Wt @ T)[1]
     diagonal = problem.H.diagonal().reshape(n, problem.spatial_size)
@@ -164,6 +171,108 @@ def build_mesh_reference(
             **description,
             "temporal_construction": construction,
             "temporal_selection_metric": temporal_metric,
+            "temporal_eigensolver": "dense",
+            "selection": selected,
+            "temporal_operator": "one-spatial-mode compression of the weighted trajectory Hessian",
+        },
+    )
+
+
+def temporal_diagonals(steps, mass, aa, ac, cc, alpha):
+    """Diagonal and off-diagonal of a one-mode weighted trajectory compression.
+
+    The backward-Euler matrix has diagonal 1/dt and subdiagonal -1/dt.
+    Its weighted normal product is tridiagonal, including the final time block.
+    This formula supports nonuniform time steps and variable spatial capacity.
+    """
+    steps = np.asarray(steps, dtype=float)
+    if (
+        steps.ndim != 1
+        or not len(steps)
+        or not np.isfinite(steps).all()
+        or np.any(steps <= 0)
+        or not np.isfinite([mass, aa, ac, cc, alpha]).all()
+        or min(mass, alpha) <= 0
+        or min(aa, cc) < 0
+    ):
+        raise ValueError("Positive time steps, mass and regularization are required")
+    weight, inverse = steps / steps.mean(), 1 / steps
+    diagonal = (mass + alpha * aa) * weight + 2 * alpha * ac * weight * inverse
+    normal = alpha * cc * weight * inverse**2
+    diagonal += normal
+    diagonal[:-1] += normal[1:]
+    off = -alpha * ac * weight[1:] * inverse[1:] - normal[1:]
+    return diagonal, off
+
+
+def _tridiagonal_reference(problem, phi, AP, CP, weights, rank, metric_name, description):
+    """Select globally before constructing temporal eigenvectors.
+
+    At most rank eigenvalues from each spatial mode can enter the global rank
+    selection. The second pass constructs only the selected temporal columns.
+    Dense n-by-n temporal matrices and the per-spatial-mode vector pool are
+    absent. The existing dense implementation remains the default.
+    """
+    n, spatial_rank = len(problem.steps), phi.shape[1]
+    diagonal = problem.H.diagonal().reshape(n, problem.spatial_size)
+
+    def compression(j):
+        column = phi[:, j]
+        d, e = temporal_diagonals(
+            problem.steps,
+            float(column @ (weights * column)),
+            float(AP[:, j] @ (weights * AP[:, j])),
+            float(AP[:, j] @ (weights * CP[:, j])),
+            float(CP[:, j] @ (weights * CP[:, j])),
+            problem.alpha,
+        )
+        metric = diagonal @ column**2 if metric_name == "jacobi" else np.ones(n)
+        if not np.isfinite(metric).all() or np.any(metric <= 0):
+            raise ValueError("Temporal selection requires a positive finite metric")
+        root = np.sqrt(metric)
+        return d / metric, e / (root[:-1] * root[1:]), root
+
+    candidates = []
+    for j in range(spatial_rank):
+        d, e, _ = compression(j)
+        scores = linalg.eigh_tridiagonal(
+            d, e, eigvals_only=True, select="i", select_range=(0, min(rank, n) - 1)
+        )
+        candidates.extend((float(value), j, k) for k, value in enumerate(scores))
+    selected = sorted(candidates)[:rank]
+    if len(selected) != rank:
+        raise ValueError("The coarse space-time pool cannot support the requested rank")
+    temporal = np.empty((n, rank))
+    residuals = np.empty(rank)
+    used = sorted({j for _, j, _ in selected})
+    for j in used:
+        positions = [(position, k) for position, (_, mode, k) in enumerate(selected) if mode == j]
+        d, e, root = compression(j)
+        _, vectors = linalg.eigh_tridiagonal(
+            d, e, select="i", select_range=(0, max(k for _, k in positions))
+        )
+        for position, k in positions:
+            vector = vectors[:, k]
+            action = d * vector
+            action[:-1] += e * vector[1:]
+            action[1:] += e * vector[:-1]
+            residuals[position] = np.linalg.norm(action - selected[position][0] * vector) / max(
+                np.linalg.norm(action), np.finfo(float).tiny
+            )
+            temporal[:, position] = vector / root
+    if not np.isfinite(residuals).all() or residuals.max() > 1e-8:
+        raise RuntimeError("Temporal eigensolve failed its independently recomputed residual check")
+    remap = {j: i for i, j in enumerate(used)}
+    return SpaceTimeReference(
+        phi[:, used],
+        temporal,
+        [remap[j] for _, j, _ in selected],
+        {
+            **description,
+            "temporal_construction": "mode_dependent",
+            "temporal_selection_metric": metric_name,
+            "temporal_eigensolver": "tridiagonal_two_pass",
+            "temporal_scaled_relative_residuals": residuals.tolist(),
             "selection": selected,
             "temporal_operator": "one-spatial-mode compression of the weighted trajectory Hessian",
         },

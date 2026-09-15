@@ -79,6 +79,7 @@ def build_reference(
     construction="mode_dependent",
     spatial_policy="scaled_schur",
     temporal_metric="jacobi",
+    temporal_solver="dense",
 ):
     """Charge construction on the fine or a declared nested reference mesh.
 
@@ -107,6 +108,7 @@ def build_reference(
         construction=construction,
         spatial_policy=spatial_policy,
         temporal_metric=temporal_metric,
+        temporal_solver=temporal_solver,
     )
 
 
@@ -141,6 +143,7 @@ def configured_reference(problem, configuration, baseline):
         construction=configuration.get("reference_construction", "mode_dependent"),
         spatial_policy=configuration.get("reference_spatial_policy", "scaled_schur"),
         temporal_metric=configuration.get("reference_temporal_metric", "jacobi"),
+        temporal_solver=configuration.get("reference_temporal_solver", "dense"),
     )
     if record is not None:
         reference.description.update(

@@ -8,6 +8,7 @@ reference_baseline_directory: null
 reference_construction: mode_dependent
 reference_spatial_policy: scaled_schur
 reference_temporal_metric: jacobi
+reference_temporal_solver: dense
 reference_transfer: full
 output: runs/coupled-optimization
 mode: derivatives

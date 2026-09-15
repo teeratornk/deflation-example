@@ -56,6 +56,46 @@ requires refinement and reoptimization under the same physical bounds. Repeat
 same-grid and finer-grid forward checks with the new source. The resolution
 thresholds describe discrete differences, not a bound on the continuum solution.
 
+## Construction and memory screening
+
+The optional `reference_temporal_solver=tridiagonal` path uses the same weighted
+one-spatial-mode compression as `dense`. Backward-Euler coupling makes that
+compression tridiagonal. A first pass selects eigenvalues across spatial modes;
+a second pass computes only the selected temporal vectors. Independent residuals
+check the resulting eigenpairs. The default remains `dense`, as in the earlier
+measurements. The new option has its own source version and requires new setup
+and optimization measurements before use in a performance comparison.
+
+Run each construction in a fresh process on allocated compute resources:
+
+```bash
+git checkout coupled-memory-preflight-v1
+uv sync --frozen --extra study
+uv run --extra study python -m deflation_example.coupled_reference_screen \
+  --baseline runs/stabilized-baseline --slabs 512 --rank 100 \
+  --temporal-solver tridiagonal --output runs/reference-memory-512
+uv run --extra study python -m deflation_example.coupled_memory_screen \
+  --baseline runs/stabilized-baseline --optimization runs/optimized \
+  --method reference --sample-steps 0 15 27 63 \
+  --slabs 128 512 2048 --ranks 0 20 100 200 --output runs/factor-memory
+```
+
+These commands use `coupled-memory-preflight-v1`, which adds the screening modules;
+`coupled-final-design-v1` retains the earlier design and reporting implementation.
+The reference screen measures assembly, construction and sampled process memory
+and saves the compact reference. For nested refinement, supply the fine baseline
+as `--baseline` and the parent baseline as `--coarse-baseline`. The factor screen
+uses the saved velocities on their original mesh at candidate time steps. It
+reports exported sparse-factor arrays, deterministic solve checks and explicit
+array-size formulas. Extrapolating those factor sizes over a trajectory estimates
+one storage contribution; it does not measure a new optimized trajectory.
+
+The sampled process allocation includes library work and diagnostic arrays.
+Do not add it to the named array counts as if they were disjoint components.
+The restricted basis, cached products, recycling candidates and simultaneous
+current/trial linearizations still require a measured optimization-level check.
+All construction and factorization failures remain in their output records.
+
 ## Freeze the complete comparison
 
 Before timed sequences, record the resolved mesh and time grid, baseline hashes,
