@@ -15,6 +15,7 @@ from scipy.sparse.linalg import splu
 
 from .coupled_derivatives import ControlJacobian, buoyancy_jacobian, thermal_velocity_jacobian
 from .coupled_flow_solve import solve_momentum
+from .coupled_factor_storage import RecomputedLU
 from .mesh_control import WeightedReducedOperator
 from .meshes import assemble_thermal
 from .solvers import relative_norm
@@ -67,6 +68,7 @@ class CoupledControlProblem:
         flow_tolerance=1e-11,
         flow_cap=100,
         flow_continuation=False,
+        momentum_factor_policy="retained",
     ):
         self.flow, self.mesh = flow, flow.mesh
         self.free = self.mesh.free.copy()
@@ -127,6 +129,9 @@ class CoupledControlProblem:
         if not isinstance(flow_continuation, bool):
             raise ValueError("Flow continuation must be Boolean")
         self.flow_continuation = flow_continuation
+        if momentum_factor_policy not in {"retained", "recompute"}:
+            raise ValueError("Choose retained or recompute momentum-factor storage")
+        self.momentum_factor_policy = momentum_factor_policy
         self.evaluation_callback = None
         self.evaluation_count = 0
         self.assembly = self.assemble(initial_flow.velocity)
@@ -250,7 +255,12 @@ class CoupledControlProblem:
                 J = self.flow.operator(
                     result.velocity, time_step=dt
                 ) + self.flow.convection_derivative(result.velocity)
-                factors.append(splu(J[self.flow_free][:, self.flow_free].tocsc()))
+                matrix = J[self.flow_free][:, self.flow_free].tocsc()
+                factors.append(
+                    splu(matrix)
+                    if self.momentum_factor_policy == "retained"
+                    else RecomputedLU(matrix)
+                )
             if self.evaluation_callback is not None:
                 self.evaluation_callback(
                     {

@@ -12,6 +12,10 @@ class CudaControlJacobian:
     """Keep the complete thermal and momentum tangent trajectory on one GPU."""
 
     def __init__(self, jacobian):
+        from .coupled_factor_storage import RecomputedLU
+
+        if any(isinstance(factor, RecomputedLU) for factor in jacobian.factors):
+            raise ValueError("CUDA derivative actions require retained momentum factors")
         try:
             import cupy as cp
             from cupyx.scipy import sparse

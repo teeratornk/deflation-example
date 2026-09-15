@@ -28,6 +28,11 @@ from .validation import integer, positive_real
 
 
 def load_problem(config):
+    policy = config.get("momentum_factor_policy", "retained")
+    if policy not in {"retained", "recompute"}:
+        raise ValueError("Choose retained or recompute momentum-factor storage")
+    if policy == "recompute" and config.get("device", "cpu") != "cpu":
+        raise ValueError("Recomputed momentum factors currently require the CPU backend")
     directory = Path(config["baseline_directory"])
     record = json.loads((directory / "record.json").read_text())
     if record["status"] != "converged":
@@ -80,6 +85,7 @@ def load_problem(config):
         flow_tolerance=config["flow_tolerance"],
         flow_cap=config["flow_cap"],
         flow_continuation=config["flow_continuation"],
+        momentum_factor_policy=policy,
     )
     return problem, record
 

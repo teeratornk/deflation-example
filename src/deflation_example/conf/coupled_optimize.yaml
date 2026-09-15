@@ -28,6 +28,7 @@ recycle_window: 20
 flow_tolerance: 1.0e-9
 flow_cap: 100
 flow_continuation: false
+momentum_factor_policy: retained
 nonlinear_tolerance: 1.0e-8
 nonlinear_cap: 100
 backtracking: halving

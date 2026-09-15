@@ -16,6 +16,27 @@ Both temporal couplings and velocity-dependent streamline diffusion are included
 The stabilization formula is differentiable within each branch; exact branch
 switches are rejected during linearization.
 
+The CPU option `momentum_factor_policy=recompute` stores immutable sparse
+momentum Jacobians and recomputes their LU factors for each vector or block
+application. Tangent and transpose actions use the same checkpoint matrices.
+This reduces stored factor data and adds factorization work to the measured
+solve intervals. The default `retained` policy and earlier timings remain
+unchanged. CUDA and hybrid actions require retained factors.
+
+The optional memory comparison checks both policies at saved velocity fields,
+with identical vector/block right-hand sides, transpose solves, two repetitions,
+and reversed method order:
+
+```bash
+uv run python -m deflation_example.coupled_memory_screen --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --sample-steps 0 15 27 63 --slabs 128 512 2048 --ranks 0 20 100 200 --checkpoint-comparison --output runs/factor-checkpoint-screen
+```
+
+The output separates sparse-matrix storage, factor-array storage, recomputation
+time, and original-equation residuals. Both objects coexist in this diagnostic;
+its sampled process peak does not compare complete optimizer memory. Complete
+comparisons must give every solver the same declared factor-storage policy and
+include all recomputation costs.
+
 All three CG methods use the positive diagonal of the frozen-velocity reduced
 operator, including the current damping term. This supplies an approximation to
 the coupled Gauss--Newton diagonal. The configuration name `jacobi` selects

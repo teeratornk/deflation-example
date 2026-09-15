@@ -16,6 +16,7 @@ from scipy.sparse.linalg import splu
 from threadpoolctl import threadpool_limits
 
 from .coupled_optimize import load_problem
+from .coupled_factor_storage import RecomputedLU
 from .coupled_saved import load_saved_solution, require_matching_baseline
 from .memory import ProcessMemory
 from .reporting import environment, write_report
@@ -45,7 +46,7 @@ def dense_storage(spatial_size, slabs, rank):
     }
 
 
-def factor_inventory(matrix):
+def factor_inventory(matrix, checkpoint_comparison=False):
     """Expose sparse-LU array sizes and independently check one deterministic solve.
 
     SciPy's exported L/U arrays exclude SuperLU's opaque internal workspace.
@@ -64,7 +65,7 @@ def factor_inventory(matrix):
     rhs = np.random.default_rng(417).normal(size=matrix.shape[0])
     solution = factor.solve(rhs)
     residual = np.linalg.norm(matrix @ solution - rhs) / np.linalg.norm(rhs)
-    return {
+    result = {
         "factor_seconds": factor_seconds,
         "dimension": matrix.shape[0],
         "matrix_nonzeros": matrix.nnz,
@@ -74,6 +75,47 @@ def factor_inventory(matrix):
         "fresh_relative_residual": float(residual),
         "factor_check_passed": bool(np.isfinite(residual) and residual <= 1e-8),
     }
+    if checkpoint_comparison:
+        tick = time.perf_counter()
+        checkpoint = RecomputedLU(matrix)
+        checkpoint_construction_seconds = time.perf_counter() - tick
+        rows = []
+        for columns in (1, 20):
+            values = np.random.default_rng(912 + columns).normal(size=(matrix.shape[0], columns))
+            for transpose in ("N", "T"):
+                for repetition in range(2):
+                    order = (
+                        ("retained", "recompute") if repetition == 0 else ("recompute", "retained")
+                    )
+                    for policy in order:
+                        implementation = factor if policy == "retained" else checkpoint
+                        tick = time.perf_counter()
+                        answer = implementation.solve(values, trans=transpose)
+                        seconds = time.perf_counter() - tick
+                        A = matrix if transpose == "N" else matrix.T
+                        relative = np.linalg.norm(A @ answer - values) / np.linalg.norm(values)
+                        rows.append(
+                            {
+                                "policy": policy,
+                                "columns": columns,
+                                "transpose": transpose,
+                                "repetition": repetition,
+                                "seconds": seconds,
+                                "fresh_relative_residual": float(relative),
+                                "verified": bool(np.isfinite(relative) and relative <= 1e-8),
+                            }
+                        )
+        result["checkpoint_comparison"] = {
+            "matrix_checkpoint_bytes": checkpoint.checkpoint_bytes,
+            "checkpoint_construction_seconds": checkpoint_construction_seconds,
+            "recomputed_factorizations": checkpoint.factorizations,
+            "recomputed_factor_seconds": checkpoint.factor_seconds,
+            "recomputed_solve_seconds": checkpoint.solve_seconds,
+            "all_actions_verified": all(row["verified"] for row in rows),
+            "actions": rows,
+            "scope": "Matched vector/block and transpose solves with reversed policy order. Recompute intervals include factorization. Retained intervals use the preceding factorization, whose cost is reported separately. Both objects coexist in this diagnostic; sampled process memory does not compare complete optimizer policies.",
+        }
+    return result
 
 
 def main():
@@ -89,6 +131,7 @@ def main():
     parser.add_argument("--ranks", type=int, nargs="+", default=[0, 20, 100, 200])
     parser.add_argument("--threads", type=int, default=8)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--checkpoint-comparison", action="store_true")
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
@@ -106,6 +149,7 @@ def main():
         "declared_time_slabs": slabs,
         "declared_ranks": ranks,
         "threads": integer(args.threads, "Threads", 1),
+        "checkpoint_comparison": args.checkpoint_comparison,
         "scope": "Saved velocity fields at candidate time steps; no new flow trajectory or optimization. Factor-array extrapolations are estimates, not memory guarantees. Named arrays overlap sampled process memory and must not be added to it.",
     }
     write_report(args.output / "record.json", {**metadata, "status": "running", "rows": rows})
@@ -158,8 +202,11 @@ def main():
                         J = problem.flow.operator(
                             velocity, time_step=horizon / n
                         ) + problem.flow.convection_derivative(velocity)
-                        values = factor_inventory(
-                            J[problem.flow_free][:, problem.flow_free].tocsc()
+                        matrix = J[problem.flow_free][:, problem.flow_free].tocsc()
+                        values = (
+                            factor_inventory(matrix, checkpoint_comparison=True)
+                            if args.checkpoint_comparison
+                            else factor_inventory(matrix)
                         )
                         row.update(status="complete", **values)
                         row["one_trajectory_factor_array_extrapolation_bytes"] = (
@@ -168,7 +215,11 @@ def main():
                         row["current_and_trial_factor_array_extrapolation_bytes"] = (
                             2 * n * values["exported_factor_array_bytes"]
                         )
-                        del J
+                        if args.checkpoint_comparison:
+                            row["current_and_trial_matrix_checkpoint_extrapolation_bytes"] = (
+                                2 * n * values["checkpoint_comparison"]["matrix_checkpoint_bytes"]
+                            )
+                        del J, matrix
                     except (MemoryError, RuntimeError) as error:
                         row.update(
                             status="memory_limited"
@@ -198,7 +249,14 @@ def main():
             "sampled_process_memory": memory,
             "all_factor_checks_passed": failure is None
             and len(rows) == len(samples) * len(slabs)
-            and all(row.get("factor_check_passed", False) for row in rows),
+            and all(
+                row.get("factor_check_passed", False)
+                and (
+                    not args.checkpoint_comparison
+                    or row["checkpoint_comparison"]["all_actions_verified"]
+                )
+                for row in rows
+            ),
             "optimization_memory_feasibility_established": False,
         },
     )
