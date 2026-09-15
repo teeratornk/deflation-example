@@ -338,6 +338,22 @@ The output retains every supplied run's status. These diagnostics locate the
 unresolved differences; spatial resolution and optimization feasibility have
 separate checks.
 
+A separate Newton comparison restarts the saved unsuccessful step using either
+the original maximum-equation merit or a fixed row-scaled residual norm. Both
+rules use the same original equations and final residual criteria. Each rule
+receives 100 Newton iterations; the original and scaled rules allow 21 and 40
+backtracking trials, respectively. The final residual is evaluated again at
+the returned temperature and velocity:
+
+```bash
+uv run python -m deflation_example.coupled_newton_repair --baseline runs/stabilized-baseline --fine-baseline runs/refined-baseline --optimization runs/startup60-reference-pilot --replay runs/replay-fine-mesh --output runs/newton-globalization
+```
+
+This local comparison uses a saved preceding state. A successful local restart
+requires a separate complete replay before supporting a trajectory claim.
+The original Newton replay retains `--line-search equation_max` and
+`--backtrack-cap 21` as its defaults.
+
 ```bash
 uv run python -m deflation_example.coupled_resolution --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --method reference --subdivision 1 --output runs/replay-original
 uv run python -m deflation_example.coupled_resolution --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --method reference --subdivision 2 --output runs/replay-refined

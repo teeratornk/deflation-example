@@ -91,6 +91,8 @@ def newton_step(
     max_iterations=30,
     initial_state=None,
     initial_flow=None,
+    line_search="equation_max",
+    backtrack_cap=21,
 ):
     """Solve one unchanged transient step, starting from past fields by default."""
     slab = integer(slab, "Slab index", 0)
@@ -100,6 +102,9 @@ def newton_step(
     if tolerance > 1e-8:
         raise ValueError("The forward tolerance may only tighten the original target")
     max_iterations = integer(max_iterations, "Newton iteration cap", 0)
+    if line_search not in {"equation_max", "fixed_scaled"}:
+        raise ValueError("Choose equation_max or fixed_scaled Newton line search")
+    backtrack_cap = integer(backtrack_cap, "Backtracking trial cap", 1)
     source = real_array(source, "Fixed source").copy()
     previous_state = real_array(previous_state, "Previous temperature").copy()
     state = real_array(
@@ -166,7 +171,7 @@ def newton_step(
             (dx[: problem.flow.nv], dx[problem.flow.nv : 2 * problem.flow.nv])
         )
         trials, retained = [], False
-        for backtrack in range(21):
+        for backtrack in range(backtrack_cap):
             step = 0.5**backtrack
             candidate = state.copy()
             candidate[problem.free] += step * update[len(problem.flow_free) :]
@@ -186,10 +191,18 @@ def newton_step(
                 previous_flow,
                 slab,
             )
-            trials.append({"step": step, **candidate_metrics})
-            if equation_merit(candidate_metrics) < (1 - 1e-4 * step) * equation_merit(
-                metrics
-            ) or criteria_met(candidate_metrics, tolerance):
+            # Hold the row scaling fixed throughout this Newton line search.
+            # The independent final equations retain their original criteria.
+            scaled_ratio = float(np.linalg.norm(scaling * candidate_residual) / denominator)
+            trials.append(
+                {"step": step, "fixed_scaled_residual_ratio": scaled_ratio, **candidate_metrics}
+            )
+            decrease = (
+                scaled_ratio < 1 - 1e-4 * step
+                if line_search == "fixed_scaled"
+                else equation_merit(candidate_metrics) < (1 - 1e-4 * step) * equation_merit(metrics)
+            )
+            if decrease or criteria_met(candidate_metrics, tolerance):
                 state, flow, residual, metrics = (
                     candidate,
                     candidate_flow,
@@ -204,6 +217,7 @@ def newton_step(
                 "linear_relative_residual": float(linear_residual),
                 "linear_corrections": correction,
                 "candidate_retained": retained,
+                "line_search": line_search,
                 "trials": trials,
                 **metrics,
             }
@@ -267,6 +281,10 @@ def main():
     parser.add_argument("--tolerance", type=float, default=1e-12)
     parser.add_argument("--cap", type=int, default=30)
     parser.add_argument("--subdivision", type=int, default=1)
+    parser.add_argument(
+        "--line-search", choices=("equation_max", "fixed_scaled"), default="equation_max"
+    )
+    parser.add_argument("--backtrack-cap", type=int, default=21)
     parser.add_argument("--threads", type=int, default=8)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -313,6 +331,8 @@ def main():
                 "linear_residual": "Row-equilibrated original Jacobian equation",
                 "mass_tolerance": 1e-6,
                 "energy_tolerance": 1e-6,
+                "line_search": args.line_search,
+                "backtrack_cap": args.backtrack_cap,
             },
             "target_position": args.target_position,
             "configuration": {
@@ -332,7 +352,15 @@ def main():
             source = np.zeros(len(problem.mesh.nodes))
             source[problem.free] = values
             result = newton_step(
-                problem, source, state, flow, n, tolerance=args.tolerance, max_iterations=args.cap
+                problem,
+                source,
+                state,
+                flow,
+                n,
+                tolerance=args.tolerance,
+                max_iterations=args.cap,
+                line_search=args.line_search,
+                backtrack_cap=args.backtrack_cap,
             )
             states.append(result.state[problem.free].copy())
             velocities.append(result.flow.velocity.copy())

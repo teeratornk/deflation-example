@@ -17,7 +17,8 @@ def data():
     return problem, state, evaluation, source
 
 
-def test_forward_newton_recovers_complete_known_trajectory_from_fixed_sources():
+@pytest.mark.parametrize("line_search", ["equation_max", "fixed_scaled"])
+def test_forward_newton_recovers_complete_known_trajectory_from_fixed_sources(line_search):
     problem, expected, evaluation, _ = data()
     state = problem.full_temperature(problem.initial)
     flow = problem.initial_flow
@@ -25,7 +26,9 @@ def test_forward_newton_recovers_complete_known_trajectory_from_fixed_sources():
         source = np.zeros(len(problem.mesh.nodes))
         source[problem.free] = evaluation.control.reshape(problem.slabs, -1)[n]
         original = source.copy()
-        result = newton_step(problem, source, state, flow, n, tolerance=1e-11)
+        result = newton_step(
+            problem, source, state, flow, n, tolerance=1e-11, line_search=line_search
+        )
         assert result.status == "converged", result.history
         _, metrics = step_equations(
             problem, forward_model(problem), result.state, result.flow, source, state, flow, n
@@ -39,6 +42,35 @@ def test_forward_newton_recovers_complete_known_trajectory_from_fixed_sources():
         np.testing.assert_array_equal(source, original)
         assert len(result.history) <= 10
         state, flow = result.state, result.flow
+
+
+def test_fixed_scaled_merit_uses_the_original_equations_for_final_acceptance():
+    from deflation_example.coupled_newton_repair import compare_step
+
+    problem, _, _, source = data()
+    previous = problem.full_temperature(problem.initial)
+    rows, fields = compare_step(
+        problem, source, previous, problem.initial_flow, previous, problem.initial_flow, 0
+    )
+    assert all(row["status"] == "converged" and row["independent_criteria_met"] for row in rows)
+    np.testing.assert_allclose(
+        fields["equation_max_state"], fields["fixed_scaled_state"], atol=1e-11
+    )
+    assert rows[1]["backtrack_cap"] == 40
+
+
+@pytest.mark.parametrize("options", [{"line_search": "unknown"}, {"backtrack_cap": 0}])
+def test_invalid_globalization_policy_rejected(options):
+    problem, _, _, source = data()
+    with pytest.raises(ValueError):
+        newton_step(
+            problem,
+            source,
+            problem.full_temperature(problem.initial),
+            problem.initial_flow,
+            0,
+            **options,
+        )
 
 
 def test_converged_initial_guard_and_zero_budget_keep_matching_fields():
