@@ -156,6 +156,7 @@ def test_gpu_blocks_preserve_original_residual_and_reuse_factors(method, coarse_
         rank=3,
         window=6,
         block_min_columns=2,
+        block_max_columns=2,
         rtol=1e-10,
         cg_factor=0.1,
         residual_policy="refine",

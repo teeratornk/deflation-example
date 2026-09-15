@@ -19,10 +19,13 @@ class CudaCoarseSpace:
 
     device = "cuda"
 
-    def __init__(self, cp, apply, size, basis, condition_limit):
+    def __init__(self, cp, apply, size, basis, condition_limit, chunk=100):
         from cupyx.scipy.linalg import solve_triangular
 
+        from .coupled_hybrid_solver import chunk_bounds
+
         self.cp, self.solve_triangular = cp, solve_triangular
+        self.chunk = chunk
         start = time.perf_counter()
         empty = basis is None or basis.shape[1] == 0
         Z = cp.empty((size, 0)) if empty else cp.asarray(basis, dtype=cp.float64)
@@ -37,7 +40,10 @@ class CudaCoarseSpace:
         self.condition, self.fallback, self.breakdown = 1.0, None, False
         self.factor, self.AZ = None, None
         if Z.shape[1]:
-            self.AZ = apply(Z)
+            # Bounded chunks keep every per-slab triangular plan within memory.
+            self.AZ = cp.concatenate(
+                [apply(Z[:, a:b]) for a, b in chunk_bounds(Z.shape[1], chunk)], axis=1
+            )
             E = Z.T @ self.AZ
             E = (E + E.T) / 2
             eigenvalues = cp.linalg.eigvalsh(E)

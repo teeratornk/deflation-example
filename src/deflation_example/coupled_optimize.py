@@ -240,6 +240,9 @@ def solver_options(cfg, solver_class):
         options["block_min_columns"] = integer(
             cfg.get("hybrid_block_min_columns", 20), "CUDA block threshold", 2
         )
+        options["block_max_columns"] = integer(
+            cfg.get("hybrid_block_max_columns", 100), "CUDA block chunk width", 1
+        )
         options["coarse_device"] = cfg.get("hybrid_coarse_device", "cpu")
     return options
 

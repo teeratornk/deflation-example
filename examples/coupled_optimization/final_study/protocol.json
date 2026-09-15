@@ -24,6 +24,7 @@
     "lower_K": 337.3,
     "device": "hybrid",
     "hybrid_block_min_columns": 20,
+    "hybrid_block_max_columns": 100,
     "hybrid_coarse_device": "cuda",
     "threads": 8,
     "flow_tolerance": 1e-12,

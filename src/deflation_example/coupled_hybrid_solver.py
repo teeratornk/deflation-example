@@ -20,16 +20,37 @@ from .study_solvers import StudySolver
 from .validation import integer
 
 
+def chunk_bounds(columns, width):
+    """Nearly equal column chunks of at most ``width``; one chunk when it fits."""
+    columns, width = integer(columns, "Columns", 0), integer(width, "Chunk width", 1)
+    if columns <= width:
+        return [(0, columns)]
+    count = -(-columns // width)
+    edges = [round(columns * k / count) for k in range(count + 1)]
+    return [(edges[k], edges[k + 1]) for k in range(count)]
+
+
 class HybridCoupledSolver(StudySolver):
     """Retain CPU vectors and accelerate blocks of at least twenty columns."""
 
-    def __init__(self, method, *, block_min_columns=20, coarse_device="cpu", **kwargs):
+    def __init__(
+        self,
+        method,
+        *,
+        block_min_columns=20,
+        block_max_columns=100,
+        coarse_device="cpu",
+        **kwargs,
+    ):
         if method not in {"jacobi", "reference", "recycling"}:
             raise ValueError("Hybrid coupled policies are jacobi, reference and recycling")
         if coarse_device not in {"cpu", "cuda"}:
             raise ValueError("The hybrid coarse-space correction runs on cpu or cuda")
         super().__init__(method, device="cpu", **kwargs)
         self.block_min_columns = integer(block_min_columns, "CUDA block threshold", 2)
+        # Device block products are applied in bounded column chunks: every
+        # per-slab triangular plan holds buffers proportional to the chunk width.
+        self.block_max_columns = integer(block_max_columns, "CUDA block chunk width", 1)
         self.coarse_device = coarse_device
         self.cpu_jacobian = self.device_jacobian = None
         self.block_records = []
@@ -125,12 +146,14 @@ class HybridCoupledSolver(StudySolver):
             start = time.perf_counter()
             apply = device_operator()
             cp = self.device_jacobian.cp
-            answer = cp.asnumpy(apply(vectors))
+            bounds = chunk_bounds(vectors.shape[1], self.block_max_columns)
+            answer = np.concatenate([cp.asnumpy(apply(vectors[:, a:b])) for a, b in bounds], axis=1)
             cp.cuda.get_current_stream().synchronize()
             self.block_records.append(
                 {
                     "kind": "operator_block",
                     "columns": vectors.shape[1],
+                    "chunks": len(bounds),
                     "factor_upload": False,
                     "seconds": time.perf_counter() - start,
                 }
@@ -156,7 +179,12 @@ class HybridCoupledSolver(StudySolver):
 
                 apply = device_operator()
                 space = CudaCoarseSpace(
-                    self.device_jacobian.cp, apply, A.shape[0], basis, condition_limit
+                    self.device_jacobian.cp,
+                    apply,
+                    A.shape[0],
+                    basis,
+                    condition_limit,
+                    chunk=self.block_max_columns,
                 )
                 self.coarse_records.append(space)
                 return space
