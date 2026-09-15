@@ -1,9 +1,11 @@
 """CPU projected CG with CUDA block products for coupled coarse-space processing.
 
 Vector iterations and final original-residual checks use the CPU operator.
-Reference and recycling bases share the same optional block acceleration.
-All transfers, lazy factor uploads and block products remain inside the caller's
-solve interval. This backend does not change the nonlinear equations or targets.
+Reference and recycling bases share the same optional block acceleration, and
+their exact coarse correction may also reside on the device. All transfers,
+lazy factor uploads, block products and device corrections remain inside the
+caller's solve interval. This backend does not change the nonlinear equations
+or targets, and the rank-zero control never performs device work.
 """
 
 import time
@@ -13,6 +15,7 @@ from scipy.sparse.linalg import LinearOperator
 
 from .coupled_cuda import CudaControlJacobian, CudaGaussNewton
 from .recycling import inactive_indices
+from .solvers import CpuCoarseSpace
 from .study_solvers import StudySolver
 from .validation import integer
 
@@ -30,6 +33,7 @@ class HybridCoupledSolver(StudySolver):
         self.coarse_device = coarse_device
         self.cpu_jacobian = self.device_jacobian = None
         self.block_records = []
+        self.coarse_records = []
 
     def close(self):
         if self.device_jacobian is not None:
@@ -39,8 +43,8 @@ class HybridCoupledSolver(StudySolver):
         super().close()
 
     def solve(self, B, b, indices, initial=None):
-        # Scope this log to the whole refinement call, including correction solves.
-        self.block_records = []
+        # Scope these logs to the whole refinement call, including correction solves.
+        self.block_records, self.coarse_records = [], []
         result, timing = super().solve(B, b, indices, initial)
         timing["hybrid_block_processing"] = {
             "minimum_columns": self.block_min_columns,
@@ -50,6 +54,30 @@ class HybridCoupledSolver(StudySolver):
             "vector_and_verification_device": "cpu",
             "block_device": "cuda",
         }
+        if self.coarse_device == "cuda":
+            spaces = [space.report() for space in self.coarse_records]
+            timing["hybrid_coarse_correction"] = {
+                "device": "cuda",
+                "spaces": spaces,
+                "applications": sum(row["applications"] for row in spaces),
+                "seconds": sum(
+                    row["upload_seconds"]
+                    + row["orthonormalization_seconds"]
+                    + row["setup_seconds"]
+                    + row["correction_seconds"]
+                    for row in spaces
+                ),
+                "resident_basis_bytes": max(
+                    (row["resident_basis_bytes"] for row in spaces), default=0
+                ),
+                "resident_operator_product_bytes": max(
+                    (row["resident_operator_product_bytes"] for row in spaces), default=0
+                ),
+                "timing_scope": "Included in components_seconds.iteration; do not add again to total_seconds.",
+            }
+            if spaces:
+                # The operator-basis product lives on the device; no host copy is held.
+                timing["cached_operator_product_bytes"] = 0
         return result, timing
 
     def _solve_once(
@@ -61,24 +89,26 @@ class HybridCoupledSolver(StudySolver):
             raise ValueError("A matching restricted coupled Gauss--Newton operator is required")
         normal = None
 
-        def block(vectors):
+        def device_operator():
             nonlocal normal
-            if vectors.shape[1] < self.block_min_columns:
-                return B @ vectors
-            start = time.perf_counter()
-            uploaded = False
-            upload_seconds = 0.0
             if self.cpu_jacobian is not parent.jacobian:
+                tick = time.perf_counter()
                 if self.device_jacobian is not None:
                     self.device_jacobian.close()
                 self.cpu_jacobian = self.device_jacobian = None
                 self.device_jacobian = CudaControlJacobian(parent.jacobian)
                 self.cpu_jacobian = parent.jacobian
-                uploaded = True
-                # Factor upload and triangular analyses recur once per nonlinear
-                # iterate; keep them visible rather than folded into block time.
                 self.device_jacobian.cp.cuda.get_current_stream().synchronize()
-                upload_seconds = time.perf_counter() - start
+                # Factor upload recurs once per nonlinear iterate; the triangular
+                # analyses follow in the first block product of each width.
+                self.block_records.append(
+                    {
+                        "kind": "factor_upload",
+                        "columns": 0,
+                        "factor_upload": True,
+                        "seconds": time.perf_counter() - tick,
+                    }
+                )
             if normal is None:
                 normal = CudaGaussNewton(
                     self.device_jacobian,
@@ -87,15 +117,21 @@ class HybridCoupledSolver(StudySolver):
                     parent.damping,
                     corrections=getattr(parent, "corrections", ()),
                 ).restrict(indices)
+            return normal
+
+        def block(vectors):
+            if vectors.shape[1] < self.block_min_columns:
+                return B @ vectors
+            start = time.perf_counter()
+            apply = device_operator()
             cp = self.device_jacobian.cp
-            answer = cp.asnumpy(normal(vectors))
+            answer = cp.asnumpy(apply(vectors))
             cp.cuda.get_current_stream().synchronize()
             self.block_records.append(
                 {
                     "kind": "operator_block",
                     "columns": vectors.shape[1],
-                    "factor_upload": uploaded,
-                    "upload_and_analysis_seconds": upload_seconds,
+                    "factor_upload": False,
                     "seconds": time.perf_counter() - start,
                 }
             )
@@ -110,12 +146,31 @@ class HybridCoupledSolver(StudySolver):
             dtype=np.dtype(float),
         )
         wrapped.diagonal = B.diagonal
-        return super()._solve_once(
-            wrapped,
-            b,
-            indices,
-            initial,
-            target=target,
-            cap=cap,
-            verify_candidates=verify_candidates,
-        )
+        self.coarse_factory = None
+        if self.coarse_device == "cuda" and self.method != "jacobi":
+
+            def factory(A, basis, condition_limit):
+                if basis is None or basis.shape[1] == 0:
+                    return CpuCoarseSpace(A, basis, condition_limit)
+                from .coupled_hybrid_coarse import CudaCoarseSpace
+
+                apply = device_operator()
+                space = CudaCoarseSpace(
+                    self.device_jacobian.cp, apply, A.shape[0], basis, condition_limit
+                )
+                self.coarse_records.append(space)
+                return space
+
+            self.coarse_factory = factory
+        try:
+            return super()._solve_once(
+                wrapped,
+                b,
+                indices,
+                initial,
+                target=target,
+                cap=cap,
+                verify_candidates=verify_candidates,
+            )
+        finally:
+            self.coarse_factory = None

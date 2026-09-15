@@ -18,7 +18,8 @@ def system():
     return problem, H, diagonal
 
 
-def test_rank_zero_and_initial_guard_do_not_upload_factors(monkeypatch):
+@pytest.mark.parametrize("coarse_device", ["cpu", "cuda"])
+def test_rank_zero_and_initial_guard_do_not_upload_factors(monkeypatch, coarse_device):
     import deflation_example.coupled_hybrid_solver as hybrid
 
     def forbidden(*args, **kwargs):
@@ -31,7 +32,12 @@ def test_rank_zero_and_initial_guard_do_not_upload_factors(monkeypatch):
     B.diagonal = lambda: diagonal
     exact = np.linspace(-1, 1, problem.size)
     solver = HybridCoupledSolver(
-        "jacobi", rank=0, rtol=1e-10, cg_factor=0.1, residual_policy="refine"
+        "jacobi",
+        rank=0,
+        rtol=1e-10,
+        cg_factor=0.1,
+        residual_policy="refine",
+        coarse_device=coarse_device,
     )
     try:
         for initial in (None, exact):
@@ -40,15 +46,55 @@ def test_rank_zero_and_initial_guard_do_not_upload_factors(monkeypatch):
             assert independent_residual(B, result.x, B @ exact) <= 1e-10
             assert not timing["hybrid_block_processing"]["calls"]
             assert solver.device_jacobian is None
+            assert timing.get("hybrid_coarse_correction", {}).get("applications", 0) == 0
             if initial is not None:
                 assert result.iterations == 0
     finally:
         solver.close()
 
 
+def test_hybrid_rejects_unknown_coarse_device():
+    with pytest.raises(ValueError):
+        HybridCoupledSolver("jacobi", rank=0, coarse_device="tpu")
+
+
+def test_cpu_coarse_space_matches_default_reference_solve():
+    # With CUDA unavailable the host coarse space must equal the in-line kernel.
+    problem, H, diagonal = system()
+    rng = np.random.default_rng(7)
+    reference = ArrayReference(rng.normal(size=(problem.size, 3)), {"construction": "test"})
+    indices = np.arange(problem.size)
+    B = H.restrict(indices)
+    B.diagonal = lambda: diagonal
+    rhs = B @ rng.normal(size=problem.size)
+    results = []
+    for coarse_device in ("cpu", "cpu"):
+        solver = HybridCoupledSolver(
+            "reference",
+            reference=reference,
+            rank=3,
+            rtol=1e-10,
+            cg_factor=0.1,
+            residual_policy="refine",
+            coarse_device=coarse_device,
+        )
+        try:
+            result, timing = solver.solve(B, rhs, indices)
+        finally:
+            solver.close()
+        assert result.status == "converged" and result.rank == 3
+        assert "hybrid_coarse_correction" not in timing
+        results.append(result)
+    assert np.array_equal(results[0].x, results[1].x)
+    assert results[0].iterations == results[1].iterations
+
+
 @pytest.mark.gpu
+@pytest.mark.parametrize("coarse_device", ["cpu", "cuda"])
 @pytest.mark.parametrize("method", ["jacobi", "reference", "recycling"])
-def test_complete_hybrid_runner_records_device_memory_and_costs(monkeypatch, tmp_path, method):
+def test_complete_hybrid_runner_records_device_memory_and_costs(
+    monkeypatch, tmp_path, method, coarse_device
+):
     pytest.importorskip("cupy")
     pytest.importorskip("pynvml")
     from omegaconf import OmegaConf
@@ -61,6 +107,8 @@ def test_complete_hybrid_runner_records_device_memory_and_costs(monkeypatch, tmp
     config.update(
         method=method,
         device="hybrid",
+        hybrid_block_min_columns=2,
+        hybrid_coarse_device=coarse_device,
         memory_interval=0.01,
         repetition=0,
         rank=3,
@@ -95,8 +143,9 @@ def test_complete_hybrid_runner_records_device_memory_and_costs(monkeypatch, tmp
 
 
 @pytest.mark.gpu
+@pytest.mark.parametrize("coarse_device", ["cpu", "cuda"])
 @pytest.mark.parametrize("method", ["reference", "recycling"])
-def test_gpu_blocks_preserve_original_residual_and_reuse_factors(method):
+def test_gpu_blocks_preserve_original_residual_and_reuse_factors(method, coarse_device):
     pytest.importorskip("cupy")
     problem, H, diagonal = system()
     rng = np.random.default_rng(96)
@@ -110,6 +159,7 @@ def test_gpu_blocks_preserve_original_residual_and_reuse_factors(method):
         rtol=1e-10,
         cg_factor=0.1,
         residual_policy="refine",
+        coarse_device=coarse_device,
     )
     try:
         identity = None
@@ -128,6 +178,15 @@ def test_gpu_blocks_preserve_original_residual_and_reuse_factors(method):
             assert sum(timing["components_seconds"].values()) == pytest.approx(
                 timing["total_seconds"]
             )
+            if coarse_device == "cuda" and result.rank:
+                coarse = timing["hybrid_coarse_correction"]
+                assert coarse["device"] == "cuda" and coarse["applications"] >= 1
+                assert coarse["seconds"] <= timing["callback_seconds"]
+                assert coarse["resident_operator_product_bytes"] > 0
+                assert timing["cached_operator_product_bytes"] == 0
+                assert coarse["spaces"][-1]["rank"] == result.rank
+            elif coarse_device == "cpu":
+                assert "hybrid_coarse_correction" not in timing
             if identity is None:
                 identity = solver.device_jacobian
                 assert sum(row["factor_upload"] for row in log["calls"]) == 1
@@ -140,6 +199,42 @@ def test_gpu_blocks_preserve_original_residual_and_reuse_factors(method):
     finally:
         solver.close()
     assert solver.device_jacobian is None
+
+
+@pytest.mark.gpu
+def test_device_coarse_space_matches_host_coarse_space():
+    pytest.importorskip("cupy")
+    problem, H, diagonal = system()
+    rng = np.random.default_rng(1207)
+    reference = ArrayReference(rng.normal(size=(problem.size, 3)), {"construction": "test"})
+    indices = np.arange(problem.size)
+    B = H.restrict(indices)
+    B.diagonal = lambda: diagonal
+    exact = rng.normal(size=problem.size)
+    rhs = B @ exact
+    solutions = {}
+    for coarse_device in ("cpu", "cuda"):
+        solver = HybridCoupledSolver(
+            "reference",
+            reference=reference,
+            rank=3,
+            block_min_columns=2,
+            rtol=1e-10,
+            cg_factor=0.1,
+            residual_policy="refine",
+            coarse_device=coarse_device,
+        )
+        try:
+            result, timing = solver.solve(B, rhs, indices)
+        finally:
+            solver.close()
+        assert result.status == "converged" and result.rank == 3
+        solutions[coarse_device] = result
+    np.testing.assert_allclose(solutions["cuda"].x, solutions["cpu"].x, atol=1e-8)
+    assert abs(solutions["cuda"].iterations - solutions["cpu"].iterations) <= 2
+    assert solutions["cuda"].coarse_condition == pytest.approx(
+        solutions["cpu"].coarse_condition, rel=1e-6
+    )
 
 
 @pytest.mark.gpu

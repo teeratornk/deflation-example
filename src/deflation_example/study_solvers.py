@@ -86,6 +86,8 @@ class StudySolver:
         )
         self.session = None
         self.previous = None
+        # Backends may supply the coarse space of the host CG recurrence.
+        self.coarse_factory = None
         if method == "amgx":
             self.session = AmgxSession(api, rtol * amgx_factor, maxiter, True).open()
 
@@ -235,6 +237,7 @@ class StudySolver:
                 refresh=self.refresh,
                 cache_operator_product=self.cache_operator_product,
                 direction_callback=None if self.history is None else self.history.capture,
+                coarse_factory=self.coarse_factory,
             )
             kernel_seconds = time.perf_counter() - tick
             if result.status in {"maxiter", "residual_failed"} and result.residual <= target:

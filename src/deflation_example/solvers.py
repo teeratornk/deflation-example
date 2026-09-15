@@ -60,6 +60,55 @@ def orthonormalize(Z, tolerance=1e-12):
     return U[:, s > tolerance * s[0]] if s[0] else U[:, :0]
 
 
+class CpuCoarseSpace:
+    """Exact coarse correction from an orthonormalized host basis.
+
+    The construction order (orthonormalization, operator product, symmetrized
+    coarse matrix, condition test, Cholesky factor) and the two correction
+    formulas are those of the original in-line kernel, so the default CG path
+    is arithmetically unchanged. Other backends supply the same interface.
+    """
+
+    device = "cpu"
+
+    def __init__(self, A, basis, condition_limit):
+        Z = np.empty((A.shape[0], 0)) if basis is None else orthonormalize(basis)
+        self.requested_rank = Z.shape[1]
+        self.condition, self.fallback, self.breakdown = 1.0, None, False
+        self.factor, self.AZ = None, None
+        if Z.shape[1]:
+            self.AZ = A @ Z
+            E = Z.T @ self.AZ
+            E = (E + E.T) / 2
+            self.condition = float(np.linalg.cond(E)) if np.all(np.isfinite(E)) else float("inf")
+            if np.isfinite(self.condition) and self.condition <= condition_limit:
+                try:
+                    self.factor = linalg.cho_factor(E, lower=True)
+                except linalg.LinAlgError:
+                    self.breakdown = True
+            else:
+                Z = Z[:, :0]
+                self.fallback = "coarse_condition_limit"
+        self.Z = Z
+        self.rank = Z.shape[1]
+        self.applications = 0
+
+    def correct(self, v):
+        self.applications += 1
+        return self.Z @ linalg.cho_solve(self.factor, self.Z.T @ v)
+
+    def precondition_correction(self, z):
+        self.applications += 1
+        return self.Z @ linalg.cho_solve(self.factor, self.AZ.T @ z)
+
+    def storage(self):
+        return {
+            "device": self.device,
+            "resident_basis_bytes": self.Z.nbytes,
+            "resident_operator_product_bytes": 0 if self.AZ is None else self.AZ.nbytes,
+        }
+
+
 def deflated_cg(
     A,
     b,
@@ -72,6 +121,7 @@ def deflated_cg(
     condition_limit=1e10,
     direction_callback=None,
     cache_operator_product=False,
+    coarse_factory=None,
 ):
     """Coarse-corrected, projected-direction CG (exact-coarse A-DEF2).
 
@@ -79,44 +129,35 @@ def deflated_cg(
     accepting a solve. Residual replacement also coarse-corrects and restarts CG.
     Rank loss and an ill-conditioned coarse matrix lead to explicit truncation or
     ordinary Jacobi-CG, not a pseudoinverse of a singular coarse matrix.
+    ``coarse_factory(A, basis, condition_limit)`` may supply the coarse space
+    from another backend; the recurrence itself stays on the host.
     """
     A = matrix(A)
     if direction_callback is not None and not callable(direction_callback):
         raise ValueError("Direction callback must be callable")
+    if coarse_factory is not None and not callable(coarse_factory):
+        raise ValueError("Coarse-space factory must be callable")
     if not isinstance(cache_operator_product, bool):
         raise ValueError("Operator-product caching must be Boolean")
     b, x, d = validate_linear_inputs(
         A, b, basis, diagonal, x0, rtol, maxiter, refresh, condition_limit
     )
-    n = len(b)
-    Z = np.empty((n, 0)) if basis is None else orthonormalize(basis)
-    condition = 1.0
-    fallback = None
-    factor = None
-    if Z.shape[1]:
-        AZ = A @ Z
-        E = Z.T @ AZ
-        E = (E + E.T) / 2
-        condition = float(np.linalg.cond(E)) if np.all(np.isfinite(E)) else float("inf")
-        if np.isfinite(condition) and condition <= condition_limit:
-            try:
-                factor = linalg.cho_factor(E, lower=True)
-            except linalg.LinAlgError:
-                return LinearResult(
-                    x, 0, independent_residual(A, x, b), "breakdown", Z.shape[1], condition
-                )
-        else:
-            Z = Z[:, :0]
-            fallback = "coarse_condition_limit"
-    rank = Z.shape[1]
+    space = (CpuCoarseSpace if coarse_factory is None else coarse_factory)(
+        A, basis, condition_limit
+    )
+    if space.breakdown:
+        return LinearResult(
+            x, 0, independent_residual(A, x, b), "breakdown", space.requested_rank, space.condition
+        )
+    rank, condition, fallback = space.rank, space.condition, space.fallback
 
     def Q(v):
-        return Z @ linalg.cho_solve(factor, Z.T @ v) if rank else np.zeros_like(v)
+        return space.correct(v) if rank else np.zeros_like(v)
 
     def precondition(r):
         z = r / d
         if rank and cache_operator_product:
-            return z - Z @ linalg.cho_solve(factor, AZ.T @ z)
+            return z - space.precondition_correction(z)
         return z - Q(A @ z) if rank else z
 
     x += Q(b - A @ x)
