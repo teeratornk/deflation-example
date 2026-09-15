@@ -27,6 +27,27 @@ LABELS = {
 }
 
 
+def residual_trace(history):
+    """Use recorded iteration indices; verification alone adds no iteration."""
+    iterations, residuals = [], []
+    last = 0
+    for row in history:
+        last = row.get("coupling_iteration", row.get("iteration", last))
+        values = [
+            row[key]
+            for key in (
+                "momentum_relative_residual",
+                "continuity_relative_residual",
+                "thermal_relative_residual",
+            )
+            if row.get(key) is not None
+        ]
+        if values:
+            iterations.append(last)
+            residuals.append(max(values))
+    return iterations, residuals
+
+
 def summarize(root, output, plots=True):
     records = []
     for path in sorted(root.glob("**/record.json")):
@@ -80,9 +101,12 @@ def summarize(root, output, plots=True):
     import matplotlib.pyplot as plt
 
     for family in ("forward", "momentum"):
-        cases = sorted(
-            {p.parent.parent.name for p, r in records if "row" in r and r["family"] == family}
-        )
+        case_times = {
+            p.parent.parent.name: r["time_s"]
+            for p, r in records
+            if "row" in r and r["family"] == family
+        }
+        cases = sorted(case_times, key=lambda case: (case_times[case], case))
         if not cases:
             continue
         columns = min(3, len(cases))
@@ -101,21 +125,10 @@ def summarize(root, output, plots=True):
                 ):
                     continue
                 physical_time = record["time_s"]
-                residuals = []
-                for row in record["row"]["history"]:
-                    values = [
-                        row[k]
-                        for k in (
-                            "momentum_relative_residual",
-                            "continuity_relative_residual",
-                            "thermal_relative_residual",
-                        )
-                        if row.get(k) is not None
-                    ]
-                    if values:
-                        residuals.append(max(values))
+                iterations, residuals = residual_trace(record["row"]["history"])
                 if residuals:
                     (line,) = ax.semilogy(
+                        iterations,
                         np.maximum(residuals, 1e-16),
                         color=COLORS[record["policy"]],
                         label=LABELS[record["policy"]],
@@ -123,7 +136,7 @@ def summarize(root, output, plots=True):
                     handles[record["policy"]] = line
                     if not record["row"]["verified"]:
                         ax.plot(
-                            len(residuals) - 1,
+                            iterations[-1],
                             max(residuals[-1], 1e-16),
                             "x",
                             color=COLORS[record["policy"]],
@@ -131,16 +144,17 @@ def summarize(root, output, plots=True):
                         )
             ax.axhline(1e-12, color="0.7", linewidth=0.7, linestyle="--")
             scheme = "BDF2" if case.startswith("bdf2") else "Backward Euler"
-            ax.set_title(f"{scheme}, {physical_time:g} s")
+            ax.set_title(f"{scheme}, {physical_time:.8g} s")
             ax.set_xlabel("Nonlinear iteration")
         for ax in axes[:, 0]:
-            ax.set_ylabel("Maximum original-equation residual")
+            ax.set_ylabel("Maximum original-\nequation residual")
         for ax in axes.ravel()[len(cases) :]:
             ax.set_visible(False)
         if handles:
+            ordered = [handles[policy] for policy in COLORS if policy in handles]
             fig.legend(
-                handles.values(),
-                [line.get_label() for line in handles.values()],
+                ordered,
+                [line.get_label() for line in ordered],
                 loc="lower center",
                 ncol=3,
                 fontsize=9,

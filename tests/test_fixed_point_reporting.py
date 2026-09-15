@@ -241,3 +241,14 @@ def test_trajectory_field_reader_requires_complete_verified_hashes(tmp_path):
     record["steps"][0]["field_sha256"] = "wrong"
     with pytest.raises(ValueError, match="checksum"):
         reader.verified_arrays(record, tmp_path)
+
+
+def test_residual_curve_uses_recorded_iterations_without_counting_verification():
+    iterations, values = example("summarize").residual_trace(
+        [
+            {"iteration": 1, "momentum_relative_residual": 0.5},
+            {"iteration": 2, "flow_status": "iteration_cap"},
+            {"procedure": "returned_state_verification", "momentum_relative_residual": 0.1},
+        ]
+    )
+    assert iterations == [1, 2] and values == [0.5, 0.1]
