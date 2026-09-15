@@ -125,6 +125,8 @@ def outcome(path, spec):
         )
         if row["seconds"] is not None:
             parts = record["components_seconds"]
+            if any(v < -max(1e-8, 1e-10 * row["seconds"]) for v in parts.values()):
+                raise ValueError("Optimizer component timers contain a negative interval")
             if any(not math.isfinite(v) for v in parts.values()) or not math.isclose(
                 sum(parts.values()), row["seconds"], rel_tol=1e-10, abs_tol=1e-8
             ):
@@ -172,17 +174,21 @@ def checked_fields(path, expected):
         return {key: data[key] for key in data.files}
 
 
-def root_agreement(root):
+def root_agreement(root, reference_policy="newton"):
     """Compare only verified local roots with identical inputs and sources."""
+    if reference_policy not in read(HERE / "protocol.json")["policies"]:
+        raise ValueError("Choose a declared root-comparison policy")
     rows = []
-    for reference_path in sorted(root.glob("screen/forward/*/newton/record.json")):
+    for reference_path in sorted(root.glob(f"screen/forward/*/{reference_policy}/record.json")):
         reference = read(reference_path)
         if not reference.get("row", {}).get("verified", False):
             continue
         base = checked_fields(reference_path.parent / "fields.npz", reference["field_sha256"])
         for path in sorted(reference_path.parent.parent.glob("*/record.json")):
             record = read(path)
-            if record["policy"] == "newton" or not record.get("row", {}).get("verified", False):
+            if record["policy"] == reference_policy or not record.get("row", {}).get(
+                "verified", False
+            ):
                 continue
             for key in (
                 "optimization_field_sha256",
@@ -211,6 +217,7 @@ def root_agreement(root):
                 {
                     "case": path.parent.parent.name,
                     "policy": record["policy"],
+                    "reference_policy": reference_policy,
                     "maximum_temperature_difference_K": float(
                         record["temperature_scale_K"]
                         * np.max(np.abs(data["state"] - base["state"]))
@@ -222,7 +229,7 @@ def root_agreement(root):
                         np.max(np.abs(data["pressure"] - base["pressure"]))
                     ),
                     "record_sha256": file_sha256(path),
-                    "newton_record_sha256": file_sha256(reference_path),
+                    "reference_record_sha256": file_sha256(reference_path),
                 }
             )
     return rows
@@ -272,7 +279,7 @@ def plot_comparisons(summary, output):
         plt.close(fig)
 
 
-def audit(root, output, plots=True, fields=True):
+def audit(root, output, plots=True, fields=True, root_policy="newton"):
     protocol = read(HERE / "protocol.json")
     selection = read(root / "selection.json") if (root / "selection.json").exists() else None
     if selection is not None and selection["protocol_sha256"] != file_sha256(
@@ -293,7 +300,7 @@ def audit(root, output, plots=True, fields=True):
         "selection_complete": selection is not None,
         "rows": rows,
         "groups": groups(rows),
-        "root_agreement": root_agreement(root) if fields else [],
+        "root_agreement": root_agreement(root, root_policy) if fields else [],
         "scope": "The local screen, fixed-control trajectories and nonlinear optimization are distinct populations. Medians require every declared repetition to be verified and timed. Sampled process allocations are lower bounds on instantaneous peak memory. Root agreement is distinct from physical resolution.",
         "timing_boundaries": {
             "screen": "One equation solve including verification.",
@@ -323,8 +330,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--root-policy",
+        choices=read(HERE / "protocol.json")["policies"],
+        default="newton",
+        help="Verified local root used only for field agreement; this does not select a numerical policy",
+    )
     args = parser.parse_args()
-    audit(args.root, args.output)
+    audit(args.root, args.output, root_policy=args.root_policy)
 
 
 if __name__ == "__main__":

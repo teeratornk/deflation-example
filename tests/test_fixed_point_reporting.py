@@ -110,6 +110,15 @@ def test_invalid_duration_is_not_a_speedup(value):
         module().duration(value)
 
 
+def test_negative_component_cannot_cancel_a_positive_interval(tmp_path):
+    path = tmp_path / "record.json"
+    record = optimizer_record()
+    record["components_seconds"] = {"setup": -5, "solve": 17}
+    write_report(path, record)
+    with pytest.raises(ValueError, match="negative interval"):
+        module().outcome(path, {"phase": "optimize"})
+
+
 def test_root_agreement_checks_both_archives_and_matching_inputs(tmp_path):
     audit = module()
     case = tmp_path / "screen/forward/ordinary"
@@ -135,6 +144,9 @@ def test_root_agreement_checks_both_archives_and_matching_inputs(tmp_path):
             {**identity, "policy": policy, "field_sha256": file_sha256(folder / "fields.npz")},
         )
     assert audit.root_agreement(tmp_path)[0]["maximum_temperature_difference_K"] == pytest.approx(1)
+    alternative = audit.root_agreement(tmp_path, "anderson3")[0]
+    assert alternative["policy"] == "newton" and alternative["reference_policy"] == "anderson3"
+    assert alternative["maximum_temperature_difference_K"] == pytest.approx(1)
     path = case / "anderson3/record.json"
     record = audit.read(path)
     write_report(path, {**record, "time_s": 2})

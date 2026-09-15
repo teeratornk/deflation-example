@@ -45,6 +45,9 @@ five saved-step cases, six numerical policies and two equation families. Task 0
 is the ordinary step with Newton. A screen repetition measures one selected
 step; it is not a complete optimization or a resolution study. Every task has a
 separate output and attempt record. Reusing an output directory is prohibited.
+The saved steps come from backward Euler and second-order backward
+differentiation formula (BDF2) replays. Complete trajectories in this example
+use backward Euler.
 
 After all screen tasks have terminated:
 
@@ -131,6 +134,11 @@ cost; the audit leaves that comparison unavailable pending complete accounting.
 The forward-process interval includes input preparation and serialization,
 whereas the optimization-sequence interval excludes common calibration and
 process preparation. They appear in separate figures.
+Use `--root-policy anderson3` to compare verified local solutions when Newton
+has no verified root. This option changes only the reference for field
+differences; it leaves the numerical policy selection and timing populations
+unchanged. Every supplied root must meet the original equation checks and use
+the same source, control and saved initial fields.
 
 For a complete verified forward trajectory, plot the desired temperature,
 computed temperature, unchanged signed heat source and fluid speed:
