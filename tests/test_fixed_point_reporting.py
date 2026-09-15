@@ -52,6 +52,84 @@ def test_momentum_only_protocol_keeps_its_own_population(tmp_path):
     assert summary["protocol_sha256"] == file_sha256(path)
 
 
+def followup_fixture(tmp_path):
+    audit = module()
+    protocol_path = audit.HERE / "protocol.json"
+    disposition = audit.read(audit.HERE / "followup-disposition.json")
+    root = tmp_path / "inputs"
+    root.mkdir()
+    selection = {
+        "protocol_sha256": file_sha256(protocol_path),
+        "environment": {"git_head": disposition["numerical_source"], "source_sha256": {}},
+        "families": {key: {"selected": "anderson3"} for key in ("forward", "momentum")},
+    }
+    write_report(root / "selection.json", selection)
+    return audit, root, selection, disposition
+
+
+def test_explicit_disposition_retains_every_declared_comparison(tmp_path):
+    audit, root, _, _ = followup_fixture(tmp_path)
+    summary = audit.audit(
+        root,
+        tmp_path / "summary",
+        plots=False,
+        disposition_path=audit.HERE / "followup-disposition.json",
+    )
+    assert len(summary["rows"]) == 92
+    withdrawn = [r for r in summary["rows"] if r["status"] == "withdrawn_before_execution"]
+    assert len(withdrawn) == 20
+    assert all(r["phase"] in {"derivatives", "optimize"} for r in withdrawn)
+    assert all(not r["verified"] and r["seconds"] is None for r in withdrawn)
+    assert sum(r["status"] == "missing" for r in summary["rows"]) == 72
+    assert all(g["median_seconds"] is None for g in summary["groups"])
+    assert summary["followup_disposition"]["declaration_sha256"] == file_sha256(
+        audit.HERE / "followup-disposition.json"
+    )
+    # Nothing is withdrawn implicitly when the declaration is omitted.
+    plain = audit.audit(root, tmp_path / "plain", plots=False)
+    assert all(r["status"] == "missing" for r in plain["rows"])
+
+
+@pytest.mark.parametrize("phase", ["derivatives", "optimize"])
+def test_disposition_cannot_hide_an_existing_followup(tmp_path, phase):
+    audit, root, selection, _ = followup_fixture(tmp_path)
+    relative = next(
+        p
+        for p, spec in audit.declared_records(audit.read(audit.HERE / "protocol.json"), selection)
+        if spec["phase"] == phase
+    )
+    path = root / relative
+    path.parent.mkdir(parents=True)
+    write_report(path, {"status": "running"})
+    with pytest.raises(ValueError, match="existing record cannot be withdrawn"):
+        audit.audit(
+            root,
+            tmp_path / "summary",
+            plots=False,
+            disposition_path=audit.HERE / "followup-disposition.json",
+        )
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "message"),
+    [
+        ("schema", "other", "schema"),
+        ("protocol_sha256", "wrong", "different protocol"),
+        ("withdrawn_phases", ["screen"], "Only unstarted"),
+        ("numerical_source", "wrong", "different numerical source"),
+        ("replacement_source", "", "lacks replacement_source"),
+        ("reason", None, "lacks reason"),
+    ],
+)
+def test_disposition_is_bound_to_a_declared_protocol_and_source(tmp_path, key, value, message):
+    audit, root, _, disposition = followup_fixture(tmp_path)
+    disposition[key] = value
+    path = tmp_path / "disposition.json"
+    write_report(path, disposition)
+    with pytest.raises(ValueError, match=message):
+        audit.audit(root, tmp_path / "summary", plots=False, disposition_path=path)
+
+
 def test_failed_or_unfinished_repetition_has_no_median():
     audit = module()
     rows = [

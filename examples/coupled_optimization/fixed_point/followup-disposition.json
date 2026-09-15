@@ -1,0 +1,9 @@
+{
+  "schema": "fixed-point-unstarted-followup-v1",
+  "protocol_sha256": "c751c8ddd6733be0bd5c0f6a7b33b5cbdefb0c43d5578f2df498c70827c1fa1a",
+  "numerical_source": "330766b3bd7e2558dd34840e9cf1d598e59d7d0d",
+  "withdrawn_phases": ["derivatives", "optimize"],
+  "replacement_source": "16dabaf998d01989b3806880f5dd8da6cba490af",
+  "replacement_protocol_sha256": "8b1a692271ea25692df09d4d4acaabcd4bf73b976b77a6465bd40af0714a9a5e",
+  "reason": "The state-form Oseen map encountered a finite-precision residual floor. A residual-equation map was verified under unchanged final accuracy, and the momentum screen was repeated with that map. The original derivative and optimizer follow-ups were replaced before execution. Every original screen outcome and the original forward trajectories remain in their declared populations."
+}

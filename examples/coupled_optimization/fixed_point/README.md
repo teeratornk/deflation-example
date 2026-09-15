@@ -181,3 +181,20 @@ For the separate residual-equation momentum study, run `audit.py` with
 its own outputs. This audits thirty momentum cases, two derivative gates and
 eighteen optimization tasks. The version-2 forward study retains its own source
 and records; the audit refuses mixed numerical sources in either population.
+
+The version-2 derivative and optimizer follow-ups were replaced before execution.
+Their replacement uses the residual-equation momentum map in version 3. All
+sixty version-2 screen outcomes remain available, including the precision-floor
+failures. To identify the unstarted follow-ups explicitly in the version-2 audit:
+
+```bash
+uv run python examples/coupled_optimization/fixed_point/audit.py \
+  --root "$V2_OUTPUT" --output "$V2_AUDIT" \
+  --disposition examples/coupled_optimization/fixed_point/followup-disposition.json
+```
+
+The declaration is bound to the original protocol and numerical source. It
+retains the unstarted comparisons in the audit as `withdrawn_before_execution`,
+without displaying them as measured comparisons. It cannot exclude an existing
+record. Audit the replacement population separately with its version-3 protocol;
+the two sources do not share a timing population.

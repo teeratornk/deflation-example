@@ -24,6 +24,23 @@ def read(path):
     return json.loads(path.read_text())
 
 
+def read_disposition(path, protocol_path):
+    """Only an explicit, protocol-bound declaration can withdraw unstarted work."""
+    if path is None:
+        return None
+    disposition = read(path)
+    if disposition.get("schema") != "fixed-point-unstarted-followup-v1":
+        raise ValueError("Unknown follow-up disposition schema")
+    if disposition.get("protocol_sha256") != file_sha256(protocol_path):
+        raise ValueError("Follow-up disposition belongs to a different protocol")
+    if disposition.get("withdrawn_phases") != ["derivatives", "optimize"]:
+        raise ValueError("Only unstarted derivative and optimizer follow-ups may be withdrawn")
+    for key in ("numerical_source", "replacement_source", "replacement_protocol_sha256", "reason"):
+        if not isinstance(disposition.get(key), str) or not disposition[key].strip():
+            raise ValueError("Follow-up disposition lacks " + key)
+    return {**disposition, "declaration_sha256": file_sha256(path)}
+
+
 def declared_records(protocol, selection=None):
     for family, case, policy in itertools.product(
         protocol["families"], protocol["cases"], protocol["policies"]
@@ -331,7 +348,11 @@ def plot_comparisons(summary, output):
         ("trajectory", "Complete forward-process time (s)"),
         ("optimize", "Complete optimization-sequence time (s)"),
     ):
-        rows = [r for r in summary["groups"] if r["phase"] == phase]
+        rows = [
+            r
+            for r in summary["groups"]
+            if r["phase"] == phase and any(s != "withdrawn_before_execution" for s in r["statuses"])
+        ]
         if not rows:
             continue
         fig, ax = plt.subplots(figsize=(max(6, 0.85 * len(rows)), 4.2))
@@ -365,19 +386,50 @@ def plot_comparisons(summary, output):
         plt.close(fig)
 
 
-def audit(root, output, plots=True, fields=True, root_policy="newton", protocol_path=None):
+def audit(
+    root,
+    output,
+    plots=True,
+    fields=True,
+    root_policy="newton",
+    protocol_path=None,
+    disposition_path=None,
+):
     protocol_path = HERE / "protocol.json" if protocol_path is None else Path(protocol_path)
     protocol = read(protocol_path)
+    disposition = read_disposition(disposition_path, protocol_path)
     selection = read(root / "selection.json") if (root / "selection.json").exists() else None
     if selection is not None and selection["protocol_sha256"] != file_sha256(protocol_path):
         raise ValueError("Selection belongs to a different protocol")
     rows, sources = [], set()
     if selection is not None:
         sources.add(json.dumps(selection["environment"]["source_sha256"], sort_keys=True))
+        if disposition is not None and (
+            selection["environment"]["git_head"] != disposition["numerical_source"]
+        ):
+            raise ValueError("Follow-up disposition has a different numerical source")
     for relative, spec in declared_records(protocol, selection):
+        if disposition is not None and spec["phase"] in disposition["withdrawn_phases"]:
+            if (root / relative).exists():
+                raise ValueError("An existing record cannot be withdrawn before execution")
+            rows.append(
+                {
+                    "record": relative,
+                    **spec,
+                    "status": "withdrawn_before_execution",
+                    "verified": False,
+                    "seconds": None,
+                    "replacement_source": disposition["replacement_source"],
+                }
+            )
+            continue
         row, record = outcome(root / relative, spec)
         rows.append({"record": relative, **row})
         if record is not None:
+            if disposition is not None and (
+                record["environment"]["git_head"] != disposition["numerical_source"]
+            ):
+                raise ValueError("Follow-up disposition has a different numerical source")
             sources.add(json.dumps(record["environment"]["source_sha256"], sort_keys=True))
     if len(sources) > 1:
         raise ValueError("Declared study records contain different numerical sources")
@@ -385,6 +437,7 @@ def audit(root, output, plots=True, fields=True, root_policy="newton", protocol_
         "schema": "fixed-point-complete-audit-v1",
         "protocol_sha256": file_sha256(protocol_path),
         "selection_complete": selection is not None,
+        "followup_disposition": disposition,
         "rows": rows,
         "groups": groups(rows),
         "root_agreement": [
@@ -430,13 +483,24 @@ def main():
         help="Use the exact protocol shipped with the numerical source being audited",
     )
     parser.add_argument(
+        "--disposition",
+        type=Path,
+        help="Explicit versioned declaration of replaced, unstarted follow-ups; existing records cannot be excluded",
+    )
+    parser.add_argument(
         "--root-policy",
         choices=read(HERE / "protocol.json")["policies"],
         default="newton",
         help="Verified local root used only for field agreement; this does not select a numerical policy",
     )
     args = parser.parse_args()
-    audit(args.root, args.output, root_policy=args.root_policy, protocol_path=args.protocol)
+    audit(
+        args.root,
+        args.output,
+        root_policy=args.root_policy,
+        protocol_path=args.protocol,
+        disposition_path=args.disposition,
+    )
 
 
 if __name__ == "__main__":
