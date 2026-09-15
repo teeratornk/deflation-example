@@ -297,24 +297,30 @@ def stage_overrides(
     rank=None,
     window=None,
     refresh=None,
+    slabs=None,
 ):
     """Hydra overrides for one stage: protocol common settings plus the frozen selection.
 
     Before the freeze (``frozen_selection`` null) the rank, window and refresh
     interval must be supplied explicitly; afterwards they come from the plan
-    and explicit values are rejected so a screen cannot silently drift.
+    and explicit values are rejected so a screen cannot silently drift. A
+    declared off-grid resolution run (``slabs`` differing from the plan grid)
+    is never a timed-population stage and must declare its settings explicitly.
     """
     if method not in protocol["methods"]:
         raise ValueError("Unknown method for this protocol")
     integer(repetition, "Repetition", 0)
     positions = [integer(p, "Stage position", 0) for p in positions]
     settings = dict(protocol["common"])
+    grid = integer(plan["grid"]["slabs"], "Frozen slabs", 1)
+    slabs = grid if slabs is None else integer(slabs, "Declared slabs", 1)
     frozen = plan.get("frozen_selection")
-    if frozen is None:
+    if frozen is None or slabs != grid:
+        stage_kind = "screen stages" if frozen is None else "off-grid resolution stages"
         if method != "jacobi" and (rank is None or window is None):
-            raise ValueError("Before the freeze, screen stages declare rank and window explicitly")
+            raise ValueError(f"Rank and window must be declared explicitly for {stage_kind}")
         if refresh is None:
-            raise ValueError("Before the freeze, screen stages declare inner_refresh explicitly")
+            raise ValueError(f"inner_refresh must be declared explicitly for {stage_kind}")
         settings.update(rank=0 if method == "jacobi" else rank, recycle_window=window or 1)
         settings["inner_refresh"] = refresh
     else:
@@ -324,7 +330,7 @@ def stage_overrides(
         settings.update(rank=policy["rank"], recycle_window=policy["recycle_window"])
         settings["inner_refresh"] = frozen["inner_refresh"]
     settings.update(
-        slabs=plan["grid"]["slabs"],
+        slabs=slabs,
         method=method,
         repetition=repetition,
         baseline_directory=plan["baseline"]["directory"],
@@ -353,6 +359,7 @@ def main():
     stage.add_argument("--resume", type=Path)
     stage.add_argument("--rank", type=int)
     stage.add_argument("--window", type=int)
+    stage.add_argument("--slabs", type=int)
     stage.add_argument("--refresh", type=int)
     one = sub.add_parser("assemble", help="Assemble the stage directories of one chain")
     one.add_argument("stages", type=Path, nargs="+")
@@ -384,6 +391,7 @@ def main():
                     args.rank,
                     args.window,
                     args.refresh,
+                    args.slabs,
                 )
             )
         )

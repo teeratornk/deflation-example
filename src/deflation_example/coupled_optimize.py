@@ -205,7 +205,7 @@ def prolonged_initial_state(cfg, problem, baseline_record):
     )
     require_matching_baseline(record, baseline_record)
     saved_slabs = integer(saved_cfg.get("slabs", 1), "Saved slabs", 1)
-    if not saved_cfg.get("transient", cfg["transient"]) == cfg["transient"]:
+    if saved_cfg.get("transient") != cfg.get("transient"):
         raise ValueError("A saved initial control must share the transient setting")
     if saved_slabs * repeat != integer(cfg["slabs"], "Slabs", 1):
         raise ValueError("The temporal repetition must map the saved slabs onto the declared slabs")

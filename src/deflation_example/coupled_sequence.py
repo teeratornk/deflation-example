@@ -30,6 +30,7 @@ from .coupled_optimize import (
     equations_verified,
     load_problem,
     observe_linear_solves,
+    prolonged_initial_state,
     solver_options,
 )
 from .coupled_optimizer import NUMERICAL_POLICY, minimize_coupled
@@ -270,13 +271,15 @@ def optimize_targets(
     previous=None,
     checkpoint=None,
     resume=None,
+    initial_state=None,
 ):
     """Keep every outcome; equivalent accepted-state warm starts across methods.
 
     ``positions`` selects the declared problems of one stage; ``previous`` is
     the restored warm start of the preceding stage; ``checkpoint`` receives the
     optimizer state after each accepted iterate; ``resume`` restarts the first
-    selected problem from such a state.
+    selected problem from such a state; ``initial_state`` is a declared initial
+    iterate for the first selected problem when no warm start is restored.
     """
     cases, fields = [], []
     lower = (cfg["lower_K"] - problem.temperature_offset) / problem.temperature_scale
@@ -292,6 +295,8 @@ def optimize_targets(
         restart = resume if resume is not None and index == 0 else None
         if restart is not None:
             row["resumed_from_iteration"] = int(restart["iteration"])
+        declared = initial_state if index == 0 and previous is None else None
+        row["initial_control_used"] = declared is not None
         try:
             result = minimize_coupled(
                 problem,
@@ -299,7 +304,7 @@ def optimize_targets(
                 lower,
                 upper,
                 solver,
-                initial=None if previous is None else previous.state,
+                initial=declared if previous is None else previous.state,
                 initial_evaluation=previous,
                 tolerance=cfg["nonlinear_tolerance"],
                 max_iterations=cfg["nonlinear_cap"],
@@ -415,6 +420,13 @@ def run(config):
     if len(set(keys)) != len(keys):
         raise ValueError("The sequence must contain distinct target/bound pairs")
     stage = stage_settings(cfg)
+    initial_control = bool(cfg.get("initial_control_directory"))
+    if initial_control and (
+        stage is None or len(stage["positions"]) != 1 or stage["restore"] is not None
+    ):
+        raise ValueError(
+            "A saved initial control applies to one staged problem without a restored warm start"
+        )
     output = Path(cfg["output"])
     output.mkdir(parents=True, exist_ok=False)
     configuration = recorded_configuration(cfg)
@@ -477,6 +489,19 @@ def run(config):
                     raise ValueError(
                         "A restored stage must share configuration, baseline, source and precede this stage"
                     )
+            initial_state = None
+            if initial_control and resume is None:
+                query = cfg["queries"][stage["positions"][0]]
+                initial_state, metadata["initial_control"] = prolonged_initial_state(
+                    {**cfg, "query": query["target"], "upper_K": query["upper_K"]},
+                    problem,
+                    baseline,
+                )
+            elif initial_control:
+                metadata["initial_control"] = {
+                    "status": "superseded_by_resume",
+                    "directory": str(cfg["initial_control_directory"]),
+                }
             parts["model_assembly_and_baseline_verification"] = time.perf_counter() - tick
             tick = time.perf_counter()
             if cfg["method"] == "reference":
@@ -563,6 +588,7 @@ def run(config):
                 previous=None if restore is None else restore["evaluation"],
                 checkpoint=checkpoint,
                 resume=None if resume is None else resume["resume"],
+                initial_state=initial_state,
             )
             exported_history = solver.export_history()
             barrier()
