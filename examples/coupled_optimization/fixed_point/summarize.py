@@ -99,6 +99,7 @@ def summarize(root, output, plots=True):
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.ticker import MaxNLocator
 
     for family in ("forward", "momentum"):
         case_times = {
@@ -132,6 +133,8 @@ def summarize(root, output, plots=True):
                         np.maximum(residuals, 1e-16),
                         color=COLORS[record["policy"]],
                         label=LABELS[record["policy"]],
+                        marker="o" if len(residuals) == 1 else None,
+                        markersize=4,
                     )
                     handles[record["policy"]] = line
                     if not record["row"]["verified"]:
@@ -146,6 +149,8 @@ def summarize(root, output, plots=True):
             scheme = "BDF2" if case.startswith("bdf2") else "Backward Euler"
             ax.set_title(f"{scheme}, {physical_time:.8g} s")
             ax.set_xlabel("Nonlinear iteration")
+            ax.set_xlim(left=0)
+            ax.xaxis.set_major_locator(MaxNLocator(nbins=5, integer=True, min_n_ticks=1))
         for ax in axes[:, 0]:
             ax.set_ylabel("Maximum original-\nequation residual")
         for ax in axes.ravel()[len(cases) :]:

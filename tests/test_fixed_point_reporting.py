@@ -332,6 +332,43 @@ def test_partial_summary_skips_empty_family_and_plots_failure(tmp_path):
     assert not (tmp_path / "figure/momentum-residuals.pdf").exists()
 
 
+def test_single_newton_update_is_visible_and_iteration_ticks_are_integers(tmp_path, monkeypatch):
+    pytest.importorskip("matplotlib")
+    from matplotlib.axes import Axes
+
+    plotted = []
+    original = Axes.semilogy
+
+    def observed(ax, *args, **kwargs):
+        plotted.append((ax, kwargs))
+        return original(ax, *args, **kwargs)
+
+    monkeypatch.setattr(Axes, "semilogy", observed)
+    folder = tmp_path / "input/screen/momentum/ordinary/newton"
+    folder.mkdir(parents=True)
+    write_report(
+        folder / "record.json",
+        {
+            "schema": "coupled-fixed-point-study-v1",
+            "status": "complete",
+            "family": "momentum",
+            "policy": "newton",
+            "time_s": 4.6875,
+            "row": {
+                "status": "converged",
+                "verified": True,
+                "history": [
+                    {"iteration": 1, "momentum_relative_residual": 8e-13},
+                ],
+            },
+        },
+    )
+    example("summarize").summarize(tmp_path / "input", tmp_path / "figure")
+    assert len(plotted) == 1 and plotted[0][1]["marker"] == "o"
+    ticks = plotted[0][0].get_xticks()
+    np.testing.assert_allclose(ticks, np.round(ticks), atol=1e-12)
+
+
 def test_trajectory_field_reader_requires_complete_verified_hashes(tmp_path):
     reader = example("trajectory_fields")
     path = tmp_path / "step.npz"
