@@ -160,3 +160,17 @@ axial plotting scales are unequal. Each field archive is checked before plotting
 incomplete trajectories produce no complete-trajectory field figure. The residual
 plots use crosses at the last recorded residual of failed local solves. Detailed
 termination labels remain in `outcomes.csv`.
+
+The following diagnostic compares a state solve and a correction solve for the
+same frozen Oseen matrix at the ordinary screening input. It then applies five
+linear residual corrections with that factorization and evaluates the original
+nonlinear momentum equations after every update:
+
+```bash
+uv run python examples/coupled_optimization/fixed_point/momentum_precision.py \
+  --data-root "$DATA_ROOT" --output "$PRECISION_DIAGNOSTIC"
+```
+
+The diagnostic does not change the screening policies or their final accuracy
+criteria. A small frozen-matrix residual alone does not establish a nonlinear
+momentum solution.

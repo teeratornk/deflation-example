@@ -354,3 +354,25 @@ def test_residual_curve_uses_recorded_iterations_without_counting_verification()
         ]
     )
     assert iterations == [1, 2] and values == [0.5, 0.1]
+
+
+def test_oseen_precision_diagnostic_preserves_matrix_boundary_and_initial_state():
+    from scipy.sparse import csr_matrix
+
+    matrix = csr_matrix([[4.0, -1.0, 0.0], [-1.0, 4.0, -1.0], [0.0, -1.0, 3.0]])
+    exact = np.array([2.0, 3.0, 4.0])
+    initial = np.array([2.0, 0.0, 0.0])
+    saved = initial.copy()
+    fixed = np.array([0])
+
+    def verify(state):
+        assert state[0] == 2.0
+        return {"error": float(np.linalg.norm(state - exact))}
+
+    rows = example("momentum_precision").fixed_matrix_comparison(
+        matrix, matrix @ exact, initial, fixed, verify, corrections=2
+    )
+    assert np.array_equal(initial, saved)
+    for route in ("state", "correction"):
+        assert len(rows[route]) == 3
+        assert max(r["original_nonlinear_equations"]["error"] for r in rows[route]) < 1e-14
