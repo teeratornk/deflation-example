@@ -69,7 +69,8 @@ and optimization measurements before use in a performance comparison.
 Run each construction in a fresh process on allocated compute resources:
 
 ```bash
-git checkout coupled-memory-preflight-v1
+git fetch origin --tags
+git checkout coupled-memory-preflight-v2
 uv sync --frozen --extra study
 uv run --extra study python -m deflation_example.coupled_reference_screen \
   --baseline runs/stabilized-baseline --slabs 512 --rank 100 \
@@ -80,8 +81,10 @@ uv run --extra study python -m deflation_example.coupled_memory_screen \
   --slabs 128 512 2048 --ranks 0 20 100 200 --output runs/factor-memory
 ```
 
-These commands use `coupled-memory-preflight-v1`, which adds the screening modules;
-`coupled-final-design-v1` retains the earlier design and reporting implementation.
+These commands use `coupled-memory-preflight-v2`. It includes the test-formatting
+correction required by CI. The numerical source and configurations match
+`coupled-memory-preflight-v1`, which remains the source of the recorded screening
+runs. `coupled-final-design-v1` retains the earlier design and reporting implementation.
 The reference screen measures assembly, construction and sampled process memory
 and saves the compact reference. For nested refinement, supply the fine baseline
 as `--baseline` and the parent baseline as `--coarse-baseline`. The factor screen

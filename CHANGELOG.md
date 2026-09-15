@@ -8,6 +8,7 @@
 
 ## Unreleased coupled-optimization verification
 
+- Point the screening reproduction commands to `coupled-memory-preflight-v2`, including the CI test-formatting correction; preserve the original numerical source and recorded screening tag.
 - Add an optional two-pass tridiagonal temporal eigensolver with independently checked residuals; retain dense construction as the default used by existing measurements.
 - Provide fresh-process reference-construction and saved-field momentum-factor storage screens before large coupled optimizations; distinguish sampled memory from named array counts and extrapolations.
 - Predeclare the final coupled comparison with unchanged physics and bounds; leave grid and rank choices open until resolution and reoptimization checks pass.
