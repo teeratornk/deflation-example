@@ -113,3 +113,21 @@ uv run python examples/coupled_optimization/fixed_point/summarize.py \
 The summary retains failures and distinguishes local step costs from trajectory
 costs. Generate a new output directory for each summary; incomplete records are
 visible and do not establish completed-solve speedups.
+
+Audit the declared populations, paired local roots and complete timing figures:
+
+```bash
+uv run python examples/coupled_optimization/fixed_point/audit.py \
+  --root "$STUDY_OUTPUT" --output "$STUDY_AUDIT"
+```
+
+The audit lists missing, failed and verified outcomes separately. It verifies
+field checksums for both sides of each local-root comparison and checks the
+optimizer timer partition. Complete-time medians require all three declared
+repetitions to meet the criteria. The figures retain each verified repetition
+and show the number verified out of the declared population. For interrupted
+optimization attempts, the stage interval alone does not supply the all-attempt
+cost; the audit leaves that comparison unavailable pending complete accounting.
+The forward-process interval includes input preparation and serialization,
+whereas the optimization-sequence interval excludes common calibration and
+process preparation. They appear in separate figures.
