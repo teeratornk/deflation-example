@@ -267,4 +267,9 @@ def main():
             report["resolution_thresholds_met"] = (
                 report["maximum_temperature_difference_K"] <= 0.05
                 and report["tracking_relative_change"] <= 0.01
-    
+            )
+        write_report(args.output / "record.json", report)
+
+
+if __name__ == "__main__":
+    main()
