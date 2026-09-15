@@ -236,6 +236,34 @@ def test_verified_optimizer_requires_every_time_slab(tmp_path):
         module().outcome(path, {"phase": "optimize"})
 
 
+def test_retained_inner_candidates_require_original_residuals(tmp_path):
+    path = tmp_path / "record.json"
+    record = optimizer_record()
+    steps = [
+        {"linear_status": "empty", "candidate_retained": True},
+        {"linear_status": "iteration_cap", "linear_residual": 0.1},
+        {
+            "linear_status": "converged",
+            "linear_residual": 2e-11,
+            "candidate_retained": True,
+        },
+    ]
+    record["cases"][0]["history"] = [{"attempts": [{"qp_history": steps}]}]
+    write_report(path, record)
+    row, _ = module().outcome(path, {"phase": "optimize"})
+    assert row["retained_inner_steps"] == 1
+    assert row["maximum_retained_inner_original_residual"] == 2e-11
+    assert row["rejected_inner_steps"] == 1
+    steps[-1]["linear_residual"] = 2e-9
+    write_report(path, record)
+    with pytest.raises(ValueError, match="retained inner original residual"):
+        module().outcome(path, {"phase": "optimize"})
+    steps[-1].update(linear_status="iteration_cap", linear_residual=2e-11)
+    write_report(path, record)
+    with pytest.raises(ValueError, match="retained inner candidate lacks"):
+        module().outcome(path, {"phase": "optimize"})
+
+
 def test_verified_derivative_gate_requires_recorded_values(tmp_path):
     path = tmp_path / "record.json"
     record = {

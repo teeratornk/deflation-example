@@ -147,6 +147,8 @@ def verified_metrics(record, phase):
             "upper_complementarity",
         )
         kkt_maximum = 0.0
+        inner_residuals = []
+        rejected_inner_steps = 0
         for case in record["cases"]:
             if len(case["equations"]) != cfg["slabs"]:
                 raise ValueError("Verified optimization omits a declared time slab")
@@ -158,6 +160,23 @@ def verified_metrics(record, phase):
                 1e-8,
                 "momentum adjoint",
             )
+            for outer in case.get("history", []):
+                for attempt in outer["attempts"]:
+                    for step in attempt["qp_history"]:
+                        if step["linear_status"] == "empty":
+                            continue
+                        if not step.get("candidate_retained", False):
+                            rejected_inner_steps += 1
+                            continue
+                        if step["linear_status"] != "converged":
+                            raise ValueError("A retained inner candidate lacks linear convergence")
+                        inner_residuals.append(
+                            bounded_metric(
+                                step.get("linear_residual"),
+                                cfg["inner_tolerance"],
+                                "retained inner original residual",
+                            )
+                        )
     if not equations:
         raise ValueError("Verified record has no independently evaluated equations")
     result = {
@@ -165,6 +184,9 @@ def verified_metrics(record, phase):
     }
     if phase == "optimize":
         result["maximum_kkt_component"] = kkt_maximum
+        result["retained_inner_steps"] = len(inner_residuals)
+        result["maximum_retained_inner_original_residual"] = max(inner_residuals, default=None)
+        result["rejected_inner_steps"] = rejected_inner_steps
     return result
 
 
