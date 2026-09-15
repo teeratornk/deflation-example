@@ -238,6 +238,8 @@ def newton_trajectory(
     callback=None,
     time_scheme="backward_euler",
     restart_interval=None,
+    line_search="equation_max",
+    backtrack_cap=21,
 ):
     """Replay a signed source history using the problem's unchanged time grid."""
     values = real_array(controls, "Fixed source history").copy()
@@ -274,6 +276,8 @@ def newton_trajectory(
             max_iterations=cap,
             initial_state=state,
             initial_flow=flow,
+            line_search=line_search,
+            backtrack_cap=backtrack_cap,
         )
         states.append(result.state[problem.free].copy())
         velocities.append(result.flow.velocity.copy())

@@ -354,6 +354,17 @@ requires a separate complete replay before supporting a trajectory claim.
 The original Newton replay retains `--line-search equation_max` and
 `--backtrack-cap 21` as its defaults.
 
+For the complete finer-mesh check, start from the original initial fields and
+retain the matching coarse-mesh trajectory as the spatial comparator:
+
+```bash
+uv run python -m deflation_example.coupled_spatial_resolution --baseline runs/stabilized-baseline --fine-baseline runs/refined-baseline --optimization runs/startup60-reference-pilot --procedure monolithic_newton --subdivision 2 --coarse-replay runs/newton-128 --line-search fixed_scaled --backtrack-cap 40 --newton-cap 30 --tolerance 1e-12 --output runs/fine-mesh-scaled-newton-128
+```
+
+This calculation preserves backward-Euler time integration and all final
+equation tolerances. Its numerical source and timings are separate from the
+original replay.
+
 For a separate temporal-discretization study, the same forward driver accepts
 `--time-scheme bdf2`. Momentum and thermal storage use the same second-order
 backward-differentiation coefficients. Backward Euler initializes the first

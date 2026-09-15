@@ -98,10 +98,18 @@ def main():
         "--procedure", choices=("segregated", "monolithic_newton"), default="segregated"
     )
     parser.add_argument("--newton-cap", type=int, default=30)
+    parser.add_argument(
+        "--line-search", choices=("equation_max", "fixed_scaled"), default="equation_max"
+    )
+    parser.add_argument("--backtrack-cap", type=int, default=21)
     parser.add_argument("--subdivision", type=int, default=1)
     parser.add_argument("--coarse-replay", type=Path)
     add_forward_options(parser)
     args = parser.parse_args()
+    if args.procedure != "monolithic_newton" and (
+        args.line_search != "equation_max" or args.backtrack_cap != 21
+    ):
+        parser.error("Newton globalization options require --procedure monolithic_newton")
     subdivision = integer(args.subdivision, "Time subdivision", 1)
     if subdivision > 1 and args.coarse_replay is None:
         parser.error("Temporal subdivision requires a matching --coarse-replay")
@@ -174,6 +182,8 @@ def main():
                 "procedure": args.procedure,
                 "tolerance": options["tolerance"],
                 "newton_cap": integer(args.newton_cap, "Newton iteration cap", 0),
+                "line_search": args.line_search,
+                "backtrack_cap": integer(args.backtrack_cap, "Backtracking trial cap", 1),
                 "linear_internal_target": 1e-10,
                 "linear_acceptance_target": 1e-8,
                 "linear_correction_cap": 2,
@@ -188,7 +198,13 @@ def main():
 
         if args.procedure == "monolithic_newton":
             result = newton_trajectory(
-                fine, source, tolerance=options["tolerance"], cap=args.newton_cap, callback=callback
+                fine,
+                source,
+                tolerance=options["tolerance"],
+                cap=args.newton_cap,
+                callback=callback,
+                line_search=args.line_search,
+                backtrack_cap=args.backtrack_cap,
             )
         else:
             result = replay_controls(fine, source, subdivision=1, **options, callback=callback)
@@ -251,9 +267,4 @@ def main():
             report["resolution_thresholds_met"] = (
                 report["maximum_temperature_difference_K"] <= 0.05
                 and report["tracking_relative_change"] <= 0.01
-            )
-        write_report(args.output / "record.json", report)
-
-
-if __name__ == "__main__":
-    main()
+    

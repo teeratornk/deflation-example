@@ -301,8 +301,9 @@ def test_newton_trajectory_replays_saved_controls_and_retains_partial_failure():
 
 
 @pytest.mark.parametrize("subdivision", [1, 2])
+@pytest.mark.parametrize("line_search", ["equation_max", "fixed_scaled"])
 def test_newton_spatial_cli_preserves_forward_protocol_and_fields(
-    tmp_path, monkeypatch, subdivision
+    tmp_path, monkeypatch, subdivision, line_search
 ):
     import json
     import sys
@@ -386,6 +387,10 @@ def test_newton_spatial_cli_preserves_forward_protocol_and_fields(
             "saved",
             "--procedure",
             "monolithic_newton",
+            "--line-search",
+            line_search,
+            "--backtrack-cap",
+            "40",
             "--tolerance",
             "1e-12",
             "--output",
@@ -398,6 +403,8 @@ def test_newton_spatial_cli_preserves_forward_protocol_and_fields(
     assert report["status"] == "converged"
     assert report["forward_solver"]["procedure"] == "monolithic_newton"
     assert report["forward_solver"]["tolerance"] == 1e-12
+    assert report["forward_solver"]["line_search"] == line_search
+    assert report["forward_solver"]["backtrack_cap"] == 40
     assert report["maximum_temperature_difference_K"] < 1e-8
     assert report["subdivision"] == subdivision
     assert (report["coarse_replay"] is not None) == (subdivision > 1)
