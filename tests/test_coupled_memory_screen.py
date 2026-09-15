@@ -33,7 +33,9 @@ def test_storage_rejects_invalid_dimensions(parameters):
 
 
 def test_factor_inventory_checks_original_system_and_separates_arrays():
-    A = sparse.diags([np.full(4, -1.0), np.full(5, 3.0), np.full(4, -1.0)], [-1, 0, 1], format="csr")
+    A = sparse.diags(
+        [np.full(4, -1.0), np.full(5, 3.0), np.full(4, -1.0)], [-1, 0, 1], format="csr"
+    )
     result = factor_inventory(A)
     assert result["factor_check_passed"]
     assert result["fresh_relative_residual"] < 1e-14
