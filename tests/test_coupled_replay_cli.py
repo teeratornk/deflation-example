@@ -20,7 +20,14 @@ def test_replay_cli_records_and_applies_iteration_options(
     tmp_path, monkeypatch, module, relaxation, cap, tolerance
 ):
     problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
-    config = {"query": 0, "target_count": 16, "lower_K": 0, "upper_K": 1}
+    config = {
+        "query": 0,
+        "target_count": 16,
+        "lower_K": 0,
+        "upper_K": 1,
+        "transient": True,
+        "slabs": problem.slabs,
+    }
     fields = {"control": np.ones(problem.size), "state": np.zeros(problem.size)}
     baseline = {
         "baseline_sha256": "same-baseline",
@@ -29,7 +36,13 @@ def test_replay_cli_records_and_applies_iteration_options(
     monkeypatch.setattr(
         module, "load_saved_solution", lambda *args: ({}, config, fields, "field-hash")
     )
-    monkeypatch.setattr(module, "load_problem", lambda cfg: (problem, baseline))
+
+    def load(cfg):
+        assert cfg["transient"] is True
+        assert cfg["slabs"] == problem.slabs
+        return problem, baseline
+
+    monkeypatch.setattr(module, "load_problem", load)
     monkeypatch.setattr(module, "require_matching_baseline", lambda *args: None)
     monkeypatch.setattr(module, "environment", lambda: {"test": True})
     if module is spatial:
