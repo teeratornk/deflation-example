@@ -211,3 +211,24 @@ def test_all_time_comparison_includes_initial_interval_and_has_decreasing_error(
 def test_nonfinite_initial_value_is_rejected(tmp_path):
     with pytest.raises(ValueError, match="initial"):
         summarize([case(tmp_path, 1)], 20, initial_value=float("nan"))
+
+
+def test_peak_location_and_traces_preserve_signed_temperature_difference(tmp_path):
+    coarse, fine = case(tmp_path, 2), case(tmp_path, 4)
+    with np.load(fine / "states.npz") as fields:
+        state, times = fields["state"].copy(), fields["times_s"].copy()
+    state[3, 0] -= 2
+    write_fields(fine / "states.npz", state=state, times_s=times)
+    pair = summarize([coarse, fine], 20, initial_value=0)["pairs"][0]
+    peak = pair["all_refined_time_peak"]
+    assert peak == {
+        "time_s": 1.0,
+        "fine_time_index": 3,
+        "free_node_index": 0,
+        "signed_fine_minus_coarse_K": -40.0,
+    }
+    assert pair["shared_time_peak"]["free_node_index"] == 0
+    trace = pair["peak_node_trace"]
+    assert trace["fine_dimensionless_temperature"][4] == -1
+    assert trace["coarse_dimensionless_temperature"][2] == 1
+    assert trace["coarse_times_s"][0] == trace["fine_times_s"][0] == 0

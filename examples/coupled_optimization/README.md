@@ -324,6 +324,20 @@ timings or fixed-source resolution checks.
 
 ## Fixed-control resolution checks
 
+The location diagnostic identifies the largest temperature difference at the
+same physical time and mesh node. It also reports the velocity difference at
+that time and plots both temperature histories. The comparison includes the
+initial interval and applies no temporal shift. Supply completed monolithic
+Newton replays of the same saved control, baseline, and forward policy:
+
+```bash
+uv run python -m deflation_example.coupled_resolution_diagnostic --baseline runs/stabilized-baseline --replays runs/newton-128 runs/newton-256 runs/newton-512 runs/newton-1024 --output runs/resolution-locations --plot
+```
+
+The output retains every supplied run's status. These diagnostics locate the
+unresolved differences; spatial resolution and optimization feasibility have
+separate checks.
+
 ```bash
 uv run python -m deflation_example.coupled_resolution --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --method reference --subdivision 1 --output runs/replay-original
 uv run python -m deflation_example.coupled_resolution --baseline runs/stabilized-baseline --optimization runs/startup60-reference-pilot --method reference --subdivision 2 --output runs/replay-refined

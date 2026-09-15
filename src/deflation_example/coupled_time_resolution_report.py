@@ -168,7 +168,9 @@ def summarize(directories, temperature_scale, initial_value=None):
         sampled, shared_times = fs[stride - 1 :: stride], ft[stride - 1 :: stride]
         if sampled.shape != cs.shape or not np.allclose(shared_times, ct, rtol=1e-12, atol=1e-12):
             raise ValueError("Refinements must share the original physical endpoints")
-        error = np.max(np.abs(sampled - cs), axis=1) * scale
+        difference = sampled - cs
+        error = np.max(np.abs(difference), axis=1) * scale
+        peak_time, peak_node = np.unravel_index(np.abs(difference).argmax(), difference.shape)
         delta = abs(fr["tracking_integral_K2_m3_s"] - cr["tracking_integral_K2_m3_s"])
         denominator = fr["tracking_integral_K2_m3_s"]
         relative = delta / denominator if denominator else (0.0 if delta == 0 else None)
@@ -185,6 +187,11 @@ def summarize(directories, temperature_scale, initial_value=None):
             ),
             "times_s": ct,
             "maximum_difference_K": error,
+            "shared_time_peak": {
+                "time_s": float(ct[peak_time]),
+                "free_node_index": int(peak_node),
+                "signed_fine_minus_coarse_K": float(difference[peak_time, peak_node] * scale),
+            },
         }
         if initial_value is not None:
             # Only a coarse-grid-sized temporary is needed for interpolation,
@@ -193,6 +200,8 @@ def summarize(directories, temperature_scale, initial_value=None):
             starts = np.concatenate(([0.0], ct[:-1]))
             widths = ct - starts
             trajectory_error = np.empty(len(fs))
+            peak_nodes = np.empty(len(fs), dtype=int)
+            peak_signed = np.empty(len(fs))
             for substep in range(stride):
                 indices = np.arange(substep, len(fs), stride)
                 fraction = (ft[indices] - starts) / widths
@@ -201,13 +210,30 @@ def summarize(directories, temperature_scale, initial_value=None):
                         "Fine time levels must lie in their corresponding coarse interval"
                     )
                 interpolated = previous + fraction[:, None] * (cs - previous)
-                trajectory_error[indices] = (
-                    np.max(np.abs(fs[indices] - interpolated), axis=1) * scale
-                )
+                delta_state = fs[indices] - interpolated
+                nodes = np.abs(delta_state).argmax(axis=1)
+                signed = delta_state[np.arange(len(indices)), nodes] * scale
+                trajectory_error[indices] = np.abs(signed)
+                peak_nodes[indices], peak_signed[indices] = nodes, signed
+            peak_time = int(trajectory_error.argmax())
+            peak_node = int(peak_nodes[peak_time])
             pair.update(
                 maximum_all_refined_time_difference_K=float(trajectory_error.max()),
                 refined_times_s=ft,
                 maximum_interpolated_difference_K=trajectory_error,
+                all_refined_time_peak={
+                    "time_s": float(ft[peak_time]),
+                    "fine_time_index": peak_time,
+                    "free_node_index": peak_node,
+                    "signed_fine_minus_coarse_K": float(peak_signed[peak_time]),
+                },
+                peak_node_trace={
+                    "free_node_index": peak_node,
+                    "coarse_times_s": np.r_[0.0, ct],
+                    "coarse_dimensionless_temperature": np.r_[initial_value, cs[:, peak_node]],
+                    "fine_times_s": np.r_[0.0, ft],
+                    "fine_dimensionless_temperature": np.r_[initial_value, fs[:, peak_node]],
+                },
             )
         pairs.append(pair)
     return {
