@@ -268,6 +268,7 @@ def plot_comparisons(summary, output):
         ax.set_ylim(bottom=0)
         fig.tight_layout()
         fig.savefig(output / f"{phase}-complete-times.pdf")
+        fig.savefig(output / f"{phase}-complete-times.png", dpi=160)
         plt.close(fig)
 
 

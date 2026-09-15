@@ -209,6 +209,7 @@ def test_partial_summary_skips_empty_family_and_plots_failure(tmp_path):
     )
     example("summarize").summarize(tmp_path / "input", tmp_path / "figure")
     assert (tmp_path / "figure/forward-residuals.pdf").exists()
+    assert (tmp_path / "figure/forward-residuals.png").exists()
     assert not (tmp_path / "figure/momentum-residuals.pdf").exists()
 
 

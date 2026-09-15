@@ -147,6 +147,7 @@ def summarize(root, output, plots=True):
             )
         fig.tight_layout(rect=(0, 0.12 if nrows == 1 else 0.08, 1, 1))
         fig.savefig(output / f"{family}-residuals.pdf")
+        fig.savefig(output / f"{family}-residuals.png", dpi=160)
         plt.close(fig)
     trajectories = [(p, r) for p, r in records if "steps" in r]
     if trajectories:
@@ -193,6 +194,7 @@ def summarize(root, output, plots=True):
         ax.legend(fontsize=8)
         fig.tight_layout()
         fig.savefig(output / "temperature-bound.pdf")
+        fig.savefig(output / "temperature-bound.png", dpi=160)
         plt.close(fig)
     return rows
 
