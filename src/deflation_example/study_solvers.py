@@ -96,6 +96,41 @@ class StudySolver:
             self.history.clear()
         self.previous = None
 
+    def export_history(self):
+        """Host copies of the recycling space and last inactive set, or None."""
+        if self.history is None:
+            return None
+
+        def host(array):
+            return np.asarray(array.get() if hasattr(array, "get") else array)
+
+        return {
+            "indices": host(self.history.indices).astype(np.int64, copy=True),
+            "basis": host(self.history.basis).astype(float, copy=True),
+            "previous": None
+            if self.previous is None
+            else np.asarray(self.previous, dtype=np.int64),
+        }
+
+    def import_history(self, payload):
+        """Restore an exported recycling space; other methods ignore the payload."""
+        if self.history is None or payload is None:
+            return
+        indices = np.asarray(payload["indices"], dtype=np.int64)
+        basis = np.asarray(payload["basis"], dtype=float)
+        if indices.ndim != 1 or basis.ndim != 2 or basis.shape[0] != len(indices):
+            raise ValueError("A recycling history pairs one inactive index with each basis row")
+        if not np.isfinite(basis).all() or len(np.unique(indices)) != len(indices):
+            raise ValueError("A recycling history must be finite with distinct inactive indices")
+        if basis.shape[1] > self.rank:
+            raise ValueError("A recycling history must not exceed the retained rank")
+        if self.history.resident:
+            raise ValueError("Resident recycling histories are not restorable")
+        self.history.clear()
+        self.history.indices, self.history.basis = indices, basis
+        previous = payload.get("previous")
+        self.previous = None if previous is None else np.asarray(previous, dtype=np.int64)
+
     def close(self):
         if self.session is not None:
             self.session.close()

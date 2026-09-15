@@ -13,6 +13,10 @@ recycle_window: 100
 warm_start: true
 repetition: 0
 memory_interval: 0.01
+stage:
+  positions: null
+  restore: null
+  resume: null
 queries:
   - {target: 0, upper_K: 357.3}
   - {target: 7, upper_K: 357.3}

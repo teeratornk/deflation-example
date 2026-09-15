@@ -37,8 +37,25 @@ def matched_identity(record, rank_policy=None):
         "blas": env.get("blas"),
         "device": record["device"],
         "timing_boundary": record["timing_boundary"],
+        "assembly_policy": (record.get("assembly") or {}).get("policy"),
         "method_specific_rank_policy": rank_policy,
     }
+
+
+def checked_population(population):
+    """The methods whose complete verified repetitions carry the speedup claim."""
+    if population is None:
+        return tuple(METHODS)
+    population = tuple(population)
+    if (
+        not population
+        or len(set(population)) != len(population)
+        or set(population) - set(METHODS)
+        or "reference" not in population
+        or len(population) < 2
+    ):
+        raise ValueError("A headline population lists distinct known methods including reference")
+    return population
 
 
 def validate_record(record):
@@ -114,11 +131,12 @@ def checked_rank_policy(policy):
     return result
 
 
-def summarize(records, repetitions=5, rank_policy=None):
+def summarize(records, repetitions=5, rank_policy=None, population=None):
     repetitions = integer(repetitions, "Declared repetitions", 1)
     if not records:
         raise ValueError("Supply at least one complete-sequence record")
     rank_policy = checked_rank_policy(rank_policy)
+    population = checked_population(population)
     identity = matched_identity(records[0], rank_policy)
     grouped = {method: [] for method in METHODS}
     seen = set()
@@ -138,22 +156,22 @@ def summarize(records, repetitions=5, rank_policy=None):
         seen.add(key)
         grouped[cfg["method"]].append(record)
     rows = []
-    for method, population in grouped.items():
-        passing = [r for r in population if r["all_problems_verified"]]
+    for method, group in grouped.items():
+        passing = [r for r in group if r["all_problems_verified"]]
         times = [r["sequence_seconds"] for r in passing]
         row = {
             "method": method,
             "declared_sequences": repetitions,
-            "recorded_sequences": len(population),
+            "recorded_sequences": len(group),
             "verified_sequences": len(passing),
-            "sequence_seconds_all_outcomes": [r["sequence_seconds"] for r in population],
+            "sequence_seconds_all_outcomes": [r["sequence_seconds"] for r in group],
             "outcomes": [
                 {
                     "repetition": r["configuration"]["repetition"],
                     "sequence_status": r["status"],
                     "target_statuses": [c["status"] for c in r["cases"]],
                 }
-                for r in population
+                for r in group
             ],
             "verified_sequence_median_seconds": float(np.median(times)) if times else None,
             "verified_sequence_range_seconds": [min(times), max(times)] if times else None,
@@ -181,14 +199,18 @@ def summarize(records, repetitions=5, rank_policy=None):
             "verified_memory_sequences": sum(bool(r["memory"].get("complete")) for r in passing),
         }
         rows.append(row)
-    complete = all(row["verified_sequences"] == repetitions for row in rows)
+    complete = all(
+        row["verified_sequences"] >= repetitions for row in rows if row["method"] in population
+    )
     speedup = None
     if complete:
         medians = {row["method"]: row["verified_sequence_median_seconds"] for row in rows}
-        speedup = min(medians["jacobi"], medians["recycling"]) / medians["reference"]
+        alternatives = [medians[method] for method in population if method != "reference"]
+        speedup = min(alternatives) / medians["reference"]
     return {
         "schema": "coupled-comparison-summary-v1",
         "matched_protocol": identity,
+        "headline_population": list(population),
         "all_declared_sequences_verified": complete,
         "fastest_tested_alternative_over_reference": speedup,
         "rank_comparison": "predeclared method-specific ranks"
@@ -208,6 +230,10 @@ def main():
         type=Path,
         help="Optional frozen JSON mapping each method to rank and recycle_window; otherwise both settings must match.",
     )
+    parser.add_argument(
+        "--population",
+        help="Comma-separated headline methods whose complete repetitions carry the claim; all recorded methods stay in the table.",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
@@ -215,7 +241,8 @@ def main():
     paths = [root / "record.json" for root in args.runs]
     records = [json.loads(path.read_text()) for path in paths]
     rank_policy = json.loads(args.rank_policy.read_text()) if args.rank_policy else None
-    report = summarize(records, args.repetitions, rank_policy)
+    population = None if args.population is None else args.population.split(",")
+    report = summarize(records, args.repetitions, rank_policy, population)
     if args.rank_policy:
         report["rank_policy_sha256"] = file_digest(args.rank_policy)
     report["input_records"] = [

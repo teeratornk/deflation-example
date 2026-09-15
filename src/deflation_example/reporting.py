@@ -136,6 +136,20 @@ def write_fields(path, **fields):
         np.savez_compressed(stream, **fields)
 
 
+def write_arrays(path, **fields):
+    """Uncompressed atomic array archive for large, frequently rewritten checkpoints."""
+    with atomic_output(path, binary=True) as stream:
+        np.savez(stream, **fields)
+
+
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def summarize_pdas(result, seconds):
     return {
         "status": result["status"],

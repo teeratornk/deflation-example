@@ -173,19 +173,22 @@ def test_gpu_blocks_preserve_original_residual_and_reuse_factors(method, coarse_
             assert independent_residual(B, result.x, rhs) <= 1e-10
             np.testing.assert_allclose(result.x, exact, atol=1e-8)
             log = timing["hybrid_block_processing"]
-            assert log["calls"] and log["seconds"] > 0
             assert log["seconds"] <= timing["callback_seconds"]
             assert sum(timing["components_seconds"].values()) == pytest.approx(
                 timing["total_seconds"]
             )
             if coarse_device == "cuda" and result.rank:
+                # The operator-basis product runs inside the resident coarse space,
+                # so block calls appear only for the factor upload itself.
                 coarse = timing["hybrid_coarse_correction"]
                 assert coarse["device"] == "cuda" and coarse["applications"] >= 1
                 assert coarse["seconds"] <= timing["callback_seconds"]
                 assert coarse["resident_operator_product_bytes"] > 0
                 assert timing["cached_operator_product_bytes"] == 0
                 assert coarse["spaces"][-1]["rank"] == result.rank
-            elif coarse_device == "cpu":
+                assert all(row["kind"] == "factor_upload" for row in log["calls"])
+            else:
+                assert log["calls"] and log["seconds"] > 0
                 assert "hybrid_coarse_correction" not in timing
             if identity is None:
                 identity = solver.device_jacobian

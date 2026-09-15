@@ -221,14 +221,21 @@ def minimize_coupled(
     backtracking="halving",
     secant_memory=0,
     callback=None,
+    checkpoint=None,
+    resume=None,
 ):
     """Damped Gauss--Newton with feasible Armijo steps and exact nonlinear KKT.
 
     Failed flow evaluations cause backtracking and remain in the history.
     All methods share globalization, QP tolerances and the original-residual
     inner check supplied by StudySolver. No global optimality claim is implied.
+    ``checkpoint`` receives the complete optimizer state after every accepted
+    iterate; ``resume`` restarts from such a state, re-evaluating its flows once
+    from the saved velocities and pressures. Neither changes the iteration.
     """
     start = time.perf_counter()
+    if checkpoint is not None and not callable(checkpoint):
+        raise ValueError("Checkpoint hook must be callable")
     tolerance = positive_real(tolerance, "Nonlinear KKT tolerance")
     max_iterations = integer(max_iterations, "Nonlinear iteration cap", 1)
     max_regularizations = integer(max_regularizations, "Regularization attempts", 1)
@@ -242,16 +249,34 @@ def minimize_coupled(
     upper = np.broadcast_to(upper, (problem.size,)).astype(float, copy=True)
     if not np.isfinite([lower, upper]).all() or np.any(lower >= upper):
         raise ValueError("Temperature bounds must be finite and strictly ordered")
+    first_iteration = 0
+    history, status = [], "nonlinear_iteration_cap"
+    damping = float(initial_damping)
+    secants = []
+    if resume is not None:
+        initial, initial_evaluation = resume["state"], resume.get("initial_evaluation")
+        history = [dict(row) for row in resume["history"]]
+        damping = float(resume["damping"])
+        if not np.isfinite(damping) or damping < 0:
+            raise ValueError("A resumed damping must be finite and nonnegative")
+        secants = [
+            (np.asarray(s, dtype=float).copy(), np.asarray(g, dtype=float).copy())
+            for s, g in resume["secants"]
+        ]
+        if secant_memory:
+            secants = secants[-secant_memory:]
+        else:
+            secants = []
+        first_iteration = integer(resume["iteration"], "Resumed iteration", 0) + 1
+        if len(history) != first_iteration or first_iteration > max_iterations:
+            raise ValueError("A resumed history must end at the checkpointed iterate")
     y = np.zeros(problem.size) if initial is None else np.asarray(initial, dtype=float).copy()
     if y.shape != (problem.size,) or not np.isfinite(y).all():
         raise ValueError("Initial temperature must match the complete trajectory")
     y = np.clip(y, lower, upper)
     evaluation = problem.evaluate(y, initial=initial_evaluation)
     objective, gradient = problem.objective_gradient(evaluation, desired)
-    history, status = [], "nonlinear_iteration_cap"
-    damping = float(initial_damping)
-    secants = []
-    for iteration in range(max_iterations + 1):
+    for iteration in range(first_iteration, max_iterations + 1):
         # Normalize each weighted optimality equation by its positive tracking weight.
         scaled_gradient = gradient / problem.weights
         scale = max(
@@ -416,6 +441,21 @@ def minimize_coupled(
         if not moved:
             status = "globalization_failed"
             break
+        if checkpoint is not None:
+            # The accepted iterate, its converged flows and every quantity the
+            # next iteration reads; a restart from here repeats no accepted step.
+            checkpoint(
+                {
+                    "iteration": iteration,
+                    "state": evaluation.state,
+                    "flows": evaluation.flows,
+                    "history": list(history),
+                    "damping": damping,
+                    "secants": list(secants),
+                    "objective": objective,
+                    "optimizer_seconds": time.perf_counter() - start,
+                }
+            )
     # The returned residuals and gradient are always evaluated at the retained state.
     scaled_gradient = gradient / problem.weights
     scale = max(
