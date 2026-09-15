@@ -158,8 +158,12 @@ shows the first, middle and last levels. Temperatures use kelvin, source density
 uses megawatts per cubic metre, and velocity uses metres per second. Radial and
 axial plotting scales are unequal. Each field archive is checked before plotting;
 incomplete trajectories produce no complete-trajectory field figure. The residual
-plots use crosses at the last recorded residual of failed local solves. Detailed
-termination labels remain in `outcomes.csv`.
+plots use crosses at the last recorded iterate of failed local solves. When the
+solver returns an earlier, better state, a separate hollow diamond shows its
+verified residual at termination. The iteration curve excludes that return
+verification, so restoring the best state does not appear as a new nonlinear
+update. Detailed termination labels and returned-state residuals remain in
+`outcomes.csv`.
 
 The following diagnostic compares a state solve and a correction solve for the
 same frozen Oseen matrix at the ordinary screening input. It then applies five

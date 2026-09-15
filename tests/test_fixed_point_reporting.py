@@ -513,7 +513,57 @@ def test_residual_curve_uses_recorded_iterations_without_counting_verification()
             {"procedure": "returned_state_verification", "momentum_relative_residual": 0.1},
         ]
     )
-    assert iterations == [1, 2] and values == [0.5, 0.1]
+    assert iterations == [1] and values == [0.5]
+
+
+def test_returned_best_state_does_not_create_a_false_iteration_drop(tmp_path, monkeypatch):
+    pytest.importorskip("matplotlib")
+    from matplotlib.axes import Axes
+
+    curves, markers = [], []
+    original_line, original_plot = Axes.semilogy, Axes.plot
+
+    def line(ax, *args, **kwargs):
+        curves.append(args[:2])
+        return original_line(ax, *args, **kwargs)
+
+    def plot(ax, *args, **kwargs):
+        if kwargs.get("marker") == "D":
+            markers.append(args[:2])
+        return original_plot(ax, *args, **kwargs)
+
+    monkeypatch.setattr(Axes, "semilogy", line)
+    monkeypatch.setattr(Axes, "plot", plot)
+    folder = tmp_path / "input/screen/forward/ordinary/relaxed100"
+    folder.mkdir(parents=True)
+    write_report(
+        folder / "record.json",
+        {
+            "schema": "coupled-fixed-point-study-v1",
+            "status": "complete",
+            "family": "forward",
+            "policy": "relaxed100",
+            "time_s": 1,
+            "row": {
+                "status": "coupling_iteration_cap",
+                "verified": False,
+                "checks": {"momentum_relative_residual": 1e-5},
+                "history": [
+                    {"coupling_iteration": 0, "momentum_relative_residual": 1e-3},
+                    {"coupling_iteration": 1, "momentum_relative_residual": 1e-5},
+                    {"coupling_iteration": 2, "momentum_relative_residual": 1e-2},
+                    {
+                        "procedure": "returned_state_verification",
+                        "momentum_relative_residual": 1e-5,
+                    },
+                ],
+            },
+        },
+    )
+    example("summarize").summarize(tmp_path / "input", tmp_path / "figure")
+    assert curves[0][0] == [0, 1, 2]
+    np.testing.assert_array_equal(curves[0][1], [1e-3, 1e-5, 1e-2])
+    assert markers == [(2, 1e-5)]
 
 
 def test_oseen_precision_diagnostic_preserves_matrix_boundary_and_initial_state():

@@ -28,10 +28,12 @@ LABELS = {
 
 
 def residual_trace(history):
-    """Use recorded iteration indices; verification alone adds no iteration."""
+    """Plot attempted iterates; restoring a retained state is a separate event."""
     iterations, residuals = [], []
     last = 0
     for row in history:
+        if row.get("procedure") == "returned_state_verification":
+            continue
         last = row.get("coupling_iteration", row.get("iteration", last))
         values = [
             row[key]
@@ -99,6 +101,7 @@ def summarize(root, output, plots=True):
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
     from matplotlib.ticker import MaxNLocator
 
     for family in ("forward", "momentum"):
@@ -116,6 +119,7 @@ def summarize(root, output, plots=True):
             nrows, columns, figsize=(3.4 * columns, 3.1 * nrows), squeeze=False, sharey=True
         )
         handles = {}
+        returned_marker_present = False
         for ax, case in zip(axes.ravel(), cases):
             physical_time = None
             for path, record in records:
@@ -145,6 +149,36 @@ def summarize(root, output, plots=True):
                             color=COLORS[record["policy"]],
                             markersize=7,
                         )
+                        checks = record["row"].get("checks", {})
+                        returned_values = [
+                            checks[key]
+                            for key in (
+                                "momentum_relative_residual",
+                                "continuity_relative_residual",
+                                "thermal_relative_residual",
+                            )
+                            if checks.get(key) is not None
+                        ]
+                        returned = max(returned_values) if returned_values else None
+                        if returned is not None and not np.isclose(
+                            returned, residuals[-1], rtol=1e-8, atol=0
+                        ):
+                            # This is a return event at termination, not another
+                            # nonlinear update or an inferred earlier iterate.
+                            final_index = max(
+                                row.get("coupling_iteration", row.get("iteration", 0))
+                                for row in record["row"]["history"]
+                            )
+                            ax.plot(
+                                final_index,
+                                max(returned, 1e-16),
+                                marker="D",
+                                linestyle="none",
+                                markerfacecolor="none",
+                                color=COLORS[record["policy"]],
+                                markersize=6,
+                            )
+                            returned_marker_present = True
             ax.axhline(1e-12, color="0.7", linewidth=0.7, linestyle="--")
             scheme = "BDF2" if case.startswith("bdf2") else "Backward Euler"
             ax.set_title(f"{scheme}, {physical_time:.8g} s")
@@ -157,6 +191,28 @@ def summarize(root, output, plots=True):
             ax.set_visible(False)
         if handles:
             ordered = [handles[policy] for policy in COLORS if policy in handles]
+            if returned_marker_present:
+                ordered.extend(
+                    [
+                        Line2D(
+                            [],
+                            [],
+                            color="0.25",
+                            marker="x",
+                            linestyle="none",
+                            label="Last recorded iterate (failed solve)",
+                        ),
+                        Line2D(
+                            [],
+                            [],
+                            color="0.25",
+                            marker="D",
+                            markerfacecolor="none",
+                            linestyle="none",
+                            label="Returned state",
+                        ),
+                    ]
+                )
             fig.legend(
                 ordered,
                 [line.get_label() for line in ordered],
@@ -164,7 +220,12 @@ def summarize(root, output, plots=True):
                 ncol=3,
                 fontsize=9,
             )
-        fig.tight_layout(rect=(0, 0.12 if nrows == 1 else 0.08, 1, 1))
+        bottom = (
+            (0.2 if nrows == 1 else 0.13)
+            if returned_marker_present
+            else (0.12 if nrows == 1 else 0.08)
+        )
+        fig.tight_layout(rect=(0, bottom, 1, 1))
         fig.savefig(output / f"{family}-residuals.pdf")
         fig.savefig(output / f"{family}-residuals.png", dpi=160)
         plt.close(fig)
