@@ -21,6 +21,9 @@ def solve_momentum(
     max_iterations=100,
     continuation=False,
     max_stages=80,
+    method="newton",
+    relaxation=0.5,
+    depth=3,
 ):
     """Try Newton, then optionally continue an artificial residual load to zero.
 
@@ -30,6 +33,26 @@ def solve_momentum(
     original target equations can accept a final result. Every failed stage
     remains in the returned history. Viscosity and boundary data stay fixed.
     """
+    if method != "newton":
+        if continuation:
+            raise ValueError("Residual-load continuation is defined only for Newton")
+        from .coupled_fixed_point import solve_picard_momentum
+
+        return solve_picard_momentum(
+            flow,
+            acceleration,
+            boundary_indices,
+            boundary_values,
+            initial=initial,
+            previous=previous,
+            time_step=time_step,
+            pressure_gauge=pressure_gauge,
+            tolerance=tolerance,
+            max_iterations=max_iterations,
+            method=method,
+            relaxation=relaxation,
+            depth=depth,
+        )
     tolerance = positive_real(tolerance, "Flow tolerance")
     max_stages = integer(max_stages, "Load continuation stage cap", 1)
     arguments = dict(

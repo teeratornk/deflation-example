@@ -70,7 +70,11 @@ class HybridCoupledSolver(StudySolver):
         timing["hybrid_block_processing"] = {
             "minimum_columns": self.block_min_columns,
             "calls": list(self.block_records),
-            "seconds": sum(row["seconds"] for row in self.block_records),
+            "seconds": sum(
+                row["seconds"]
+                for row in self.block_records
+                if not row.get("enclosed_by_operator_block", False)
+            ),
             "timing_scope": "Included in the CPU kernel and recycling-selection intervals; do not add again to total_seconds.",
             "vector_and_verification_device": "cpu",
             "block_device": "cuda",
@@ -144,7 +148,10 @@ class HybridCoupledSolver(StudySolver):
             if vectors.shape[1] < self.block_min_columns:
                 return B @ vectors
             start = time.perf_counter()
+            log_start = len(self.block_records)
             apply = device_operator()
+            for row in self.block_records[log_start:]:
+                row["enclosed_by_operator_block"] = True
             cp = self.device_jacobian.cp
             bounds = chunk_bounds(vectors.shape[1], self.block_max_columns)
             answer = np.concatenate([cp.asnumpy(apply(vectors[:, a:b])) for a, b in bounds], axis=1)
@@ -152,6 +159,7 @@ class HybridCoupledSolver(StudySolver):
             self.block_records.append(
                 {
                     "kind": "operator_block",
+                    "includes_factor_upload": True,
                     "columns": vectors.shape[1],
                     "chunks": len(bounds),
                     "factor_upload": False,

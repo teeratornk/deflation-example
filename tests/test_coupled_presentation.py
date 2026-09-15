@@ -43,8 +43,12 @@ def test_presentation_reports_split_ratios_and_screen(monkeypatch, tmp_path):
     assert built["schema"] == presentation.SCHEMA
     ratios = built["ratios"]
     assert ratios["fastest_tested_alternative"] == "jacobi"
-    assert ratios["wall_ratio"] == pytest.approx(
+    assert ratios["stage_sum_ratio"] == pytest.approx(
         report["fastest_tested_alternative_over_reference"]
+    )
+    assert ratios["wall_ratio"] == pytest.approx(
+        built["methods"]["jacobi"]["elapsed_wall_seconds"][0]
+        / built["methods"]["reference"]["elapsed_wall_seconds"][0]
     )
     assert ratios["cg_iteration_ratio"] > 0 and ratios["inner_solve_ratio"] > 0
     for method in ("jacobi", "reference"):

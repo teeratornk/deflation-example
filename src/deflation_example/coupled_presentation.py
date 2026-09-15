@@ -192,9 +192,19 @@ def build(summary_directory, output, screen_directories=(), plots=False):
         fastest = min(alternatives, key=lambda m: methods[m]["median_sequence_seconds"])
         alt = methods[fastest]
         floor = reference["median_evaluation_seconds"] + reference["median_other_seconds"]
+        elapsed = {m: methods[m]["elapsed_wall_seconds"] for m in population}
+        available = all(
+            elapsed[m] and all(v is not None and v > 0 for v in elapsed[m]) for m in population
+        )
+        fastest_elapsed = min(alternatives, key=lambda m: median(elapsed[m])) if available else None
         ratios = {
             "fastest_tested_alternative": fastest,
-            "wall_ratio": alt["median_sequence_seconds"] / reference["median_sequence_seconds"],
+            "stage_sum_ratio": alt["median_sequence_seconds"]
+            / reference["median_sequence_seconds"],
+            "fastest_elapsed_alternative": fastest_elapsed,
+            "wall_ratio": (median(elapsed[fastest_elapsed]) / median(elapsed["reference"]))
+            if available
+            else None,
             "wall_ratio_with_restart_overheads": alt["median_stage_sum_plus_overheads_seconds"]
             / reference["median_stage_sum_plus_overheads_seconds"],
             "wall_ratio_preparation_inclusive": alt["median_preparation_inclusive_seconds"]
@@ -387,8 +397,9 @@ def write_tables(report, output):
     if report["ratios"]:
         r = report["ratios"]
         for label, key, spec in (
-            ("Complete wall time", "wall_ratio", ".2f"),
-            ("Wall time with restart overheads", "wall_ratio_with_restart_overheads", ".2f"),
+            ("Sum of measured stage intervals", "stage_sum_ratio", ".2f"),
+            ("Elapsed time, including scheduler gaps", "wall_ratio", ".2f"),
+            ("Stage sum with restart overheads", "wall_ratio_with_restart_overheads", ".2f"),
             ("Preparation-inclusive time", "wall_ratio_preparation_inclusive", ".2f"),
             ("Inner linear-solve time", "inner_solve_ratio", ".2f"),
             ("CG iterations", "cg_iteration_ratio", ".2f"),

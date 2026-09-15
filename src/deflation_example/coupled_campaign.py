@@ -130,6 +130,20 @@ def assemble(stage_directories, interrupted_attempts=(), execution_status=None):
     attempts = [load_attempt(directory) for directory in interrupted_attempts]
     if execution_status is not None:
         discarded = discarded_seconds(attempts, execution_status)
+    completed_cost = [entry["record"].get("attempt_process_seconds") for entry in stages]
+    scheduler_cost = {
+        r["directory"]: r["elapsed_seconds"] for r in (execution_status or {}).get("attempts", [])
+    }
+    all_attempt_cost = None
+    if all(v is not None for v in completed_cost) and all(
+        a["directory"] in scheduler_cost for a in attempts
+    ):
+        all_attempt_cost = sum(completed_cost) + sum(
+            float(scheduler_cost[a["directory"]]) for a in attempts
+        )
+        all_attempt_cost += sum(
+            entry["record"].get("attempt_restore_seconds", 0) for entry in stages
+        )
     verified = sum(bool(row["verified"]) for row in cases)
     all_verified = complete_chain and verified == len(cases) and len(cases) == declared
     started = min(entry["record"]["stage"]["started_utc"] for entry in stages)
@@ -157,6 +171,10 @@ def assemble(stage_directories, interrupted_attempts=(), execution_status=None):
         "components_seconds": components,
         "process_preparation_seconds": preparation,
         "preparation_inclusive_seconds": calibration + preparation + total,
+        "all_attempt_process_seconds": all_attempt_cost,
+        "all_attempt_preparation_inclusive_seconds": None
+        if all_attempt_cost is None
+        else calibration + all_attempt_cost,
         "memory": memory,
         "reference_storage": first.get("reference_storage", {}),
         "assembly": {
@@ -206,6 +224,7 @@ def load_attempt(directory):
         else {
             "iteration": meta["iteration"],
             "stage_elapsed_seconds": meta["stage_elapsed_seconds"],
+            "attempt_process_seconds": meta.get("attempt_process_seconds"),
             "written_utc": meta["written_utc"],
             "arrays_sha256": meta["arrays_sha256"],
         },
@@ -218,12 +237,24 @@ def discarded_seconds(attempts, execution_status):
     """Scheduler elapsed time of interrupted attempts beyond their last checkpoint."""
     total = 0.0
     rows = {row["directory"]: row for row in execution_status.get("attempts", [])}
+    previous_cumulative = 0.0
     for attempt in attempts:
         row = rows.get(attempt["directory"])
         if row is None or attempt["last_checkpoint"] is None:
             return None
         elapsed = float(row["elapsed_seconds"])
-        total += max(0.0, elapsed - float(attempt["last_checkpoint"]["stage_elapsed_seconds"]))
+        checkpoint = attempt["last_checkpoint"]
+        cumulative = float(checkpoint["stage_elapsed_seconds"])
+        local = checkpoint.get("attempt_process_seconds")
+        if local is None:
+            # Legacy chains supply chronological cumulative retained work.
+            local = (
+                cumulative - previous_cumulative
+                if cumulative >= previous_cumulative
+                else cumulative
+            )
+        total += max(0.0, elapsed - float(local))
+        previous_cumulative = cumulative
     return total
 
 

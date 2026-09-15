@@ -82,7 +82,8 @@ def test_staged_chain_reproduces_the_single_process_sequence(monkeypatch, tmp_pa
     assert first["schema"] == sequence.STAGE_SCHEMA and first["all_problems_verified"]
     assert first["stage"]["final"]["warm_start_valid"]
     assert first["stage"]["checkpoints"]["count"] >= 1
-    assert (tmp_path / "stage-0/checkpoint-latest.npz").is_file()
+    checkpoint = json.loads((tmp_path / "stage-0/checkpoint-latest.json").read_text())
+    assert (tmp_path / "stage-0" / checkpoint["arrays_path"]).is_file()
     second = run_stage(
         problem, method, tmp_path / "stage-1", positions=[1], restore=tmp_path / "stage-0"
     )
@@ -234,7 +235,7 @@ def test_interrupted_stage_resumes_from_its_checkpoint_and_assembles(monkeypatch
         [chain / "stage-0", chain / "stage-1-resume-0"], [chain / "stage-1"], status
     )
     assert with_status["assembly"]["discarded_seconds"] == pytest.approx(
-        1e4 - meta["stage_elapsed_seconds"]
+        1e4 - meta["attempt_process_seconds"]
     )
     chains = campaign.discover_chains(tmp_path / "runs")
     assert set(chains) == {("recycling", 0)}

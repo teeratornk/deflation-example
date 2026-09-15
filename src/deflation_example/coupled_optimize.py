@@ -87,6 +87,9 @@ def load_problem(config):
         flow_cap=config["flow_cap"],
         flow_continuation=config["flow_continuation"],
         momentum_factor_policy=policy,
+        flow_method=config.get("flow_method", "newton"),
+        flow_relaxation=config.get("flow_relaxation", 0.5),
+        flow_history=config.get("flow_history", 3),
     )
     return problem, record
 

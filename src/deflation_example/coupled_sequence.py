@@ -18,6 +18,7 @@ import json
 import os
 from pathlib import Path
 import time
+import uuid
 
 import hydra
 import numpy as np
@@ -199,19 +200,31 @@ def load_restore(path):
     }
 
 
+def checkpoint_manifest(path):
+    """Read the latest committed generation, or its intact predecessor."""
+    failures = []
+    for name in ("checkpoint-latest.json", "checkpoint-previous.json"):
+        try:
+            meta = json.loads((path / name).read_text())
+            arrays = path / meta.get("arrays_path", "checkpoint-latest.npz")
+            if arrays.parent != path or file_sha256(arrays) != meta["arrays_sha256"]:
+                raise ValueError("Checkpoint arrays do not match the recorded checksum")
+            return meta, arrays
+        except (OSError, ValueError, KeyError) as exc:
+            failures.append(str(exc))
+    raise ValueError("No intact committed checkpoint: " + "; ".join(failures))
+
+
 def load_resume(path, position, digest, method):
     """Read an interrupted attempt's last checkpoint for the same declared problem."""
     tick = time.perf_counter()
-    meta = json.loads((path / "checkpoint-latest.json").read_text())
+    meta, arrays_path = checkpoint_manifest(path)
     if meta.get("schema") != CHECKPOINT_SCHEMA:
         raise ValueError("Unknown checkpoint schema")
     if meta["position"] != position or meta["method"] != method:
         raise ValueError("A checkpoint resumes only its own declared problem and method")
     if meta["configuration_sha256"] != digest:
         raise ValueError("A checkpoint resumes only an identical configuration")
-    arrays_path = path / "checkpoint-latest.npz"
-    if file_sha256(arrays_path) != meta["arrays_sha256"]:
-        raise ValueError("Checkpoint arrays do not match the recorded checksum")
     with np.load(arrays_path) as data:
         arrays = {key: data[key] for key in data.files}
     steps, gradients = arrays["secant_steps"], arrays["secant_gradients"]
@@ -239,6 +252,8 @@ def load_resume(path, position, digest, method):
         "recycling": recycling,
         "iteration": int(meta["iteration"]),
         "prior_seconds": float(meta["stage_elapsed_seconds"]),
+        "baseline_sha256": meta.get("baseline_sha256"),
+        "source_sha256": meta.get("source_sha256"),
         "prior_process_preparation_seconds": float(meta.get("process_preparation_seconds", 0.0)),
         "checkpoint_sha256": meta["arrays_sha256"],
         "seconds": time.perf_counter() - tick,
@@ -477,6 +492,11 @@ def run(config):
                 input_sha256=baseline["input_sha256"],
                 state_dofs_per_problem=problem.size,
             )
+            if resume is not None and (
+                resume["baseline_sha256"] != baseline["baseline_sha256"]
+                or resume["source_sha256"] != metadata["environment"]["source_sha256"]
+            ):
+                raise ValueError("A checkpoint must share its baseline and numerical source")
             if restore is not None:
                 previous_record = restore["record"]
                 if (
@@ -558,7 +578,13 @@ def run(config):
                         ),
                         **history_arrays(solver.export_history()),
                     }
-                    write_arrays(output / "checkpoint-latest.npz", **arrays)
+                    arrays_path = output / ("checkpoint-" + uuid.uuid4().hex + ".npz")
+                    write_arrays(arrays_path, **arrays)
+                    latest = output / "checkpoint-latest.json"
+                    if latest.exists():
+                        write_report(
+                            output / "checkpoint-previous.json", json.loads(latest.read_text())
+                        )
                     write_report(
                         output / "checkpoint-latest.json",
                         {
@@ -566,14 +592,19 @@ def run(config):
                             "position": position,
                             "method": cfg["method"],
                             "configuration_sha256": digest,
+                            "baseline_sha256": baseline["baseline_sha256"],
+                            "source_sha256": metadata["environment"]["source_sha256"],
+                            "arrays_path": arrays_path.name,
                             "iteration": payload["iteration"],
                             "damping": payload["damping"],
                             "objective": payload["objective"],
                             "history": payload["history"],
                             "optimizer_seconds": payload["optimizer_seconds"],
                             "stage_elapsed_seconds": prior_seconds + time.perf_counter() - start,
+                            "attempt_elapsed_seconds": time.perf_counter() - start,
+                            "attempt_process_seconds": time.perf_counter() - process_start,
                             "process_preparation_seconds": preparation,
-                            "arrays_sha256": file_sha256(output / "checkpoint-latest.npz"),
+                            "arrays_sha256": file_sha256(arrays_path),
                             "written_utc": utc_now(),
                         },
                     )
@@ -638,6 +669,10 @@ def run(config):
             and len(cases) == expected
             and all(row["verified"] for row in cases),
             "sequence_seconds": total,
+            "attempt_sequence_seconds": total - prior_seconds,
+            "attempt_process_seconds": time.perf_counter() - process_start,
+            "attempt_restore_seconds": (0.0 if restore is None else restore["seconds"])
+            + (0.0 if resume is None else resume["seconds"]),
             "components_seconds": parts,
             "process_preparation_seconds": preparation,
             "preparation_inclusive_seconds": metadata.get("calibration_seconds", 0.0)

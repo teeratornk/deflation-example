@@ -1,0 +1,107 @@
+# Fixed-point iteration for coupled thermal control
+
+This example compares nonlinear solution procedures for the same equations.
+The forward screen alternates momentum and thermal solves with an unchanged
+saved heat-source control. The momentum screen changes only the nonlinear flow
+solver used inside optimization. Exact tangent and adjoint operators remain in
+use. Neither comparison changes the physical model or temperature bounds.
+
+Anderson acceleration for Boussinesq fixed-point solves has been studied by
+Pollock, Rebholz and Xiao, *Acceleration of nonlinear solvers for natural
+convection problems*, https://arxiv.org/abs/2004.06471. The safeguards here define
+a separate measured policy; that analysis does not establish convergence for
+these particular meshes and parameters.
+
+## Install and verify
+
+Use the study source identifier accompanying the records. Release v0.6.2 and
+the earlier timing sources do not contain this addition. From that checkout:
+
+```bash
+uv sync --frozen --extra study --extra plot
+uv run pytest tests/test_fixed_point.py tests/test_fixed_point_study.py \
+  tests/test_coupled_audit_regressions.py
+```
+
+Run numerical tests and experiments on a compute node. The forward and momentum
+screens use CPU sparse factorizations. GPU time is used for the later hybrid
+optimization comparisons; install `--extra coupled-gpu` for those tasks.
+
+## Inputs and execution
+
+`protocol.json` identifies the existing baseline, nested-mesh baseline, optimized
+control and saved difficult steps by directory and checksum. Supply their common
+parent as `DATA_ROOT`; these files are evidence inputs, not generated meshes or
+replacement controls. Input data must be supplied separately when institutional
+release restrictions apply. The manufactured verification tests need no archive.
+
+```bash
+uv run python examples/coupled_optimization/fixed_point/workflow.py screen \
+  --task 0 --data-root "$DATA_ROOT" --output "$STUDY_OUTPUT"
+```
+
+Run screen tasks 0–59 in separate processes with identical resources. There are
+five saved-step cases, six numerical policies and two equation families. Task 0
+is the ordinary step with Newton. A screen repetition measures one selected
+step; it is not a complete optimization or a resolution study. Every task has a
+separate output and attempt record. Reusing an output directory is prohibited.
+
+After all screen tasks have terminated:
+
+```bash
+uv run python examples/coupled_optimization/fixed_point/workflow.py select \
+  --data-root "$DATA_ROOT" --output "$STUDY_OUTPUT"
+```
+
+Selection considers every declared outcome and freezes the best fixed-point
+policy separately for each family. Newton remains the comparator. Coverage is
+primary; elapsed time on commonly converged cases breaks ties. Selection refuses
+incomplete or mixed-source screens. A policy with no converged case cannot
+proceed. Caps and failed solves never contribute a completed-solve speedup.
+
+Use the same command with `trajectory --task 0` through `--task 11` for both
+meshes, both policies and three repetitions. Each trajectory starts from the
+original initial fields and retains immutable step archives. Use the underlying
+`fixed_point_study trajectory --resume` command only after interruption, with
+the same arguments and source. Resume checks every committed step and input
+identity. Numerical failures are terminal. All unfinished process costs remain
+unknown until scheduler accounting supplies them; they are never treated as zero.
+
+Run `derivatives --task 0` and `--task 1` before `optimize --task 0` through
+`--task 17`. The latter compares three linear solvers, two momentum procedures
+and three independent repetitions on the nominal 64-slab optimization. The
+derivative gates check the full coupled control derivatives and must both pass.
+Every command supports `--dry-run` to inspect its exact arguments.
+
+## Numerical policies and interpretation
+
+The relaxed policies use factors 0.25, 0.5 and 1. Anderson histories contain at
+most three or five differences, with damping 0.5. Pivoted QR uses relative rank
+threshold `1e-12`; difference-coefficient one-norm above 10 triggers the relaxed
+step. A freshly evaluated equation residual that increases also rejects the
+accelerated proposal. History resets at each physical step or rejected proposal.
+Temperature acceleration uses lumped spatial mass weights. Momentum acceleration
+uses velocity mass weights and applies the same affine combination to pressure.
+
+Forward acceptance requires momentum, continuity and thermal residuals at most
+`1e-12`, and mass/energy defects at most `1e-6`. Optimization retains original
+inner residual `1e-10` and KKT threshold `1e-8`. Returned states and residuals
+always correspond. An already-converged initial guess needs no nonlinear solve.
+
+Report step time, complete-trajectory time, complete optimization time, sampled
+memory, tracking and temperature-bound violation separately. Preserve the
+original spatial/temporal resolution requirements. Faster nonlinear convergence
+does not establish resolved physical temperatures or feasibility between stored
+time levels. Existing manuscript timings remain attached to their original
+implementation.
+
+Generate tables and residual/temperature figures with:
+
+```bash
+uv run python examples/coupled_optimization/fixed_point/summarize.py \
+  --root "$STUDY_OUTPUT" --output "$STUDY_FIGURES"
+```
+
+The summary retains failures and distinguishes local step costs from trajectory
+costs. Generate a new output directory for each summary; incomplete records are
+visible and do not establish completed-solve speedups.

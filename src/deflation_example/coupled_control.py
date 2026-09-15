@@ -69,6 +69,9 @@ class CoupledControlProblem:
         flow_cap=100,
         flow_continuation=False,
         momentum_factor_policy="retained",
+        flow_method="newton",
+        flow_relaxation=0.5,
+        flow_history=3,
     ):
         self.flow, self.mesh = flow, flow.mesh
         self.free = self.mesh.free.copy()
@@ -126,6 +129,13 @@ class CoupledControlProblem:
         flow.load(self.acceleration)
         self.flow_tolerance = positive_real(flow_tolerance, "Flow tolerance")
         self.flow_cap = integer(flow_cap, "Flow iteration cap", 1)
+        if flow_method not in {"newton", "picard", "anderson"}:
+            raise ValueError("Unknown momentum iteration")
+        self.flow_method = flow_method
+        self.flow_relaxation = positive_real(flow_relaxation, "Flow relaxation")
+        self.flow_history = integer(flow_history, "Flow history", 1)
+        if self.flow_relaxation > 1:
+            raise ValueError("Flow relaxation must not exceed one")
         if not isinstance(flow_continuation, bool):
             raise ValueError("Flow continuation must be Boolean")
         self.flow_continuation = flow_continuation
@@ -208,6 +218,9 @@ class CoupledControlProblem:
                 tolerance=self.flow_tolerance,
                 max_iterations=self.flow_cap,
                 continuation=self.flow_continuation,
+                method=self.flow_method,
+                relaxation=self.flow_relaxation,
+                depth=self.flow_history,
             )
             checks = self.flow.verify(
                 result,
