@@ -136,7 +136,14 @@ def newton_step(
             break
         if iteration == max_iterations:
             break
-        H = step_linearization(problem, state[problem.free], flow.velocity, slab)[0]
+        H = step_linearization(
+            problem,
+            state[problem.free],
+            flow.velocity,
+            slab,
+            control=source,
+            previous=None if previous_state is None else previous_state[problem.free],
+        )[0]
         scaling = 1 / np.maximum(abs(H).max(axis=1).toarray().ravel(), np.finfo(float).tiny)
         try:
             factor = splu((sparse.diags(scaling) @ H).tocsc())
