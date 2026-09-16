@@ -180,3 +180,31 @@ def test_the_streamline_length_must_be_in_both_records(tmp_path):
             conditioning_record(tmp_path, "after", 0, 1.06e-3),
             length="spectral",
         )
+
+
+def test_the_stabilisation_macros_are_written_and_gated(tmp_path):
+    """The subsection is included only when its own macro file exists."""
+    from deflation_example.coupled_presentation import write_stabilization
+
+    output = tmp_path / "artifacts"
+    output.mkdir()
+    write_stabilization({"stabilization": None}, output)
+    assert not (output / "stabilization.tex").exists()
+
+    report = build(
+        convergence_record(tmp_path),
+        conditioning_record(tmp_path, "before", 35, 1.5e-4),
+        conditioning_record(
+            tmp_path,
+            "after",
+            0,
+            1.06e-3,
+            {"fluid_cells": 14848, "cells_limited": 14828, "fraction_limited": 0.9987,
+             "smallest_factor": 0.009, "median_factor": 0.457},
+        ),
+    )
+    write_stabilization({"stabilization": report}, output)
+    written = (output / "stabilization.tex").read_text()
+    assert written.startswith("\\newcommand{\\coupledStab")
+    assert written.count("\\newcommand") == len(macros(report))
+    assert "coupledStabUnstabilisedOrder" not in written

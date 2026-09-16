@@ -161,7 +161,15 @@ def load_spatial(directories):
     return sorted(rows, key=lambda row: (row["slabs"], row["procedure"] or ""))
 
 
-def build(summary_directory, output, screen_directories=(), plots=False, regime=None, spatial=()):
+def build(
+    summary_directory,
+    output,
+    screen_directories=(),
+    plots=False,
+    regime=None,
+    spatial=(),
+    stabilization=None,
+):
     campaign, records = load_campaign(summary_directory)
     summary = campaign.get("summary") or {}
     population = summary.get("headline_population", ["jacobi", "reference"])
@@ -268,6 +276,11 @@ def build(summary_directory, output, screen_directories=(), plots=False, regime=
         # here so one manifest covers every artifact, never merged into the headline.
         "regime": None if regime is None else json.loads(Path(regime).read_text()),
         "spatial": load_spatial(spatial),
+        # The stabilisation correction is a property of the discrete operator, not of
+        # the comparison, so it is carried beside the headline and never inside it.
+        "stabilization": (
+            None if stabilization is None else json.loads(Path(stabilization).read_text())
+        ),
     }
     write_report(output / "summary.json", report)
     write_tables(report, output)
@@ -371,8 +384,33 @@ def write_macros(report, output):
         stream.write("\n".join(lines) + "\n")
 
 
+def write_stabilization(report, output):
+    """The correction's own macros, in their own file so the section can be gated.
+
+    They are kept out of the headline macros deliberately: the subsection that uses
+    them is included only when this file exists, so an evidence bundle without the
+    correction simply does not carry that subsection rather than carrying it with
+    undefined numbers in it.
+    """
+    stabilization = report.get("stabilization")
+    if not stabilization:
+        return None
+    from .coupled_stabilization import macros as stabilization_macros
+
+    values = stabilization_macros(stabilization)
+    lines = [f"\\newcommand{{\\{name}}}{{{value}}}" for name, value in values.items()]
+    with atomic_output(output / "stabilization.tex") as stream:
+        stream.write("\n".join(lines) + "\n")
+    return values
+
+
 def write_tables(report, output):
+    headline = macros(report)
     write_macros(report, output)
+    written = write_stabilization(report, output)
+    overlap = set(headline) & set(written or {})
+    if overlap:
+        raise ValueError(f"The stabilisation macros collide with the headline macros: {overlap}")
     if report.get("regime"):
         from .coupled_regime import write_tables as regime_tables
 
@@ -604,8 +642,19 @@ def main():
     parser.add_argument(
         "--spatial", type=Path, nargs="*", default=[], help="coupled_spatial_pair outputs"
     )
+    parser.add_argument(
+        "--stabilization", type=Path, help="coupled_stabilization report stabilization.json"
+    )
     args = parser.parse_args()
-    build(args.summary, args.output, args.screen, args.plot, args.regime, args.spatial)
+    build(
+        args.summary,
+        args.output,
+        args.screen,
+        args.plot,
+        args.regime,
+        args.spatial,
+        args.stabilization,
+    )
 
 
 if __name__ == "__main__":
