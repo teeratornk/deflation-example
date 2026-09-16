@@ -1,0 +1,23 @@
+{
+  "schema": "coupled-saved-step-repair-v1",
+  "scope": "Matched local correction; separate from frozen complete trajectories and optimization timings.",
+  "diagnostic_source": "af500ce",
+  "diagnostic_population": [0, 57, 58],
+  "input": "fine/anderson5/rep-0, first failed step at 276.5625 s",
+  "selection_reason": "First failed step of the first finer-mesh Anderson repetition; selected before local correction outcomes.",
+  "initial_guess": "Same retained failed temperature, velocity and pressure for every method.",
+  "fixed_data": "Same signed control, previous verified state, physical properties, boundary conditions and backward-Euler time step.",
+  "policies": ["equation_max", "fixed_scaled", "temperature", "coupled"],
+  "equation_tolerance": 1e-12,
+  "mass_tolerance": 1e-6,
+  "energy_tolerance": 1e-6,
+  "newton_cap": 100,
+  "backtrack_caps": {"equation_max": 21, "fixed_scaled": 40},
+  "anderson_depth": 5,
+  "relaxation": 0.5,
+  "coupling_cap": 300,
+  "flow_cap": 100,
+  "coupled_mixing": "One affine combination of temperature, velocity and pressure; temperature mass weights select coefficients. Original coupled residual safeguards remain active.",
+  "failure_policy": "Retain every outcome and all elapsed intervals; a failed run cannot define a completed-solve speedup.",
+  "next_gate": "Verify a local correction before considering a separately versioned complete trajectory. Do not claim physical resolution or reference-deflation speedup from a forward correction."
+}
