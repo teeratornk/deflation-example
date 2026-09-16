@@ -81,10 +81,17 @@ def test_independent_momentum_adjoint_checks_detect_an_incorrect_transpose_solve
     assert failed["maximum_momentum_adjoint_relative_residual"] > 0.9
 
 
-def small_coupled_problem(steps=None, feedback=0.003, uniform_capacity=False):
+def small_coupled_problem(steps=None, feedback=0.003, uniform_capacity=False, inlet=0.02):
+    """The shared small coupled problem.
+
+    ``inlet`` raises the through-flow. At the default this problem is slow enough
+    that the diffusive limit sets the streamline parameter, so the consistent
+    weighting's row bound is slack; a caller that needs the bound to bind asks for a
+    faster inlet.
+    """
     mesh = annular_rectangle(3)
     flow = AxisymmetricFlow(mesh, 0.1)
-    velocity = np.column_stack((np.zeros(flow.nv), np.full(flow.nv, 0.02)))
+    velocity = np.column_stack((np.zeros(flow.nv), np.full(flow.nv, inlet)))
     baseline = flow.solve(
         np.zeros_like(flow.quadrature_points),
         flow.boundary,

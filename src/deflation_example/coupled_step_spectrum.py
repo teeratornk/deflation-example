@@ -43,7 +43,13 @@ def step_linearization(problem, state, velocity, slab, control=None, previous=No
     flow_jacobian += problem.flow.convection_derivative(velocity)
     flow_jacobian = flow_jacobian[problem.flow_free][:, problem.flow_free]
     thermal_jacobian = thermal_velocity_jacobian(
-        problem.flow, velocity, full, problem.capacity, problem.conductivity, problem.velocity_scale
+        problem.flow,
+        velocity,
+        full,
+        problem.capacity,
+        problem.conductivity,
+        problem.velocity_scale,
+        limit_rows=assembly.consistent,
     )[problem.free][:, problem.flow_free]
     if assembly.consistent:
         thermal_mass = (

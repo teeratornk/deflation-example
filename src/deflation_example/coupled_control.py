@@ -281,6 +281,7 @@ class CoupledControlProblem:
                 self.capacity,
                 self.conductivity,
                 self.velocity_scale,
+                limit_rows=assembly.consistent,
             )
             if action is not None:
                 # The consistent weighting puts the same streamline factor on the

@@ -9,8 +9,12 @@ from deflation_example.coupled_resolution import forward_model
 from test_coupled_derivatives import small_coupled_problem
 
 
-@pytest.mark.parametrize("consistent", [False, True])
-def test_current_and_previous_derivatives_against_complete_equations(consistent):
+@pytest.mark.parametrize(
+    "consistent,inlet",
+    [(False, 0.02), (True, 0.02), (True, 0.3)],
+    ids=["lumped", "consistent-slack-bound", "consistent-binding-bound"],
+)
+def test_current_and_previous_derivatives_against_complete_equations(consistent, inlet):
     """The step Jacobian is the derivative of the step the runner actually solves.
 
     With a consistent stabilisation the storage, the source and the control's action
@@ -18,11 +22,18 @@ def test_current_and_previous_derivatives_against_complete_equations(consistent)
     velocity and all three belong in this derivative. The control and the previous
     state are handed over as complete nodal fields, the way the runner holds them.
     """
-    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True, inlet=inlet)
     if consistent:
         problem.consistent_stabilization = True
         problem.assembly = problem.assemble(problem.initial_flow.velocity)
-    assert problem.assemble(problem.initial_flow.velocity).consistent is consistent
+    built = problem.assemble(problem.initial_flow.velocity)
+    assert built.consistent is consistent
+    if consistent:
+        # The bound on the streamline parameter is part of the model, so it is part of
+        # this derivative. At the faster inlet it binds in every fluid cell, which is
+        # the regime the transformer mesh is in; at the default it is slack.
+        binding = (built.streamline_limit[problem.flow.fluid_cells] < 1.0).mean()
+        assert binding == (1.0 if inlet > 0.02 else 0.0)
     Y = np.linspace(0.04, 0.08, problem.size)
     evaluation = problem.evaluate(Y)
     model = forward_model(problem)
@@ -37,7 +48,7 @@ def test_current_and_previous_derivatives_against_complete_equations(consistent)
         problem, state[problem.free], flow.velocity, n, control=control, previous=previous
     )
     if consistent:
-        lumped = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+        lumped = small_coupled_problem([0.2, 0.35], uniform_capacity=True, inlet=inlet)
         L = step_linearization(lumped, state[lumped.free], flow.velocity, n)[0]
         share = abs(H - L).max() / abs(L).max()
         assert share > 1e-3, f"the weighting moves the step by only {share}, so this proves nothing"
