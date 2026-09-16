@@ -153,6 +153,9 @@ def load_spatial(directories):
                 "mass_weighted_space_time_rms_K": statistics["mass_weighted_space_time_rms_K"],
                 "peak": statistics["pointwise_peak"],
                 "criteria": record["criteria"],
+                # Present only once the assessment was run against a declared horizon
+                # split. An older record has none, and says so rather than implying one.
+                "declared_split": record.get("declared_split"),
             }
         )
     return sorted(rows, key=lambda row: (row["slabs"], row["procedure"] or ""))
