@@ -123,7 +123,9 @@ def optimization_command(args, protocol, policy, *, method=None, repetition=0):
         "threads": args.threads,
         "output": str(output),
         "baseline_directory": str(args.data_root / protocol["baseline"]),
-        "reference_baseline_directory": str(args.data_root / protocol["baseline"]),
+        # This study constructs its reference on the optimization mesh. A
+        # separate baseline requests a strictly coarser, nested mesh.
+        "reference_baseline_directory": None,
         "device": "cpu" if method is None else "hybrid",
         "mode": "derivatives" if method is None else "optimize",
         "evaluation_progress": True,
@@ -187,7 +189,8 @@ def command(args, protocol):
         if "slab" in case:
             cmd += ["--slab", str(case["slab"])]
         return cmd, output
-    frozen = read(args.output / "selection.json")
+    gate_root = getattr(args, "gate_root", None) or args.output
+    frozen = read(gate_root / "selection.json")
     if frozen["protocol_sha256"] != file_sha256(HERE / "protocol.json"):
         raise ValueError("Frozen selection belongs to a different protocol")
     if frozen["environment"]["source_sha256"] != environment()["source_sha256"]:
@@ -222,7 +225,7 @@ def command(args, protocol):
     if args.phase == "derivatives":
         return optimization_command(args, protocol, ("newton", selected)[args.task])
     for policy in ("newton", selected):
-        gate = read(args.output / "derivatives" / policy / "derivatives" / "record.json")
+        gate = read(gate_root / "derivatives" / policy / "derivatives" / "record.json")
         if (
             gate["status"] != "verified"
             or gate["environment"]["source_sha256"] != environment()["source_sha256"]
@@ -250,11 +253,18 @@ def main():
     )
     parser.add_argument("--data-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--gate-root",
+        type=Path,
+        help="Existing matching selection and derivative records; optimization only",
+    )
     parser.add_argument("--threads", type=int, default=8)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.task < 0 or args.threads < 1:
         parser.error("Task must be nonnegative and threads positive")
+    if args.gate_root is not None and args.phase != "optimize":
+        parser.error("A separate gate root is supported only for optimization")
     protocol = read(HERE / "protocol.json")
     if args.phase == "select":
         if args.dry_run:
@@ -279,7 +289,22 @@ def main():
         "environment": environment(),
         "protocol_sha256": file_sha256(HERE / "protocol.json"),
         "status": "running",
+        "launcher_sha256": file_sha256(Path(__file__)),
+        "reference_setup_policy": "same-mesh-reference-no-separate-coarse-baseline-v1",
     }
+    if args.phase == "optimize":
+        gate_root = args.gate_root or args.output
+        selected = read(gate_root / "selection.json")["families"]["momentum"]["selected"]
+        meta["gate_record_sha256"] = {
+            str(path.relative_to(gate_root)): file_sha256(path)
+            for path in [
+                gate_root / "selection.json",
+                *[
+                    gate_root / "derivatives" / policy / "derivatives" / "record.json"
+                    for policy in ("newton", selected)
+                ],
+            ]
+        }
     write_report(attempt, meta)
     began = time.perf_counter()
     result = subprocess.run(cmd, check=False)

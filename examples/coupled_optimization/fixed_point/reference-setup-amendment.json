@@ -1,0 +1,18 @@
+{
+  "schema": "fixed-point-reference-setup-amendment-v1",
+  "protocol_sha256": "8b1a692271ea25692df09d4d4acaabcd4bf73b976b77a6465bd40af0714a9a5e",
+  "numerical_source": "16dabaf998d01989b3806880f5dd8da6cba490af",
+  "changed_setting": "reference_baseline_directory",
+  "old_value": "same path as baseline_directory",
+  "new_value": null,
+  "reason": "A separate reference baseline requests an immediate nested parent mesh. The same-mesh study instead uses the already loaded optimization problem and the identity spatial transfer. Numerical solver files and all other settings remain unchanged.",
+  "replacement_tasks": [2, 3, 8, 9, 14, 15],
+  "withdrawn_before_execution_tasks": [8, 9, 14, 15],
+  "original_setup_errors": [
+    {"task": 2, "record": "optimize/newton/reference/rep-0/record.json", "sha256": "47d88ad4d491e20beb90faf92ad671aa87159117e8196c187f2e961b19cf0497"},
+    {"task": 3, "record": "optimize/anderson5/reference/rep-0/record.json", "sha256": "6deed0ace31b52ea8774e89d7bf2ec9f1d56e01ffc80efe4e445bb9352c1d9a8"}
+  ],
+  "diagnosis_record_sha256": "135d5a9d3cc66a9fb9e68713df6cf4350e2ce916831145d440706dfaf30c5754",
+  "diagnosis": "The original configuration reproduces ValueError: The reference mesh must be the immediate nested parent. The corrected construction supplies 200 columns and sampled numerical rank 200 on the same 693120-state problem.",
+  "preservation": "Retain original setup-error records and durations. Use a separate root for corrected reference computations. The other twelve optimizer tasks and both derivative gates retain their original outputs. This correction does not replace a numerical convergence failure."
+}

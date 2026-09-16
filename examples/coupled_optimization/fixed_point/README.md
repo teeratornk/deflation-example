@@ -1,5 +1,40 @@
 # Residual-equation momentum iteration
 
+## Same-mesh reference setup correction
+
+The numerical solver files are unchanged from `16dabaf`. The earlier launcher
+passed the optimization baseline as a separate coarse baseline. That option
+requires an immediate nested parent mesh, so the reference runs stopped before
+optimization. The corrected launcher sets `reference_baseline_directory=null`
+and constructs the reference on the already loaded optimization mesh. Rank,
+target, time levels, precision, stopping tests and solver settings are unchanged.
+The two original setup failures remain in their original directories. They are
+execution errors and do not establish numerical convergence or a solver ranking.
+
+Reproduce the error and check the corrected rank-200 construction on a compute
+node before starting the corrected reference runs:
+
+```bash
+uv run python examples/coupled_optimization/fixed_point/reference_setup_check.py \
+  --data-root "$DATA_ROOT" --output "$SETUP_CHECK"
+```
+
+Matching completed selection and derivative checks can be reused because the
+numerical source is unchanged. Run the corrected reference tasks (2, 3, 8, 9,
+14, 15) into a new output root, keeping the original records:
+
+```bash
+uv run python examples/coupled_optimization/fixed_point/workflow.py optimize \
+  --task 2 --data-root "$DATA_ROOT" --gate-root "$ORIGINAL_STUDY_OUTPUT" \
+  --output "$CORRECTED_REFERENCE_OUTPUT"
+```
+
+Each attempt records its launcher hash and the exact gate-record hashes. The
+unchanged Jacobi and recycling computations continue in the original root.
+Report this configuration correction explicitly; preserve setup-error costs
+alongside the corrected complete computations. A setup check supplies no
+optimization timing, and no failed attempt enters a completed-solve speedup.
+
 This study changes only the nonlinear momentum solver used inside coupled
 thermal optimization. The physical model, controls, bounds, exact tangent and
 adjoint operators remain unchanged. The forward screen and twelve fixed-control
