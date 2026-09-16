@@ -63,16 +63,48 @@ def test_a_fixed_point_policy_is_read_as_the_forward_procedure():
     assert procedure_of({})["procedure"] is None
 
 
-def test_an_unconverged_trajectory_is_refused(tmp_path):
+def stall(directory, at):
+    record = json.loads((directory / "record.json").read_text())
+    record["status"] = "numerical_failure"
+    record["steps"][at]["status"] = "newton_line_search_stagnation"
+    del record["steps"][at + 1 :]
+    (directory / "record.json").write_text(json.dumps(record))
+    return directory
+
+
+def test_an_unconverged_trajectory_is_refused_unless_a_partial_one_is_asked_for(tmp_path):
     directory = trajectory(tmp_path / "a", dofs=6, status="numerical_failure")
     with pytest.raises(ValueError, match="converged trajectory"):
         load_trajectory(directory)
-    partial = trajectory(tmp_path / "b", dofs=6)
-    record = json.loads((partial / "record.json").read_text())
-    record["steps"][2]["status"] = "newton_line_search_stagnation"
-    (partial / "record.json").write_text(json.dumps(record))
-    with pytest.raises(ValueError, match="unconverged step"):
-        load_trajectory(partial)
+    stalled = stall(trajectory(tmp_path / "b", dofs=6), 2)
+    with pytest.raises(ValueError, match="converged trajectory"):
+        load_trajectory(stalled)
+    # Asked for explicitly, the leading converged interval is read and labelled.
+    partial = load_trajectory(stalled, allow_partial=True)
+    assert partial["complete"] is False
+    assert partial["levels_reached"] == 2 and partial["declared_levels"] == 4
+    assert partial["terminating_status"] == "newton_line_search_stagnation"
+    assert partial["state"].shape[0] == 2 and len(partial["times_s"]) == 2
+
+
+def test_a_converged_step_after_a_failed_one_is_refused(tmp_path):
+    directory = trajectory(tmp_path / "c", dofs=6)
+    record = json.loads((directory / "record.json").read_text())
+    record["status"] = "numerical_failure"
+    record["steps"][1]["status"] = "coupling_iteration_cap"
+    (directory / "record.json").write_text(json.dumps(record))
+    with pytest.raises(ValueError, match="converged step after a failed one"):
+        load_trajectory(directory, allow_partial=True)
+
+
+def test_the_comparison_covers_the_interval_both_trajectories_reached(tmp_path):
+    coarse = load_trajectory(trajectory(tmp_path / "coarse", dofs=6), allow_partial=True)
+    fine = load_trajectory(
+        stall(trajectory(tmp_path / "fine", dofs=21), 2), allow_partial=True
+    )
+    shared = checked_pair(coarse, fine, "src")
+    assert shared == 2, "the comparison stops where the fine trajectory stopped"
+    assert coarse["complete"] and not fine["complete"]
 
 
 def test_the_pair_must_differ_in_the_mesh_and_nothing_else(tmp_path):

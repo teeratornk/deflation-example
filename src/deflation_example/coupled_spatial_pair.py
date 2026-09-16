@@ -53,21 +53,72 @@ def procedure_of(record):
     return {"source": "unstated", "procedure": None}
 
 
-def load_trajectory(directory):
+def trajectory_states(directory, converged):
+    """Temperatures and times, from the whole-trajectory archive or the per-step ones.
+
+    A run writes one archive per step as it goes and the combined archive only on
+    success, so a trajectory that stopped early has its fields in the per-step
+    archives alone. Each step names its own file and carries its checksum, which is
+    verified here, so reading them is not a weaker provenance than the combined one.
+    """
+    directory = Path(directory)
+    combined = directory / "states.npz"
+    if combined.exists():
+        with np.load(combined, allow_pickle=False) as data:
+            return data["state"].copy(), data["times_s"].copy()
+    if not converged:
+        raise ValueError(f"{directory} has neither a combined archive nor a converged step")
+    states, times = [], []
+    for step in converged:
+        name = step.get("fields")
+        if not name:
+            raise ValueError(f"{directory} has a converged step with no field archive")
+        path = directory / name
+        if file_digest(path) != step.get("field_sha256"):
+            raise ValueError(f"{path} does not match the checksum its step recorded")
+        with np.load(path, allow_pickle=False) as data:
+            states.append(data["state"].copy())
+        times.append(float(step["time_s"]))
+    return np.vstack(states), np.array(times)
+
+
+def load_trajectory(directory, allow_partial=False):
+    """One trajectory, with the levels it actually reached.
+
+    No fine-mesh forward attempt of this problem has reached the horizon, so a
+    comparison over the interval both meshes did reach is the only one available.
+    That is a real result about the model, not a shortcut, and it is only allowed
+    when the caller asks for it and it is recorded in full.
+    """
     directory = Path(directory)
     record = json.loads((directory / "record.json").read_text())
-    if record.get("status") != "converged":
-        raise ValueError(f"{directory} is not a complete converged trajectory")
     steps = record.get("steps") or []
-    if steps and not all(row.get("status") == "converged" for row in steps):
-        raise ValueError(f"{directory} contains an unconverged step")
-    with np.load(directory / "states.npz", allow_pickle=False) as data:
-        state, times = data["state"].copy(), data["times_s"].copy()
+    converged = [row for row in steps if row.get("status") == "converged"]
+    complete = record.get("status") == "converged" and len(converged) == len(steps)
+    if not complete and not allow_partial:
+        raise ValueError(f"{directory} is not a complete converged trajectory")
+    if converged != steps[: len(converged)]:
+        raise ValueError(f"{directory} has a converged step after a failed one")
+    state, times = trajectory_states(directory, converged)
+    reached = min(len(converged), len(state)) if steps else len(state)
+    if reached < 1:
+        raise ValueError(f"{directory} reached no converged time level")
+    state, times = state[:reached], times[:reached]
     return {
+        "complete": complete,
+        "terminating_status": (
+            steps[len(converged)]["status"] if len(steps) > len(converged) else record.get("status")
+        ),
+        "levels_reached": reached,
+        "declared_levels": record.get("slabs", len(state)),
         "directory": str(directory),
         "record": record,
         "record_sha256": file_digest(directory / "record.json"),
-        "field_sha256": file_digest(directory / "states.npz"),
+        "field_sha256": (
+            file_digest(directory / "states.npz")
+            if (directory / "states.npz").exists()
+            else [step.get("field_sha256") for step in converged]
+        ),
         "state": state,
         "times_s": times,
         "slabs": record.get("slabs", len(state)),
@@ -79,49 +130,79 @@ def load_trajectory(directory):
 
 
 def checked_pair(coarse, fine, source_digest):
-    """Refuse anything that is not a pure spatial refinement of one saved source."""
+    """Refuse anything that is not a pure spatial refinement of one saved source.
+
+    Returns the number of leading time levels both trajectories reached, which is
+    the interval the comparison covers.
+    """
     for side, name in ((coarse, "coarse"), (fine, "fine")):
         if side["record"].get("optimization_field_sha256") != source_digest:
             raise ValueError(f"The {name} trajectory replays a different saved source")
-    if coarse["slabs"] != fine["slabs"] or coarse["subdivision"] != fine["subdivision"]:
+    if (
+        coarse["declared_levels"] != fine["declared_levels"]
+        or coarse["subdivision"] != fine["subdivision"]
+    ):
         raise ValueError(
             "A spatial comparison needs one time grid; these trajectories refine time as well"
         )
     if coarse["time_scheme"] != fine["time_scheme"]:
         raise ValueError("A spatial comparison needs one time integration scheme")
-    if not np.allclose(coarse["times_s"], fine["times_s"], rtol=1e-12, atol=1e-12):
+    shared = min(coarse["levels_reached"], fine["levels_reached"])
+    if not np.allclose(
+        coarse["times_s"][:shared], fine["times_s"][:shared], rtol=1e-12, atol=1e-12
+    ):
         raise ValueError("The two trajectories are not on the same physical time levels")
     if coarse["spatial_state_dofs"] == fine["spatial_state_dofs"]:
         raise ValueError("The two trajectories are on the same mesh; there is nothing to compare")
     if (fine["spatial_state_dofs"] or 0) < (coarse["spatial_state_dofs"] or 0):
         raise ValueError("The fine trajectory must have more spatial degrees of freedom")
+    return shared
 
 
-def assess(coarse_dir, fine_dir, baseline, fine_baseline, optimization, method, position, upper_K):
-    coarse = load_trajectory(coarse_dir)
-    fine = load_trajectory(fine_dir)
+def assess(
+    coarse_dir,
+    fine_dir,
+    baseline,
+    fine_baseline,
+    optimization,
+    method,
+    position,
+    upper_K,
+    allow_partial=False,
+):
+    coarse = load_trajectory(coarse_dir, allow_partial)
+    fine = load_trajectory(fine_dir, allow_partial)
     record, cfg, fields, digest = load_saved_solution(optimization, method, position)
     if not cfg["transient"]:
         raise ValueError("A spatial trajectory comparison requires a transient optimization")
-    checked_pair(coarse, fine, digest)
+    shared = checked_pair(coarse, fine, digest)
     slabs = integer(cfg["slabs"], "Original time slabs", 1)
-    if coarse["slabs"] != slabs:
-        raise ValueError("The trajectories must use the optimization's own time grid")
-    coarse_problem, coarse_base = load_problem({**cfg, "baseline_directory": str(baseline)})
-    fine_problem, fine_base = load_problem({**cfg, "baseline_directory": str(fine_baseline)})
+    subdivision = integer(coarse["subdivision"], "Time subdivision", 1)
+    if coarse["declared_levels"] != slabs * subdivision:
+        raise ValueError("The trajectories must subdivide the optimization's own time grid")
+    comparison_cfg = {**cfg, "slabs": slabs * subdivision}
+    coarse_problem, coarse_base = load_problem(
+        {**comparison_cfg, "baseline_directory": str(baseline)}
+    )
+    fine_problem, fine_base = load_problem(
+        {**comparison_cfg, "baseline_directory": str(fine_baseline)}
+    )
     require_matching_baseline(record, coarse_base)
     for key in ("properties", "inlet_velocity_m_s", "grad_div_coefficient_m2_s"):
         if coarse_base.get(key) != fine_base.get(key):
             raise ValueError("Baseline physical inputs must match across refinement")
-    controls = fields["control"].reshape(slabs, coarse_problem.spatial_size)
+    # Each saved source is copied unchanged into its temporal subintervals.
+    controls = np.repeat(
+        fields["control"].reshape(slabs, coarse_problem.spatial_size), subdivision, axis=0
+    )
     _, P = transfer_source(coarse_problem, fine_problem, controls)
-    lifted = np.asarray(P @ coarse["state"].T).T
+    lifted = np.asarray(P @ coarse["state"][:shared].T).T
     mass = fine_problem.assembly.mass[fine_problem.free]
     statistics = statistics_from_arrays(
         lifted,
-        coarse["times_s"],
-        fine["state"],
-        fine["times_s"],
+        coarse["times_s"][:shared],
+        fine["state"][:shared],
+        fine["times_s"][:shared],
         fine_problem.mesh,
         mass,
         fine_problem.temperature_scale,
@@ -130,6 +211,9 @@ def assess(coarse_dir, fine_dir, baseline, fine_baseline, optimization, method, 
     same = coarse["procedure"].get("procedure") == fine["procedure"].get("procedure")
     pointwise = statistics["pointwise_maximum_K"]
     rms = statistics["mass_weighted_space_time_rms_K"]
+    whole = shared == coarse["declared_levels"] and coarse["complete"] and fine["complete"]
+    horizon = float(cfg["horizon_s"])
+    assessed_to = float(fine["times_s"][shared - 1])
     return {
         "schema": SCHEMA,
         "environment": environment(),
@@ -149,6 +233,9 @@ def assess(coarse_dir, fine_dir, baseline, fine_baseline, optimization, method, 
                 "field_sha256",
                 "spatial_state_dofs",
                 "procedure",
+                "complete",
+                "levels_reached",
+                "terminating_status",
             )
         },
         "fine": {
@@ -159,10 +246,29 @@ def assess(coarse_dir, fine_dir, baseline, fine_baseline, optimization, method, 
                 "field_sha256",
                 "spatial_state_dofs",
                 "procedure",
+                "complete",
+                "levels_reached",
+                "terminating_status",
             )
         },
-        "slabs": coarse["slabs"],
+        "slabs": coarse["declared_levels"],
+        "subdivision": subdivision,
         "time_scheme": coarse["time_scheme"],
+        "assessed_interval": {
+            "levels": shared,
+            "declared_levels": coarse["declared_levels"],
+            "to_time_s": assessed_to,
+            "horizon_s": horizon,
+            "fraction_of_horizon": assessed_to / horizon,
+            "covers_the_horizon": whole,
+            "note": (
+                "The comparison covers the declared horizon."
+                if whole
+                else "No fine-mesh forward attempt reached the horizon. The comparison covers "
+                "the leading interval both meshes reached, and the temperature criteria below "
+                "are therefore reported for that interval and not as a verdict at the horizon."
+            ),
+        },
         "refinement": "one nested uniform refinement; the coarse trajectory is lifted by nested P1 interpolation",
         "forward_procedures_match": same,
         "procedure_note": (
@@ -176,8 +282,12 @@ def assess(coarse_dir, fine_dir, baseline, fine_baseline, optimization, method, 
         "criteria": {
             "pointwise_maximum_K": POINTWISE_K,
             "mass_weighted_space_time_rms_K": RMS_K,
-            "pointwise_met": bool(pointwise <= POINTWISE_K),
-            "rms_met": bool(rms <= RMS_K),
+            # A criterion can only be met at the horizon. Over a truncated interval
+            # the numbers are reported and the verdict is withheld.
+            "pointwise_met": bool(pointwise <= POINTWISE_K) if whole else None,
+            "rms_met": bool(rms <= RMS_K) if whole else None,
+            "pointwise_met_over_assessed_interval": bool(pointwise <= POINTWISE_K),
+            "rms_met_over_assessed_interval": bool(rms <= RMS_K),
         },
         "scope": "Fixed-source spatial comparison at matching physical time levels. A small difference "
         "between two meshes is not a continuum solution certificate.",
@@ -195,6 +305,11 @@ def main():
     parser.add_argument("--target-position", type=int)
     parser.add_argument("--upper-K", type=float)
     parser.add_argument("--threads", type=int, default=4)
+    parser.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="Compare the leading interval both trajectories reached, and withhold the verdict",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
@@ -209,6 +324,7 @@ def main():
             args.method,
             args.target_position,
             args.upper_K,
+            args.allow_partial,
         )
     args.output.mkdir(parents=True)
     write_report(args.output / "record.json", report)
@@ -219,6 +335,7 @@ def main():
                 "mass_weighted_space_time_rms_K": report["statistics"][
                     "mass_weighted_space_time_rms_K"
                 ],
+                "assessed_interval": report["assessed_interval"],
                 "criteria": report["criteria"],
                 "forward_procedures_match": report["forward_procedures_match"],
             },
