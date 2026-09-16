@@ -1,6 +1,7 @@
 """A spatial comparison must be pure: one source, one time grid, two meshes."""
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -8,8 +9,10 @@ import pytest
 from deflation_example.coupled_resolution_v2 import statistics_from_arrays
 from deflation_example.coupled_spatial_pair import (
     checked_pair,
+    load_protocol,
     load_trajectory,
     procedure_of,
+    split_assessment,
 )
 from deflation_example.mesh_refinement import refine
 from test_axisymmetric_flow import annular_rectangle
@@ -162,3 +165,100 @@ def test_pair_statistics_still_reads_two_directories(tmp_path):
     statistics = pair_statistics(coarse, fine, mesh, mass, 20.0, 0.0)
     assert statistics["coarse_levels"] == 2 and statistics["fine_levels"] == 4
     assert statistics["pointwise_maximum_K"] >= 0.0
+
+
+def declared_protocol(path, boundary, *, schema="coupled-resolution-protocol-v3"):
+    path.write_text(
+        json.dumps(
+            {
+                "schema": schema,
+                "split": {"pointwise_interval_s": [0.0, boundary]},
+                "criteria": {
+                    "pointwise_interval": {
+                        "maximum_temperature_difference_K": 0.05,
+                        "mass_weighted_rms_difference_K": 0.05,
+                    },
+                    "full_horizon": {"mass_weighted_rms_difference_K": 0.05},
+                },
+            }
+        )
+    )
+    return path
+
+
+def split_inputs(levels=8, nodes=5, late=10.0):
+    """A difference that is nothing early and large late, which is the case at issue."""
+    times = np.linspace(1.0, float(levels), levels)
+    mesh = annular_rectangle(2)
+    mass = np.full(nodes, 0.25)
+    coarse = np.zeros((levels, nodes))
+    fine = np.zeros((levels, nodes))
+    fine[times > levels / 2] = late
+    return times, mesh, mass, coarse, fine
+
+
+def test_the_declared_split_judges_the_interval_and_withholds_what_it_cannot_see(tmp_path):
+    times, mesh, mass, coarse, fine = split_inputs()
+    protocol, digest = load_protocol(declared_protocol(tmp_path / "p.json", 4.0))
+    report = split_assessment(
+        protocol, digest, coarse, times, fine, times, mesh, mass, 1.0, whole=True
+    )
+    assert report["protocol_sha256"] == digest
+    assert report["levels_in_interval"] == 4 and report["interval_reached"]
+    # The early interval agrees exactly, so it passes while the horizon does not.
+    assert report["interval_statistics"]["pointwise_maximum_K"] == 0.0
+    assert report["pointwise_met"] and report["interval_rms_met"]
+    assert report["horizon_rms_met"] is False and report["horizon_rms_K"] > 0.05
+    assert report["not_judged_here"] == [
+        "tracking_relative_change",
+        "maximum_upper_violation_change_K",
+    ]
+
+
+def test_a_trajectory_that_stops_inside_the_interval_gets_no_verdict(tmp_path):
+    times, mesh, mass, coarse, fine = split_inputs()
+    protocol, digest = load_protocol(declared_protocol(tmp_path / "p.json", 6.0))
+    short = slice(0, 3)
+    report = split_assessment(
+        protocol,
+        digest,
+        coarse[short],
+        times[short],
+        fine[short],
+        times[short],
+        mesh,
+        mass,
+        1.0,
+        whole=False,
+    )
+    assert report["levels_in_interval"] == 3 and not report["interval_reached"]
+    assert report["pointwise_met"] is None and report["interval_rms_met"] is None
+    assert report["horizon_rms_met"] is None
+    assert report["interval_statistics"]["pointwise_maximum_K"] == 0.0
+
+
+def test_only_the_declared_protocol_is_accepted(tmp_path):
+    with pytest.raises(ValueError, match="coupled-resolution-protocol-v3"):
+        load_protocol(declared_protocol(tmp_path / "q.json", 4.0, schema="something-else"))
+    bad = tmp_path / "r.json"
+    bad.write_text(
+        json.dumps(
+            {
+                "schema": "coupled-resolution-protocol-v3",
+                "split": {"pointwise_interval_s": [0.0, 0.0]},
+            }
+        )
+    )
+    with pytest.raises(ValueError, match="positive span"):
+        load_protocol(bad)
+
+
+def test_the_declared_protocol_on_disk_is_the_one_the_reporter_reads():
+    """The file the study declared must satisfy the reader, not only a fixture."""
+    declared = Path("runs/coupled-resolution-protocol-v3.json")
+    if not declared.exists():
+        pytest.skip("the declared protocol is not present on this machine")
+    protocol, digest = load_protocol(declared)
+    assert protocol["interpretation"]["declared_before_reading"] is True
+    assert protocol["split"]["pointwise_interval_s"][1] == 93.75
+    assert len(digest) == 64

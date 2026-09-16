@@ -16,6 +16,7 @@ rule is to report it, never to hide it.
 """
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -33,6 +34,84 @@ SCHEMA = "coupled-spatial-pair-assessment-v1"
 # The temperature criteria of the original design, reported unchanged.
 POINTWISE_K = 0.05
 RMS_K = 0.05
+PROTOCOL_SCHEMA = "coupled-resolution-protocol-v3"
+
+
+def load_protocol(path):
+    """The declared horizon split and its digest.
+
+    The split is read from the declared file rather than restated here, and the
+    file's hash goes into the report, so an assessment can never quietly drift from
+    the rule that was declared before the results were read.
+    """
+    raw = Path(path).read_bytes()
+    protocol = json.loads(raw)
+    if protocol.get("schema") != PROTOCOL_SCHEMA:
+        raise ValueError(f"Expected a {PROTOCOL_SCHEMA} declaration")
+    interval = protocol["split"]["pointwise_interval_s"]
+    if len(interval) != 2 or not 0 <= interval[0] < interval[1]:
+        raise ValueError("The declared pointwise interval must be a positive span from zero")
+    return protocol, hashlib.sha256(raw).hexdigest()
+
+
+def split_assessment(protocol, digest, lifted, coarse_times, fine_state, fine_times, mesh, mass,
+                     scale, whole):
+    """Apply the declared split: pointwise inside the interval, functional outside.
+
+    Outside the interval the coupled linearisation amplifies a perturbation by about
+    seven orders over this horizon, so a pointwise criterion there would demand early
+    agreement finer than roundoff. The protocol therefore asks for pointwise
+    agreement only where that amplification is bounded by ten, and for the
+    mass-weighted norm everywhere. This function judges those two. The tracking
+    integral and the bound excess are the protocol's other full-horizon criteria and
+    are not formed here; they are named as such so their absence is visible.
+    """
+    boundary = float(protocol["split"]["pointwise_interval_s"][1])
+    tolerance = 1e-9
+    inside = fine_times <= boundary + tolerance
+    reached = bool(fine_times[-1] >= boundary - tolerance) if len(fine_times) else False
+    criteria = protocol["criteria"]
+    interval = None
+    if inside.any():
+        interval = statistics_from_arrays(
+            lifted[inside], coarse_times[inside], fine_state[inside], fine_times[inside],
+            mesh, mass, scale, 0.0,
+        )
+    pointwise_limit = float(criteria["pointwise_interval"]["maximum_temperature_difference_K"])
+    rms_limit = float(criteria["pointwise_interval"]["mass_weighted_rms_difference_K"])
+    horizon_rms_limit = float(criteria["full_horizon"]["mass_weighted_rms_difference_K"])
+    horizon_rms = statistics_from_arrays(
+        lifted, coarse_times, fine_state, fine_times, mesh, mass, scale, 0.0
+    )["mass_weighted_space_time_rms_K"]
+    return {
+        "protocol_schema": PROTOCOL_SCHEMA,
+        "protocol_sha256": digest,
+        "pointwise_interval_s": [0.0, boundary],
+        "levels_in_interval": int(inside.sum()),
+        "interval_reached": reached,
+        "interval_statistics": interval,
+        "pointwise_met": (
+            None
+            if interval is None or not reached
+            else bool(interval["pointwise_maximum_K"] <= pointwise_limit)
+        ),
+        "interval_rms_met": (
+            None
+            if interval is None or not reached
+            else bool(interval["mass_weighted_space_time_rms_K"] <= rms_limit)
+        ),
+        "horizon_rms_K": horizon_rms,
+        "horizon_rms_met": bool(horizon_rms <= horizon_rms_limit) if whole else None,
+        "not_judged_here": [
+            "tracking_relative_change",
+            "maximum_upper_violation_change_K",
+        ],
+        "note": (
+            "A verdict inside the interval needs a trajectory that reaches its end; a "
+            "full-horizon verdict needs one that reaches the horizon. Where either is missing "
+            "the numbers are reported and the verdict is withheld."
+        ),
+    }
 
 
 def procedure_of(record):
@@ -169,6 +248,7 @@ def assess(
     position,
     upper_K,
     allow_partial=False,
+    protocol=None,
 ):
     coarse = load_trajectory(coarse_dir, allow_partial)
     fine = load_trajectory(fine_dir, allow_partial)
@@ -212,6 +292,21 @@ def assess(
     pointwise = statistics["pointwise_maximum_K"]
     rms = statistics["mass_weighted_space_time_rms_K"]
     whole = shared == coarse["declared_levels"] and coarse["complete"] and fine["complete"]
+    split = None
+    if protocol is not None:
+        declared, protocol_digest = load_protocol(protocol)
+        split = split_assessment(
+            declared,
+            protocol_digest,
+            lifted,
+            coarse["times_s"][:shared],
+            fine["state"][:shared],
+            fine["times_s"][:shared],
+            fine_problem.mesh,
+            mass,
+            fine_problem.temperature_scale,
+            whole,
+        )
     horizon = float(cfg["horizon_s"])
     assessed_to = float(fine["times_s"][shared - 1])
     return {
@@ -279,6 +374,7 @@ def assess(
             "as such rather than as a mesh effect."
         ),
         "statistics": statistics,
+        "declared_split": split,
         "criteria": {
             "pointwise_maximum_K": POINTWISE_K,
             "mass_weighted_space_time_rms_K": RMS_K,
@@ -310,6 +406,11 @@ def main():
         action="store_true",
         help="Compare the leading interval both trajectories reached, and withhold the verdict",
     )
+    parser.add_argument(
+        "--protocol",
+        type=Path,
+        help="A declared coupled-resolution-protocol-v3 file, applied as the horizon split",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
@@ -325,6 +426,7 @@ def main():
             args.target_position,
             args.upper_K,
             args.allow_partial,
+            args.protocol,
         )
     args.output.mkdir(parents=True)
     write_report(args.output / "record.json", report)
@@ -337,6 +439,31 @@ def main():
                 ],
                 "assessed_interval": report["assessed_interval"],
                 "criteria": report["criteria"],
+                "declared_split": (
+                    None
+                    if report["declared_split"] is None
+                    else {
+                        k: v
+                        for k, v in report["declared_split"].items()
+                        if k != "interval_statistics"
+                    }
+                    | {
+                        "interval_pointwise_maximum_K": (
+                            None
+                            if report["declared_split"]["interval_statistics"] is None
+                            else report["declared_split"]["interval_statistics"][
+                                "pointwise_maximum_K"
+                            ]
+                        ),
+                        "interval_rms_K": (
+                            None
+                            if report["declared_split"]["interval_statistics"] is None
+                            else report["declared_split"]["interval_statistics"][
+                                "mass_weighted_space_time_rms_K"
+                            ]
+                        ),
+                    }
+                ),
                 "forward_procedures_match": report["forward_procedures_match"],
             },
             indent=1,
