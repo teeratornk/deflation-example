@@ -187,6 +187,7 @@ def assemble_thermal(
     *,
     transport_form="advective",
     consistent=False,
+    streamline_length="edge",
 ):
     """Assemble diffusion, nonconservative transport, and optional streamline diffusion.
 
@@ -224,6 +225,8 @@ def assemble_thermal(
         raise ValueError("Choose advective or skew thermal transport")
     if consistent and not streamline:
         raise ValueError("A consistent stabilisation needs the streamline term it weights")
+    if streamline_length not in {"edge", "flow"}:
+        raise ValueError("Choose the longest edge or the length along the flow")
     if transport_form == "skew" and not quadratic_flow:
         raise ValueError("Skew thermal transport requires a quadratic 2D velocity")
     if (v.shape != (nc, d) and not quadratic_flow) or not np.isfinite(v).all():
@@ -283,26 +286,25 @@ def assemble_thermal(
     if streamline:
         verts = mesh.nodes[mesh.cells]
         h = np.max(np.linalg.norm(verts[:, :, None] - verts[:, None, :], axis=3), axis=(1, 2))
-        if consistent:
-            # The longest edge overestimates the element length for a stretched cell,
-            # and the streamline weight is proportional to it. On this mesh that put
-            # the weight at eighteen times the lumped mass and reversed the sign of
-            # the source action on some rows. The length along the flow keeps the
-            # weight at most one by construction, because it divides by exactly the
-            # sum of the directional derivatives it is built from.
+        if streamline_length == "flow":
+            # The length along the flow rather than the longest edge. It bounds the
+            # streamline weight, which keeps the assembled source action positive, but
+            # it only ever lowers the parameter on a mesh like the transformer's, and
+            # lowering it removes stabilisation the advection-dominated problem needs.
+            # Measured there: never above the longest edge, median ratio 0.95, and the
+            # forward solve is worse with it than without. Hence not the default.
             directional = np.abs(np.einsum("ed,eid->ei", v, grad)).sum(axis=1)
             h = 2 * np.linalg.norm(v, axis=1) / np.maximum(directional, np.finfo(float).tiny)
         speed = c * np.linalg.norm(v, axis=1)
         tau = np.minimum(
             h / (2 * np.maximum(speed, np.finfo(float).tiny)), h**2 / (12 * eigenvalues[:, 0])
         )
-        if consistent:
+        if streamline_length == "flow":
             # A cell must not take more out of a node's source action than that node's
             # own share of the cell mass, or the assembled action loses positive row
-            # sums and the recovered control changes sign. The limit scales the
-            # parameter itself, so all three pieces of the term keep one value and the
-            # weighting stays consistent; where the classical value is already safe it
-            # is left alone.
+            # sums. The limit scales the parameter itself, so all three pieces of the
+            # term keep one value; scaling the assembled terms instead cost a factor of
+            # two in the convergence rate.
             share = lump / measure[:, None]
             reach = np.max(
                 np.abs(tau[:, None] * transport_gradient)
