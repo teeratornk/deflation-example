@@ -47,6 +47,7 @@ def solve_forward(
     max_iterations=300,
     flow_cap=100,
     callback=None,
+    mixing="temperature",
 ):
     start = time.perf_counter()
     tolerance = positive_real(tolerance, "Coupled tolerance")
@@ -54,6 +55,8 @@ def solve_forward(
     flow_cap = integer(flow_cap, "Flow cap", 1)
     if policy not in {"relaxed", "anderson"}:
         raise ValueError("Unknown forward fixed-point policy")
+    if mixing not in {"temperature", "coupled"}:
+        raise ValueError("Choose temperature or coupled field mixing")
     relaxation = positive_real(relaxation, "Relaxation")
     if relaxation > 1:
         raise ValueError("Relaxation must not exceed one")
@@ -171,32 +174,63 @@ def solve_forward(
         factor = relaxation if feedback and model.expansion else 1.0
         plain = state.copy()
         plain[model.I] += factor * (mapped - state[model.I])
+        plain_flow = candidate_flow
+        if mixing == "coupled":
+            # Mix the complete fixed-point iterate with one set of coefficients.
+            # Temperature mass weights select the coefficients; velocity and
+            # kinematic pressure follow the same affine combination with zero
+            # least-squares weights. All original equations still decide acceptance.
+            def pack(y, v):
+                return np.r_[y, v.velocity.ravel(), v.pressure]
+
+            def unpack(vector):
+                nt, nv = len(model.I), flow.velocity.size
+                return vector[:nt], FlowResult(
+                    vector[nt : nt + nv].reshape(flow.velocity.shape).copy(),
+                    vector[nt + nv :].copy(),
+                    "mixed",
+                    [],
+                )
+
+            current_vector = pack(state[model.I], flow)
+            mapped_vector = pack(mapped, candidate_flow)
+            _, plain_flow = unpack(current_vector + factor * (mapped_vector - current_vector))
         proposal, row = plain, {"proposal": "relaxed", "history_rank": 0}
+        proposal_flow = plain_flow
         if policy == "anderson":
             if mixer is None:
-                mixer = Anderson(assembly.mass[model.I], depth=depth, damping=factor)
-            mixed, row = mixer.propose(state[model.I], mapped)
+                weights = assembly.mass[model.I]
+                if mixing == "coupled":
+                    weights = np.r_[weights, np.zeros(flow.velocity.size + flow.pressure.size)]
+                mixer = Anderson(weights, depth=depth, damping=factor)
+            if mixing == "coupled":
+                mixed, row = mixer.propose(current_vector, mapped_vector)
+                mixed, proposal_flow = unpack(mixed)
+            else:
+                mixed, row = mixer.propose(state[model.I], mapped)
             proposal = state.copy()
             proposal[model.I] = mixed
-        metrics = checks(proposal, candidate_flow, system)
+        metrics = checks(proposal, proposal_flow, system if mixing == "temperature" else None)
         if row["proposal"] == "anderson" and merit(metrics) > merit(current):
             row["rejected_merit"] = merit(metrics)
             proposal = plain
-            metrics = checks(proposal, candidate_flow, system)
+            proposal_flow = plain_flow
+            metrics = checks(proposal, proposal_flow, system if mixing == "temperature" else None)
             row["proposal"] = "residual_safeguard"
             mixer.reset()
         stagnant = np.array_equal(proposal, state) and np.array_equal(
-            candidate_flow.velocity, flow.velocity
+            proposal_flow.velocity, flow.velocity
         )
-        state, flow, current = proposal, candidate_flow, metrics
+        state, flow, current = proposal, proposal_flow, metrics
         if merit(metrics) < best[0]:
             best = (merit(metrics), state.copy(), flow, metrics)
         entry = {
             "coupling_iteration": iteration,
             **row,
             **metrics,
-            "flow_status": flow.status,
-            "flow_history": flow.history,
+            "flow_status": candidate_flow.status,
+            "flow_history": candidate_flow.history,
+            "mixing": mixing,
             "flow_initial_verified": flow_initial_verified,
             "flow_internal_tolerance": tolerance,
             "elapsed_seconds": time.perf_counter() - start,
