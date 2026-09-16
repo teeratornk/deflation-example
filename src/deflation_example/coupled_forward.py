@@ -251,17 +251,24 @@ class CoupledForward:
         reactions. This is a discrete conservation check, distinct from a
         resolution study of physical conductive boundary fluxes.
         """
+        # The storage and the source enter through the assembly's own actions, which
+        # are the lumped diagonals unless the stabilisation is consistent. Every
+        # streamline-weighted row sums to zero over the domain, so the identity below
+        # closes either way, but the components have to be the ones actually solved.
         storage_vector = np.zeros_like(state)
         if time_step is not None:
-            storage_vector = assembly.capacity * (state - previous) / (time_step / self.time_scale)
-        load = assembly.load + assembly.mass * control
+            storage_vector = np.asarray(
+                assembly.storage @ (state - previous) / (time_step / self.time_scale)
+            ).reshape(-1)
+        weighted_control = np.asarray(assembly.source_action @ control).reshape(-1)
+        load = assembly.load + weighted_control
         reaction = assembly.stiffness @ state + storage_vector - load
         advective_boundary = self.transport_factor * float(
             self.flow.boundary_flux(velocity, scalar=state).sum()
         )
         supply = float(reaction[self.J].sum())
         boundary_absolute_sum = float(np.abs(reaction[self.J]).sum())
-        source = float(assembly.mass @ control)
+        source = float(weighted_control.sum())
         background = float(assembly.load.sum())
         storage = float(storage_vector.sum())
         defect = storage + advective_boundary - source - background - supply
