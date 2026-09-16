@@ -158,9 +158,7 @@ def load_spatial(directories):
     return sorted(rows, key=lambda row: (row["slabs"], row["procedure"] or ""))
 
 
-def build(
-    summary_directory, output, screen_directories=(), plots=False, regime=None, spatial=()
-):
+def build(summary_directory, output, screen_directories=(), plots=False, regime=None, spatial=()):
     campaign, records = load_campaign(summary_directory)
     summary = campaign.get("summary") or {}
     population = summary.get("headline_population", ["jacobi", "reference"])

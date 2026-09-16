@@ -99,9 +99,7 @@ def test_a_converged_step_after_a_failed_one_is_refused(tmp_path):
 
 def test_the_comparison_covers_the_interval_both_trajectories_reached(tmp_path):
     coarse = load_trajectory(trajectory(tmp_path / "coarse", dofs=6), allow_partial=True)
-    fine = load_trajectory(
-        stall(trajectory(tmp_path / "fine", dofs=21), 2), allow_partial=True
-    )
+    fine = load_trajectory(stall(trajectory(tmp_path / "fine", dofs=21), 2), allow_partial=True)
     shared = checked_pair(coarse, fine, "src")
     assert shared == 2, "the comparison stops where the fine trajectory stopped"
     assert coarse["complete"] and not fine["complete"]
