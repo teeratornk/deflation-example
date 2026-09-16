@@ -95,14 +95,21 @@ def build_reference(
         if coarse is problem
         else nested_prolongation(coarse.mesh, problem.mesh)
     )
+    # Both sides use the lumped assembly, which is what this construction can
+    # represent and what the study declares the coarse space is built from. A problem
+    # that draws no distinction has only one assembly, and that one is it; a weighted
+    # assembly reaching build_mesh_control is refused there rather than here.
+    def lumped(side):
+        return getattr(side, "reference_assembly", side.assembly)
+
     frozen = build_mesh_control(
-        problem.assembly,
+        lumped(problem),
         alpha=problem.alpha,
         time_steps=problem.steps if len(problem.steps) else None,
     )
     return build_mesh_reference(
         frozen,
-        coarse.assembly,
+        lumped(coarse),
         P,
         rank,
         construction=construction,

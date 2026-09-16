@@ -148,6 +148,17 @@ class CoupledControlProblem:
         self.evaluation_callback = None
         self.evaluation_count = 0
         self.assembly = self.assemble(initial_flow.velocity)
+        # The coarse space is built from the lumped assembly even when the model is
+        # weighted, which is a declared approximation rather than an oversight: it is
+        # a preconditioner ingredient, every solve is still accepted on the true
+        # original residual, and the construction eliminates the control by dividing
+        # by the lumped mass and forms its transient operator as a Kronecker sum,
+        # neither of which a weighted storage is.
+        self.reference_assembly = (
+            self.assemble(initial_flow.velocity, consistent=False)
+            if self.consistent_stabilization
+            else self.assembly
+        )
         mass = self.assembly.mass[self.free]
         self.weights = mass / mass.mean()
         self.objective_scale = float(mass.mean())
@@ -165,7 +176,12 @@ class CoupledControlProblem:
             (flow.mass, flow.mass, sparse.csr_matrix((flow.np, flow.np))), format="csr"
         )[self.flow_free][:, self.flow_free]
 
-    def assemble(self, velocity):
+    def assemble(self, velocity, consistent=None):
+        """The thermal assembly at one velocity.
+
+        ``consistent`` overrides the problem's own setting, which the reference
+        construction uses to ask for the lumped assembly deliberately.
+        """
         return assemble_thermal(
             self.mesh,
             self.conductivity,
@@ -174,7 +190,7 @@ class CoupledControlProblem:
             self.source,
             streamline=True,
             transport_form=self.transport_form,
-            consistent=self.consistent_stabilization,
+            consistent=self.consistent_stabilization if consistent is None else consistent,
         )
 
     def full_temperature(self, state):
