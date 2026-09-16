@@ -137,20 +137,37 @@ def plot(report, output):
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.ticker import MaxNLocator
 
     figure, axes = plt.subplots(1, 2, figsize=(11, 4.5), layout="constrained")
+    colors = dict(
+        zip(LABELS, ("#0072B2", "#009E73", "#CC79A7", "#E69F00", "#D55E00", "#56B4E9"), strict=True)
+    )
     for row in report["rows"]:
         axis = axes[0] if row["policy"] in {"equation_max", "fixed_scaled"} else axes[1]
         history = np.asarray(row["residual_history"])
+        color = colors[row["policy"]]
         if history.size:
-            axis.semilogy(history[:, 0], np.maximum(history[:, 1], 1e-17), label=row["label"])
-            axis.plot(history[-1, 0], max(history[-1, 1], 1e-17), "o" if row["verified"] else "x")
+            axis.semilogy(
+                history[:, 0],
+                np.maximum(history[:, 1], 1e-17),
+                label=row["label"],
+                color=color,
+                linestyle="--" if row["policy"] == "fixed_scaled" else "-",
+            )
+            axis.plot(
+                history[-1, 0],
+                max(history[-1, 1], 1e-17),
+                "o" if row["verified"] else "x",
+                color=color,
+            )
         else:
-            axis.plot([], [], label=row["label"] + " — " + row["status"])
+            axis.plot([], [], label=row["label"] + " — " + row["status"], color=color)
     for axis, title in zip(
         axes, ("Monolithic Newton correction", "Fixed-point correction"), strict=True
     ):
         axis.set_yscale("log")
+        axis.xaxis.set_major_locator(MaxNLocator(integer=True))
         axis.axhline(
             1e-12, color="black", linestyle=":", linewidth=1, label="Final equation target"
         )
