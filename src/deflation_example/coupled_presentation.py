@@ -93,11 +93,18 @@ def load_campaign(summary_directory):
 
 
 def load_screen(directories):
+    """Every screen attempt, including one the scheduler ended before it finished.
+
+    An interrupted stage leaves a record at status ``running`` with no timers. It is
+    a measured outcome and is retained with null timings rather than dropped, which
+    is also what the rank freeze does with it.
+    """
     rows = []
     for directory in map(Path, directories):
         record = json.loads((directory / "record.json").read_text())
         cfg = record["configuration"]
-        split = linear_split(record)
+        timed = record.get("sequence_seconds") is not None
+        split = linear_split(record) if timed else {}
         rows.append(
             {
                 "directory": str(directory),
@@ -108,9 +115,12 @@ def load_screen(directories):
                 "coarse_device": cfg.get("hybrid_coarse_device"),
                 "status": record["status"],
                 "verified": bool(record.get("all_problems_verified")),
-                "sequence_seconds": record["sequence_seconds"],
-                "preparation_inclusive_seconds": record["preparation_inclusive_seconds"],
-                **{k: split[k] for k in ("cg_iterations", "linear_seconds", "outer_iterations")},
+                "sequence_seconds": record.get("sequence_seconds"),
+                "preparation_inclusive_seconds": record.get("preparation_inclusive_seconds"),
+                **{
+                    key: split.get(key)
+                    for key in ("cg_iterations", "linear_seconds", "outer_iterations")
+                },
             }
         )
     return rows

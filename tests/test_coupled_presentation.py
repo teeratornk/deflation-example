@@ -128,3 +128,44 @@ def test_regime_artifacts_ride_along_without_entering_the_headline(monkeypatch, 
     assert "\\newcommand{\\coupledFrozenSpeedup}" in macros
     rows = (tmp_path / "tables" / "regime_rows.tex").read_text()
     assert rows.count(r"\\") == 2 and "Coupled" in rows and "Frozen" in rows
+
+
+def test_an_interrupted_screen_attempt_is_retained_with_null_timings(tmp_path):
+    """A scheduler termination leaves a record with no timers; it is an outcome, not a gap."""
+    directory = tmp_path / "jacobi-r0" / "stage-1"
+    directory.mkdir(parents=True)
+    (directory / "record.json").write_text(
+        json.dumps(
+            {
+                "schema": "coupled-sequence-stage-v1",
+                "status": "running",
+                "configuration": {
+                    "method": "jacobi",
+                    "rank": 0,
+                    "recycle_window": 1,
+                    "device": "hybrid",
+                    "hybrid_coarse_device": "cuda",
+                },
+                "cases": [],
+            }
+        )
+    )
+    rows = presentation.load_screen([directory])
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["status"] == "running" and row["verified"] is False
+    assert row["sequence_seconds"] is None
+    assert row["preparation_inclusive_seconds"] is None
+    assert row["cg_iterations"] is None and row["outer_iterations"] is None
+    # The table renders the missing numbers rather than failing on them.
+    rendered = " & ".join(
+        [
+            presentation.LABELS[row["method"]],
+            str(row["rank"]),
+            f"{row['device']} ({row['coarse_device']} coarse)",
+            row["status"],
+            presentation._fmt(row["preparation_inclusive_seconds"], ".0f"),
+            presentation._fmt(row["cg_iterations"], ".0f"),
+        ]
+    )
+    assert rendered.count("---") == 2
