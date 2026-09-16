@@ -37,3 +37,19 @@ the saved failed state under the unchanged 1e-12 equation and 1e-6 balance
 criteria. A local success does not certify a complete trajectory, physical
 resolution, or optimization acceleration. Changes to transport or time steps
 require separately identified comparisons and cannot inherit frozen timings.
+
+## Local iteration spectrum and quarter-relaxation follow-up
+
+`coupling_spectrum.py` takes the same input arguments. Its optional
+`--repair /path/to/correction` loads an independently verified correction of
+the identical step. It evaluates the derivative of the temperature fixed-point
+map. These modes describe iteration convergence rather than physical evolution.
+The computed eigenpair residuals accompany every mode. Four computed modes
+inside the unit circle do not constitute a complete contraction certificate.
+
+At the corrected failing step, a measured mode makes relaxation 0.5 locally
+amplifying. `relaxation_check.py` therefore predeclares two additional local
+checks at relaxation 0.25: `--acceleration relaxed` and `--acceleration anderson`.
+Use the same baseline, control, trajectory and `--slab 58` arguments above and
+new output directories. The existing original- and complete-field mixing
+comparisons remain unchanged. Keep failures and all elapsed intervals.
