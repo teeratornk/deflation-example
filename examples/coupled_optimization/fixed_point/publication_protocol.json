@@ -1,0 +1,26 @@
+{
+  "schema": "coupled-publication-completion-v1",
+  "scope": "Fully coupled optimization is required for submission. The prescribed-flow evidence and all frozen numerical procedures remain unchanged.",
+  "forward_correction": {
+    "procedure": "fixed_scaled_newton",
+    "newton_cap": 100,
+    "backtracking_cap": 40,
+    "first_checks": [{"mesh": "original", "slabs": 64}, {"mesh": "fine", "slabs": 128}],
+    "repetitions_after_first_checks": 3,
+    "control_scope": "The first forward checks use the original saved control only to verify the corrected procedure. Physical-resolution evidence for publication must use the final optimized control."
+  },
+  "accuracy": {"coupled_equations": 1e-12, "mass_balance": 1e-6, "energy_balance": 1e-6, "inner_original_residual": 1e-10, "optimization_kkt": 1e-8},
+  "physics": {"horizon_s": 600, "target_startup_s": 60, "source_policy": "Keep signed sources unchanged on each fixed-control replay; preserve their original piecewise-constant time representation."},
+  "resolution": {"maximum_temperature_difference_K": 0.05, "relative_tracking_difference": 0.01, "consecutive_passing_comparisons": 2, "policy": "Refine space and physical time separately. Evaluate every stored time level. No optimality or physical-resolution claim follows from a solver iteration test."},
+  "optimization": {
+    "methods": ["jacobi", "reference", "recycling"],
+    "ranks": [100, 200, 400],
+    "rank_zero": "Jacobi uses no coarse-space processing",
+    "spatial_temporal_controls": [{"mesh": "original", "slabs": 64}, {"mesh": "original", "slabs": 128}, {"mesh": "fine", "slabs": 64}],
+    "selection": "Complete the declared pilot population first. Choose the lowest complete median time among accuracy- and memory-qualified configurations; break exact ties by lower memory, then lower rank. Retain every outcome. Freeze the selected configuration before final comparisons.",
+    "targets": "Target 7 plus two nonduplicate targets chosen before final outcomes: closest desired-field amplitude to the population median, then maximum remaining amplitude; ties use the lowest target index. Evaluate amplitudes with the same physical weights and mesh for every target.",
+    "final_repetitions_per_method_and_target": 3,
+    "cost": "Charge construction, all outer and inner solves, transfers, verification and cleanup. Keep preparation-inclusive totals identifiable. Never derive a completed-solve speedup from a capped or failed baseline."
+  },
+  "publication": {"positive_claim": "A complete time-to-accuracy saving against a named successful matched comparator, with ranges and memory. Kernel or local correction savings are separate findings.", "release": "Remain local until pushing is authorized. The approved institutional identifier is supplied by the author."}
+}
