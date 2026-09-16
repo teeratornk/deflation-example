@@ -27,7 +27,7 @@ def exact_temperature(nodes):
     return nodes[:, 1] ** 2
 
 
-def solve_manufactured(n, streamline):
+def solve_manufactured(n, streamline, consistent=False):
     """One refinement level; returns the largest nodal error against the exact field."""
     base = annular_rectangle(n)
     nodes = base.nodes
@@ -59,17 +59,23 @@ def solve_manufactured(n, streamline):
         minlength=len(nodes),
     )
 
-    assembly = assemble_thermal(mesh, conductivity, capacity, velocity, streamline=streamline)
+    assembly = assemble_thermal(
+        mesh, conductivity, capacity, velocity, streamline=streamline, consistent=consistent
+    )
     exact = exact_temperature(nodes)
     free = np.setdiff1d(np.arange(len(nodes)), mesh.dirichlet)
     K = assembly.stiffness.tocsr()
-    rhs = load[free] - K[free][:, mesh.dirichlet] @ exact[mesh.dirichlet]
+    # A nodal source enters through the assembly's own action, which carries the
+    # streamline weight when the stabilisation is consistent.
+    nodal = load / assembly.mass
+    weighted_load = np.asarray(assembly.source_action @ nodal).reshape(-1)
+    rhs = weighted_load[free] - K[free][:, mesh.dirichlet] @ exact[mesh.dirichlet]
     state = spsolve(sparse.csr_matrix(K[free][:, free]), rhs)
     return float(np.max(np.abs(state - exact[free])))
 
 
-def rates(streamline):
-    errors = [solve_manufactured(n, streamline) for n in (4, 8, 16)]
+def rates(streamline, consistent=False):
+    errors = [solve_manufactured(n, streamline, consistent) for n in (4, 8, 16)]
     return errors, [errors[0] / errors[1], errors[1] / errors[2]]
 
 
@@ -87,18 +93,31 @@ def test_the_unstabilised_operator_reproduces_the_manufactured_field():
 
 
 @pytest.mark.xfail(
-    reason="The streamline term is not residual weighted, so it leaves a first-order floor",
+    reason="The streamline term alone is not residual weighted, so it leaves a first-order floor",
     strict=True,
 )
-def test_the_stabilised_operator_converges_at_the_same_rate():
-    """This is the acceptance gate for a consistent stabilisation.
-
-    It fails today, and the size of the failure is the point: the ratios sit near
-    two rather than four, and the errors themselves are far larger than the
-    unstabilised ones, because the added diffusivity dominates the physical one.
-    """
+def test_the_unweighted_stabilisation_cannot_reach_the_rate():
+    """The declared symmetric term on its own, which is what the study used."""
     errors, ratio = rates(streamline=True)
     assert min(ratio) > 3, f"stabilised ratios {ratio} from errors {errors}"
+
+
+def test_the_consistent_stabilisation_recovers_the_rate():
+    """The acceptance gate: weighting the whole residual removes the first-order floor.
+
+    The remaining error is not at roundoff, because the streamline weight against
+    the basis is lumped as everything else in this assembly is. What matters is
+    that it now halves like the square of the element size instead of like the
+    element size, so refinement buys what the elements can give.
+    """
+    floor, floor_ratio = rates(streamline=True)
+    errors, ratio = rates(streamline=True, consistent=True)
+    assert all(np.isfinite(errors))
+    assert min(ratio) > 3, f"consistent ratios {ratio} from errors {errors}"
+    assert max(floor_ratio) < min(ratio), (
+        f"consistent {ratio} should converge faster than unweighted {floor_ratio}"
+    )
+    assert errors[-1] < floor[-1] / 10, f"consistent {errors} against unweighted {floor}"
 
 
 def test_the_stabilisation_is_what_costs_the_accuracy():

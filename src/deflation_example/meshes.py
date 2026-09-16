@@ -134,10 +134,31 @@ class ThermalAssembly:
     transport: sparse.csr_matrix
     stabilization: sparse.csr_matrix
     load: np.ndarray
+    # The other two pieces of a residual-weighted stabilisation. They are empty
+    # unless it is asked for, so the declared symmetric term stands alone by
+    # default and every earlier record reproduces exactly.
+    stabilized_storage: sparse.csr_matrix = None
+    stabilized_source: sparse.csr_matrix = None
 
     @property
     def stiffness(self):
         return self.diffusion + self.transport + self.stabilization
+
+    @property
+    def storage(self):
+        """Capacity acting on the time derivative, lumped plus any streamline weight."""
+        lumped = sparse.diags(self.capacity)
+        return lumped if self.stabilized_storage is None else lumped + self.stabilized_storage
+
+    @property
+    def source_action(self):
+        """How a nodal source enters the equation, lumped plus any streamline weight."""
+        lumped = sparse.diags(self.mass)
+        return lumped if self.stabilized_source is None else lumped + self.stabilized_source
+
+    @property
+    def consistent(self):
+        return self.stabilized_storage is not None and self.stabilized_source is not None
 
 
 def simplex_geometry(mesh):
@@ -165,13 +186,20 @@ def assemble_thermal(
     streamline=False,
     *,
     transport_form="advective",
+    consistent=False,
 ):
     """Assemble diffusion, nonconservative transport, and optional streamline diffusion.
 
     Conductivity is a symmetric positive-definite tensor per cell. Capacity and
     velocity are frozen per cell. Streamline diffusion adds a declared symmetric
-    artificial-diffusion term to the discrete state equation; no SUPG right-hand
-    side is implied. The exact transpose of the resulting equation is used.
+    artificial-diffusion term to the discrete state equation. On its own that term
+    is not weighted against the rest of the residual, so it does not vanish for the
+    exact solution and leaves an error proportional to the element size. Asking for
+    ``consistent`` adds the other two pieces of the same streamline weighting, the
+    storage and the source, which restores the rate the elements can give; on P1
+    cells with cell-constant conductivity the diffusive part of the residual is
+    identically zero and needs no term. The exact transpose of the resulting
+    equation is used.
     For a continuous quadratic 2D velocity, ``skew`` adds half the cellwise
     divergence times temperature. Its quadratic form is the boundary heat flux
     plus any interelement capacity-flux jumps. Axisymmetric divergence includes
@@ -194,6 +222,8 @@ def assemble_thermal(
     quadratic_flow = d == 2 and v.shape == (nc, 6, 2)
     if transport_form not in {"advective", "skew"}:
         raise ValueError("Choose advective or skew thermal transport")
+    if consistent and not streamline:
+        raise ValueError("A consistent stabilisation needs the streamline term it weights")
     if transport_form == "skew" and not quadratic_flow:
         raise ValueError("Skew thermal transport requires a quadratic 2D velocity")
     if (v.shape != (nc, d) and not quadratic_flow) or not np.isfinite(v).all():
@@ -248,6 +278,7 @@ def assemble_thermal(
         transport = lump[:, :, None] * transport_gradient[:, None, :]
     transport_gradient = c[:, None] * np.einsum("ed,eid->ei", v, grad)
     stabilization = np.zeros_like(diffusion)
+    stabilized_storage = stabilized_source = None
     if streamline:
         verts = mesh.nodes[mesh.cells]
         h = np.max(np.linalg.norm(verts[:, :, None] - verts[:, None, :], axis=3), axis=(1, 2))
@@ -258,6 +289,17 @@ def assemble_thermal(
         stabilization = (measure * tau)[:, None, None] * (
             transport_gradient[:, :, None] * transport_gradient[:, None, :]
         )
+        if consistent:
+            # The same streamline weight applied to the rest of the residual, so the
+            # whole term vanishes for the exact solution instead of adding an
+            # artificial diffusivity proportional to the element size. On P1 cells
+            # with cell-constant conductivity the diffusive part of the residual is
+            # identically zero, so only the storage and the source remain.
+            # The local mass already carries the cell measure, so the streamline
+            # weight must not carry it a second time.
+            weighted = tau[:, None] * transport_gradient
+            stabilized_storage = c[:, None, None] * weighted[:, :, None] * lump[:, None, :]
+            stabilized_source = weighted[:, :, None] * lump[:, None, :]
     size = len(mesh.nodes)
     rows = np.repeat(mesh.cells, d + 1, axis=1).ravel()
     cols = np.tile(mesh.cells, (1, d + 1)).ravel()
@@ -276,6 +318,8 @@ def assemble_thermal(
         matrix(transport),
         matrix(stabilization),
         vector(q[:, None] * lump),
+        None if stabilized_storage is None else matrix(stabilized_storage),
+        None if stabilized_source is None else matrix(stabilized_source),
     )
 
 
