@@ -183,13 +183,17 @@ def load_trajectory(directory, allow_partial=False):
     if reached < 1:
         raise ValueError(f"{directory} reached no converged time level")
     state, times = state[:reached], times[:reached]
+    # How long the trajectory was meant to be, which is not how far it got. A replay
+    # names it forward_slabs and a study record names it slabs; falling back to what
+    # was reached would make a stalled run look complete.
+    declared = record.get("slabs", record.get("forward_slabs", len(state)))
     return {
         "complete": complete,
         "terminating_status": (
             steps[len(converged)]["status"] if len(steps) > len(converged) else record.get("status")
         ),
         "levels_reached": reached,
-        "declared_levels": record.get("slabs", len(state)),
+        "declared_levels": declared,
         "directory": str(directory),
         "record": record,
         "record_sha256": file_digest(directory / "record.json"),
@@ -200,7 +204,7 @@ def load_trajectory(directory, allow_partial=False):
         ),
         "state": state,
         "times_s": times,
-        "slabs": record.get("slabs", len(state)),
+        "slabs": declared,
         "spatial_state_dofs": record.get("spatial_state_dofs"),
         "subdivision": record.get("subdivision", 1),
         "time_scheme": record.get("time_scheme", "backward_euler"),

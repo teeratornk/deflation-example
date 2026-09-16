@@ -262,3 +262,43 @@ def test_the_declared_protocol_on_disk_is_the_one_the_reporter_reads():
     assert protocol["interpretation"]["declared_before_reading"] is True
     assert protocol["split"]["pointwise_interval_s"][1] == 93.75
     assert len(digest) == 64
+
+
+def replay_trajectory(directory, *, slabs, reached, subdivision=1, horizon=1.0):
+    """A forward-replay record, which names its declared length forward_slabs."""
+    directory.mkdir(parents=True, exist_ok=True)
+    times = np.cumsum(np.full(reached, horizon / slabs))
+    (directory / "record.json").write_text(
+        json.dumps(
+            {
+                "schema": "coupled-fixed-source-newton-replay-v1",
+                "status": "newton_line_search_stagnation",
+                "forward_slabs": slabs,
+                "subdivision": subdivision,
+                "optimization_field_sha256": "src",
+                "forward_solver": {"procedure": "monolithic_newton"},
+                "steps": [
+                    {"time_s": float(t), "status": "converged"} for t in times
+                ]
+                + [{"time_s": 0.0, "status": "newton_line_search_stagnation"}],
+            }
+        )
+    )
+    np.savez(
+        directory / "states.npz",
+        state=np.linspace(0.0, 1.0, reached * 6).reshape(reached, 6),
+        times_s=times,
+    )
+    return directory
+
+
+def test_a_stalled_replay_keeps_the_length_it_was_meant_to_have(tmp_path):
+    """Falling back to what was reached would make a stalled run look complete."""
+    stalled = load_trajectory(
+        replay_trajectory(tmp_path / "stalled", slabs=64, reached=3),
+        allow_partial=True,
+    )
+    assert stalled["levels_reached"] == 3
+    assert stalled["declared_levels"] == 64 and stalled["slabs"] == 64
+    assert stalled["complete"] is False
+    assert stalled["procedure"]["procedure"] == "monolithic_newton"
