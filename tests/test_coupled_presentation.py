@@ -86,3 +86,45 @@ def sequence_screen(monkeypatch, problem, tmp_path):
     record = sequence.run(OmegaConf.create(config))
     assert record["all_problems_verified"]
     return tmp_path / "screen-jacobi"
+
+
+def test_regime_artifacts_ride_along_without_entering_the_headline(monkeypatch, tmp_path):
+    """The regime ablations share one manifest with the headline but never pool into it."""
+    from deflation_example import coupled_regime as regime
+    from test_coupled_regime import populate, tangent_design
+
+    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+    prepared(monkeypatch, problem)
+    records = [chain(problem, method, tmp_path / method) for method in ("jacobi", "reference")]
+    summary_dir = tmp_path / "summary"
+    summary_dir.mkdir()
+    report = summarize(records, repetitions=1, population=["jacobi", "reference"])
+    write_report(
+        summary_dir / "summary.json",
+        {"schema": "coupled-campaign-report-v1", "chains": [], "summary": report},
+    )
+    (summary_dir / "assembled").mkdir()
+    for record in records:
+        target = summary_dir / "assembled" / f"{record['configuration']['method']}-rep-0"
+        target.mkdir()
+        write_report(target / "record.json", record)
+    runs = tmp_path / "regime-runs"
+    runs.mkdir()
+    populate(runs)
+    design_path = tmp_path / "tangent.json"
+    design_path.write_text(json.dumps(tangent_design()))
+    regime_output = tmp_path / "regime"
+    regime.build(design_path, runs, None, None, regime_output)
+
+    built = presentation.build(
+        summary_dir, tmp_path / "tables", regime=regime_output / "regime.json"
+    )
+    assert built["regime"]["tangent"]["verdict"]["status"] == "supported"
+    # The headline population is untouched by the ablation records.
+    assert built["methods"]["jacobi"]["verified"] == 1
+    assert built["ratios"]["fastest_tested_alternative"] == "jacobi"
+    macros = (tmp_path / "tables" / "macros.tex").read_text()
+    assert "\\newcommand{\\coupledTangentVerdict}{supported}" in macros
+    assert "\\newcommand{\\coupledFrozenSpeedup}" in macros
+    rows = (tmp_path / "tables" / "regime_rows.tex").read_text()
+    assert rows.count(r"\\") == 2 and "Coupled" in rows and "Frozen" in rows

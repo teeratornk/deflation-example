@@ -116,7 +116,7 @@ def load_screen(directories):
     return rows
 
 
-def build(summary_directory, output, screen_directories=(), plots=False):
+def build(summary_directory, output, screen_directories=(), plots=False, regime=None):
     campaign, records = load_campaign(summary_directory)
     summary = campaign.get("summary") or {}
     population = summary.get("headline_population", ["jacobi", "reference"])
@@ -219,6 +219,9 @@ def build(summary_directory, output, screen_directories=(), plots=False):
         "ratios": ratios,
         "screen": screen,
         "chains": campaign.get("chains"),
+        # The regime ablations are a separate declared population. They are carried
+        # here so one manifest covers every artifact, never merged into the headline.
+        "regime": None if regime is None else json.loads(Path(regime).read_text()),
     }
     write_report(output / "summary.json", report)
     write_tables(report, output)
@@ -290,6 +293,14 @@ def macros(report):
             )
         ),
     }
+    regime = report.get("regime")
+    if regime:
+        from .coupled_regime import macros as regime_macros
+
+        overlap = set(values) & set(regime_macros(regime))
+        if overlap:
+            raise ValueError(f"The regime macros collide with the headline macros: {overlap}")
+        values.update(regime_macros(regime))
     return values
 
 
@@ -301,6 +312,10 @@ def write_macros(report, output):
 
 def write_tables(report, output):
     write_macros(report, output)
+    if report.get("regime"):
+        from .coupled_regime import write_tables as regime_tables
+
+        regime_tables(report["regime"], output)
     end = r" \\"
     complete, split, accuracy_rows, memory_rows, execution_rows = [], [], [], [], []
     for method in METHODS:
@@ -463,8 +478,9 @@ def main():
     parser.add_argument("--screen", type=Path, nargs="*", default=[])
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--plot", action="store_true")
+    parser.add_argument("--regime", type=Path, help="coupled_regime output regime.json")
     args = parser.parse_args()
-    build(args.summary, args.output, args.screen, args.plot)
+    build(args.summary, args.output, args.screen, args.plot, args.regime)
 
 
 if __name__ == "__main__":
