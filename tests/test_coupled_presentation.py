@@ -169,3 +169,78 @@ def test_an_interrupted_screen_attempt_is_retained_with_null_timings(tmp_path):
         ]
     )
     assert rendered.count("---") == 2
+
+
+def spatial_record(directory, slabs, procedure, to_time, maximum):
+    directory.mkdir()
+    (directory / "record.json").write_text(
+        json.dumps(
+            {
+                "schema": "coupled-spatial-pair-assessment-v1",
+                "slabs": slabs,
+                "forward_procedures_match": True,
+                "coarse": {
+                    "procedure": {"procedure": procedure},
+                    "spatial_state_dofs": 10830,
+                    "terminating_status": "converged",
+                },
+                "fine": {
+                    "procedure": {"procedure": procedure},
+                    "spatial_state_dofs": 42180,
+                    "terminating_status": "newton_line_search_stagnation",
+                },
+                "assessed_interval": {
+                    "levels": 7,
+                    "declared_levels": slabs,
+                    "to_time_s": to_time,
+                    "horizon_s": 600.0,
+                    "fraction_of_horizon": to_time / 600.0,
+                    "covers_the_horizon": False,
+                },
+                "statistics": {
+                    "pointwise_maximum_K": maximum,
+                    "mass_weighted_space_time_rms_K": 0.34,
+                    "pointwise_peak": {"time_s": to_time},
+                },
+                "criteria": {"pointwise_met": None, "rms_met": None},
+            }
+        )
+    )
+    return directory
+
+
+def test_spatial_assessments_reach_the_tables_with_their_coverage(tmp_path):
+    """The widest assessed window carries the prose number, and its coverage goes with it."""
+    directories = [
+        spatial_record(tmp_path / "64-newton", 64, "newton", 65.625, 6.32),
+        spatial_record(tmp_path / "64-anderson5", 64, "anderson5", 46.875, 3.69),
+    ]
+    rows = presentation.load_spatial(directories)
+    assert [row["procedure"] for row in rows] == ["anderson5", "newton"]
+    empty = dict.fromkeys(
+        (
+            "median_sequence_seconds",
+            "median_linear_fraction",
+            "median_cg_iterations",
+            "deployed_rank_range",
+        )
+    )
+    methods = {
+        name: {**empty, "verified": 0, "recorded": 0, "restart_counts": []}
+        for name in presentation.METHODS
+    }
+    values = presentation.macros(
+        {"methods": methods, "ratios": None, "regime": None, "spatial": rows}
+    )
+    # The widest window is the Newton one, so it supplies the prose numbers.
+    assert values["coupledSpatialMaximumK"] == "6.32"
+    assert values["coupledSpatialAssessedSeconds"] == "65.6"
+    assert values["coupledSpatialAssessedPercent"] == "11"
+    assert values["coupledSpatialProcedure"] == "newton"
+    assert values["coupledSpatialAssessments"] == "2"
+    # A directory that is not a spatial assessment is refused rather than guessed at.
+    other = tmp_path / "other"
+    other.mkdir()
+    (other / "record.json").write_text(json.dumps({"schema": "something-else"}))
+    with pytest.raises(ValueError, match="not a spatial pair assessment"):
+        presentation.load_spatial([other])

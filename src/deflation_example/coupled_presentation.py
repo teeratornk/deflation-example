@@ -126,7 +126,41 @@ def load_screen(directories):
     return rows
 
 
-def build(summary_directory, output, screen_directories=(), plots=False, regime=None):
+def load_spatial(directories):
+    """Spatial refinement assessments, each with how much of the horizon it covers."""
+    rows = []
+    for directory in map(Path, directories):
+        record = json.loads((Path(directory) / "record.json").read_text())
+        if record.get("schema") != "coupled-spatial-pair-assessment-v1":
+            raise ValueError(f"{directory} is not a spatial pair assessment")
+        interval = record["assessed_interval"]
+        statistics = record["statistics"]
+        rows.append(
+            {
+                "directory": str(directory),
+                "procedure": record["coarse"]["procedure"].get("procedure"),
+                "procedures_match": record["forward_procedures_match"],
+                "slabs": record["slabs"],
+                "coarse_state_dofs": record["coarse"]["spatial_state_dofs"],
+                "fine_state_dofs": record["fine"]["spatial_state_dofs"],
+                "levels": interval["levels"],
+                "declared_levels": interval["declared_levels"],
+                "to_time_s": interval["to_time_s"],
+                "fraction_of_horizon": interval["fraction_of_horizon"],
+                "covers_the_horizon": interval["covers_the_horizon"],
+                "fine_terminating_status": record["fine"]["terminating_status"],
+                "pointwise_maximum_K": statistics["pointwise_maximum_K"],
+                "mass_weighted_space_time_rms_K": statistics["mass_weighted_space_time_rms_K"],
+                "peak": statistics["pointwise_peak"],
+                "criteria": record["criteria"],
+            }
+        )
+    return sorted(rows, key=lambda row: (row["slabs"], row["procedure"] or ""))
+
+
+def build(
+    summary_directory, output, screen_directories=(), plots=False, regime=None, spatial=()
+):
     campaign, records = load_campaign(summary_directory)
     summary = campaign.get("summary") or {}
     population = summary.get("headline_population", ["jacobi", "reference"])
@@ -232,6 +266,7 @@ def build(summary_directory, output, screen_directories=(), plots=False, regime=
         # The regime ablations are a separate declared population. They are carried
         # here so one manifest covers every artifact, never merged into the headline.
         "regime": None if regime is None else json.loads(Path(regime).read_text()),
+        "spatial": load_spatial(spatial),
     }
     write_report(output / "summary.json", report)
     write_tables(report, output)
@@ -311,6 +346,21 @@ def macros(report):
         if overlap:
             raise ValueError(f"The regime macros collide with the headline macros: {overlap}")
         values.update(regime_macros(regime))
+    spatial = report.get("spatial") or []
+    if spatial:
+        # The widest assessed window carries the prose number, and the prose says
+        # how much of the horizon that is, because no fine trajectory reached it.
+        widest = max(spatial, key=lambda row: row["to_time_s"])
+        values.update(
+            coupledSpatialMaximumK=_fmt(widest["pointwise_maximum_K"], ".2f"),
+            coupledSpatialRmsK=_fmt(widest["mass_weighted_space_time_rms_K"], ".3f"),
+            coupledSpatialAssessedSeconds=_fmt(widest["to_time_s"], ".1f"),
+            coupledSpatialAssessedPercent=_fmt(100 * widest["fraction_of_horizon"], ".0f"),
+            coupledSpatialProcedure=str(widest["procedure"]),
+            coupledSpatialFineDofs=str(widest["fine_state_dofs"]),
+            coupledSpatialCoarseDofs=str(widest["coarse_state_dofs"]),
+            coupledSpatialAssessments=str(len(spatial)),
+        )
     return values
 
 
@@ -446,6 +496,22 @@ def write_tables(report, output):
             values = report["methods"][method]["per_position_median_seconds"]
             cells.append(_fmt(values[position] if position < len(values) else None, ".0f"))
         positions.append(" & ".join(cells) + end)
+    spatial_rows = []
+    for row in report.get("spatial") or []:
+        spatial_rows.append(
+            " & ".join(
+                [
+                    str(row["slabs"]),
+                    str(row["procedure"]).replace("_", r"\_"),
+                    f"{row['coarse_state_dofs']}--{row['fine_state_dofs']}",
+                    _fmt(row["to_time_s"], ".1f"),
+                    _fmt(100 * row["fraction_of_horizon"], ".0f"),
+                    _fmt(row["pointwise_maximum_K"], ".2f"),
+                    _fmt(row["mass_weighted_space_time_rms_K"], ".3f"),
+                ]
+            )
+            + end
+        )
     for name, rows in (
         ("complete_rows.tex", complete),
         ("split_rows.tex", split),
@@ -454,6 +520,7 @@ def write_tables(report, output):
         ("memory_rows.tex", memory_rows),
         ("execution_rows.tex", execution_rows),
         ("screen_rows.tex", screen_rows),
+        ("spatial_rows.tex", spatial_rows),
         ("target_rows.tex", positions),
     ):
         with atomic_output(output / name) as stream:
@@ -489,8 +556,11 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--plot", action="store_true")
     parser.add_argument("--regime", type=Path, help="coupled_regime output regime.json")
+    parser.add_argument(
+        "--spatial", type=Path, nargs="*", default=[], help="coupled_spatial_pair outputs"
+    )
     args = parser.parse_args()
-    build(args.summary, args.output, args.screen, args.plot, args.regime)
+    build(args.summary, args.output, args.screen, args.plot, args.regime, args.spatial)
 
 
 if __name__ == "__main__":
