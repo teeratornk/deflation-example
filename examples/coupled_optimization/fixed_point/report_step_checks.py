@@ -57,6 +57,8 @@ def load_comparison(directories, allow_incomplete=False):
         if signature is not None and identity != signature:
             raise ValueError("Local comparisons use different inputs or accuracy")
         signature = identity
+        if record["accuracy"] != {"equation": 1e-12, "mass": 1e-6, "energy": 1e-6}:
+            raise ValueError("Unexpected final accuracy criteria")
         if record["status"] not in {"complete", "execution_failure"} and not allow_incomplete:
             raise ValueError("Local comparison remains incomplete")
         checks = record.get("checks", {})
@@ -143,9 +145,12 @@ def plot(report, output):
         if history.size:
             axis.semilogy(history[:, 0], np.maximum(history[:, 1], 1e-17), label=row["label"])
             axis.plot(history[-1, 0], max(history[-1, 1], 1e-17), "o" if row["verified"] else "x")
+        else:
+            axis.plot([], [], label=row["label"] + " — " + row["status"])
     for axis, title in zip(
         axes, ("Monolithic Newton correction", "Fixed-point correction"), strict=True
     ):
+        axis.set_yscale("log")
         axis.axhline(
             1e-12, color="black", linestyle=":", linewidth=1, label="Final equation target"
         )
@@ -160,7 +165,7 @@ def plot(report, output):
     figure.suptitle(
         "Partial local comparison"
         if report["incomplete"]
-        else "Matched local correction at 276.5625 s"
+        else f"Matched local correction at {report['matched_identity'][3]:g} s"
     )
     figure.savefig(output / "local-correction.pdf")
     figure.savefig(output / "local-correction.png", dpi=180)

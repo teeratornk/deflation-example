@@ -59,3 +59,21 @@ def test_mismatched_initial_field_is_rejected(tmp_path):
     write_report(path, record)
     with pytest.raises(ValueError, match="different inputs"):
         module.load_comparison(directories)
+
+
+def test_false_success_is_rejected(tmp_path):
+    import json
+
+    directories = records(tmp_path)
+    path = directories[0] / "record.json"
+    record = json.loads(path.read_text())
+    record.update(verified=True, termination="converged")
+    write_report(path, record)
+    with pytest.raises(ValueError, match="Successful label"):
+        module.load_comparison(directories)
+
+
+def test_failed_methods_still_appear_in_figure(tmp_path):
+    report = module.load_comparison(records(tmp_path))
+    module.plot(report, tmp_path)
+    assert (tmp_path / "local-correction.png").stat().st_size > 1000
