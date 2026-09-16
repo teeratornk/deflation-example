@@ -73,6 +73,28 @@ def equation_merit(metrics):
     )
 
 
+def trust_scale(problem, flow, update, limit):
+    """Largest step whose field change stays inside the declared trust region.
+
+    A near-singular step Jacobian returns an exact Newton direction that is
+    enormous, and halving from one then spends every trial far outside the region
+    where the linear model means anything: the residual grows quadratically all the
+    way down and the search stagnates with the direction never having been tested.
+    Starting the search at the edge of a declared region costs nothing when the step
+    is already inside it, because the scale is then exactly one.
+
+    The limit is an absolute change in the nondimensional temperature and the same
+    fraction of the current peak speed in the velocity, so one number sets both.
+    """
+    limit = positive_real(limit, "Newton trust region")
+    nv = len(problem.flow_free)
+    velocity = float(np.max(np.abs(update[:nv]))) if nv else 0.0
+    temperature = float(np.max(np.abs(update[nv:]))) if len(update) > nv else 0.0
+    speed = max(float(np.max(np.abs(flow.velocity))), np.finfo(float).tiny)
+    excess = max(temperature / limit, velocity / (limit * speed), 1.0)
+    return 1.0 / excess
+
+
 def criteria_met(metrics, tolerance):
     return (
         equation_merit(metrics) <= tolerance
@@ -94,6 +116,7 @@ def newton_step(
     initial_flow=None,
     line_search="equation_max",
     backtrack_cap=21,
+    trust_region=None,
 ):
     """Solve one unchanged transient step, starting from past fields by default."""
     slab = integer(slab, "Slab index", 0)
@@ -179,8 +202,9 @@ def newton_step(
             (dx[: problem.flow.nv], dx[problem.flow.nv : 2 * problem.flow.nv])
         )
         trials, retained = [], False
+        trust = 1.0 if trust_region is None else trust_scale(problem, flow, update, trust_region)
         for backtrack in range(backtrack_cap):
-            step = 0.5**backtrack
+            step = trust * 0.5**backtrack
             candidate = state.copy()
             candidate[problem.free] += step * update[len(problem.flow_free) :]
             candidate_flow = FlowResult(
@@ -226,6 +250,7 @@ def newton_step(
                 "linear_corrections": correction,
                 "candidate_retained": retained,
                 "line_search": line_search,
+                "trust_region_scale": trust,
                 "trials": trials,
                 **metrics,
             }
@@ -247,6 +272,7 @@ def newton_trajectory(
     restart_interval=None,
     line_search="equation_max",
     backtrack_cap=21,
+    trust_region=None,
 ):
     """Replay a signed source history using the problem's unchanged time grid."""
     values = real_array(controls, "Fixed source history").copy()
@@ -285,6 +311,7 @@ def newton_trajectory(
             initial_flow=flow,
             line_search=line_search,
             backtrack_cap=backtrack_cap,
+            trust_region=trust_region,
         )
         states.append(result.state[problem.free].copy())
         velocities.append(result.flow.velocity.copy())
@@ -332,6 +359,13 @@ def main():
         "--line-search", choices=("equation_max", "fixed_scaled"), default="equation_max"
     )
     parser.add_argument("--backtrack-cap", type=int, default=21)
+    parser.add_argument(
+        "--trust-region",
+        type=float,
+        help="Start each line search at the edge of a region this wide in nondimensional "
+        "temperature, and the same fraction of the peak speed in velocity. Omit for the "
+        "unrestricted search this study has always used.",
+    )
     parser.add_argument("--threads", type=int, default=8)
     parser.add_argument(
         "--consistent-stabilization",
@@ -390,6 +424,7 @@ def main():
                 "energy_tolerance": 1e-6,
                 "line_search": args.line_search,
                 "backtrack_cap": args.backtrack_cap,
+                "trust_region": args.trust_region,
                 "time_scheme": args.time_scheme,
                 "time_integrator_restart": "Backward Euler on the first substep of every original piecewise-constant source interval",
             },
@@ -431,6 +466,7 @@ def main():
                 max_iterations=args.cap,
                 line_search=args.line_search,
                 backtrack_cap=args.backtrack_cap,
+                trust_region=args.trust_region,
                 initial_state=state,
                 initial_flow=flow,
             )

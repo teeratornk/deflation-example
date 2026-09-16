@@ -114,6 +114,12 @@ def main():
     )
     parser.add_argument("--backtrack-cap", type=int, default=21)
     parser.add_argument(
+        "--trust-region",
+        type=float,
+        help="Start each Newton line search at the edge of a region this wide in "
+        "nondimensional temperature; omit for the unrestricted search",
+    )
+    parser.add_argument(
         "--time-scheme", choices=("backward_euler", "bdf2"), default="backward_euler"
     )
     parser.add_argument("--subdivision", type=int, default=1)
@@ -214,6 +220,7 @@ def main():
                 "newton_cap": integer(args.newton_cap, "Newton iteration cap", 0),
                 "line_search": args.line_search,
                 "backtrack_cap": integer(args.backtrack_cap, "Backtracking trial cap", 1),
+                "trust_region": args.trust_region,
                 "linear_internal_target": 1e-10,
                 "linear_acceptance_target": 1e-8,
                 "linear_correction_cap": 2,
@@ -237,6 +244,7 @@ def main():
                 callback=callback,
                 line_search=args.line_search,
                 backtrack_cap=args.backtrack_cap,
+                trust_region=args.trust_region,
                 time_scheme=args.time_scheme,
                 restart_interval=subdivision,
             )

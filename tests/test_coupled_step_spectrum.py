@@ -80,3 +80,46 @@ def test_diagonal_pencil_reports_amplification_and_residual():
         sorted(row["amplification_modulus"] for row in report["modes"]), [0.5, 1]
     )
     assert max(row["pencil_relative_residual"] for row in report["modes"]) < 1e-8
+
+
+def test_the_trust_region_scales_a_runaway_step_and_leaves_a_small_one_alone():
+    """A near-singular step Jacobian returns an exact direction that is enormous.
+
+    Halving from one then spends every trial outside the region where the linear
+    model means anything, which is exactly how the corrected model stagnated: the
+    residual grew quadratically through twenty-one halvings and the direction was
+    never tested. The region is declared, not inferred, and it must cost nothing
+    when the step is already inside it.
+    """
+    from deflation_example.coupled_newton_replay import trust_scale
+
+    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+    flow = problem.initial_flow
+    nv = len(problem.flow_free)
+    speed = max(float(np.max(np.abs(flow.velocity))), np.finfo(float).tiny)
+
+    small = np.zeros(nv + problem.spatial_size)
+    small[nv:] = 0.01
+    small[:nv] = 0.01 * speed
+    assert trust_scale(problem, flow, small, 0.05) == 1.0
+
+    runaway = np.zeros_like(small)
+    runaway[nv:] = 5.0
+    assert trust_scale(problem, flow, runaway, 0.05) == pytest.approx(0.01)
+
+    fast = np.zeros_like(small)
+    fast[:nv] = 5.0 * speed
+    assert trust_scale(problem, flow, fast, 0.05) == pytest.approx(0.01)
+
+    with pytest.raises(ValueError):
+        trust_scale(problem, flow, small, 0.0)
+
+
+def test_the_unrestricted_search_is_what_it_always_was():
+    """Without the option every line search still starts at a full Newton step."""
+    import inspect
+
+    from deflation_example.coupled_newton_replay import newton_step, newton_trajectory
+
+    for function in (newton_step, newton_trajectory):
+        assert inspect.signature(function).parameters["trust_region"].default is None
