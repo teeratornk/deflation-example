@@ -101,6 +101,12 @@ def main():
     parser.add_argument("--slabs", type=int, nargs="+", default=[0, 15, 27])
     parser.add_argument("--modes", type=int, default=4)
     parser.add_argument("--threads", type=int, default=4)
+    parser.add_argument(
+        "--transport-form",
+        choices=("advective", "skew"),
+        default="advective",
+        help="Thermal transport form of the linearised operator",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
@@ -109,7 +115,13 @@ def main():
         record, cfg, fields, digest = load_saved_solution(
             args.optimization, args.method, args.target_position
         )
-        problem, baseline = load_problem({**cfg, "baseline_directory": str(args.baseline)})
+        problem, baseline = load_problem(
+            {
+                **cfg,
+                "baseline_directory": str(args.baseline),
+                "transport_form": args.transport_form,
+            }
+        )
         require_matching_baseline(record, baseline)
         state = fields["state"].reshape(problem.slabs, problem.spatial_size)
         filename = (
@@ -126,6 +138,7 @@ def main():
             "optimization_source": record["environment"]["git_head"],
             "optimization_field_sha256": digest,
             "target_position": args.target_position,
+            "transport_form": args.transport_form,
             "scope": "Local linearized fixed-source propagation factors; no full-trajectory or physical stability certificate.",
         }
         rows = []

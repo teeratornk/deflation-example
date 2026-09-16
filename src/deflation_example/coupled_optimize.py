@@ -87,6 +87,7 @@ def load_problem(config):
         flow_cap=config["flow_cap"],
         flow_continuation=config["flow_continuation"],
         momentum_factor_policy=policy,
+        transport_form=config.get("transport_form", "advective"),
     )
     return problem, record
 

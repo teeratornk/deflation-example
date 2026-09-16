@@ -69,6 +69,7 @@ class CoupledControlProblem:
         flow_cap=100,
         flow_continuation=False,
         momentum_factor_policy="retained",
+        transport_form="advective",
     ):
         self.flow, self.mesh = flow, flow.mesh
         self.free = self.mesh.free.copy()
@@ -132,6 +133,9 @@ class CoupledControlProblem:
         if momentum_factor_policy not in {"retained", "recompute"}:
             raise ValueError("Choose retained or recompute momentum-factor storage")
         self.momentum_factor_policy = momentum_factor_policy
+        if transport_form not in {"advective", "skew"}:
+            raise ValueError("Choose advective or skew thermal transport")
+        self.transport_form = transport_form
         self.evaluation_callback = None
         self.evaluation_count = 0
         self.assembly = self.assemble(initial_flow.velocity)
@@ -160,6 +164,7 @@ class CoupledControlProblem:
             self.velocity_scale * self.flow.thermal_velocity(velocity),
             self.source,
             streamline=True,
+            transport_form=self.transport_form,
         )
 
     def full_temperature(self, state):
