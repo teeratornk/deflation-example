@@ -68,6 +68,19 @@ def node_location(mesh, free_node):
 def pair_statistics(coarse_dir, fine_dir, mesh, mass, scale, initial_value):
     coarse_state, coarse_times = load_states(coarse_dir)
     fine_state, fine_times = load_states(fine_dir)
+    return statistics_from_arrays(
+        coarse_state, coarse_times, fine_state, fine_times, mesh, mass, scale, initial_value
+    )
+
+
+def statistics_from_arrays(
+    coarse_state, coarse_times, fine_state, fine_times, mesh, mass, scale, initial_value
+):
+    """The v2 statistics of one refinement comparison, both trajectories on one mesh.
+
+    A spatial comparison lifts the coarse trajectory onto the fine mesh before
+    calling this, so the columns are the fine mesh's free nodes in both arguments.
+    """
     if coarse_state.shape[1] != len(mass) or fine_state.shape[1] != len(mass):
         raise ValueError("Temperature columns must match the free nodes of the mesh")
     difference = scale * (
