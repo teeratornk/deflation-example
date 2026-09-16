@@ -387,10 +387,12 @@ class CoupledControlProblem:
                 "slab, because the tangent's traversal is all or nothing"
             )
         thermal = sparse.bmat(blocks, format="csr")
-        # The preconditioner and the coarse space read this operator. When the
-        # stabilisation is consistent the blocks above are unnormalised, so give
-        # them the lumped normalisation here: both are preconditioner ingredients
-        # and every solve is still accepted on the true original residual.
+        # The preconditioner's diagonal reads this operator, and only that; the
+        # coarse space is built separately from the lumped reference assembly. When
+        # the stabilisation is consistent the blocks above are unnormalised, so give
+        # them the lumped normalisation here, which approximates the factored source
+        # action by its diagonal. Both are preconditioner ingredients and every solve
+        # is still accepted on the true original residual.
         frozen = thermal
         if source_factors:
             lumped = sparse.diags(np.tile(1.0 / self.assembly.mass[self.free], self.slabs))

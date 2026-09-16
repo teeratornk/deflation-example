@@ -69,10 +69,13 @@ class CudaControlJacobian:
             return cp.empty_like(x)
         if transpose and self.source_factors is not None:
             # The transpose applies the transposed factor first, which is what makes
-            # it the exact adjoint of a tangent that applies the factor last.
-            x = self._normalize(x.reshape(self.slabs, self.spatial_size, columns), True).reshape(
-                self.shape[0], columns
-            )
+            # it the exact adjoint of a tangent that applies the factor last. On a copy:
+            # cp.asarray returns a device array unchanged, so normalising in place here
+            # would write through to whatever the caller passed in. The processor's own
+            # transpose copies for the same reason.
+            x = self._normalize(
+                x.reshape(self.slabs, self.spatial_size, columns).copy(), True
+            ).reshape(self.shape[0], columns)
         blocks = x.reshape(self.slabs, self.spatial_size, columns)
         result = ((self.thermal.T if transpose else self.thermal) @ x).reshape(blocks.shape)
         if self.thermal_only:

@@ -38,11 +38,10 @@ def streamline_parameter(grad, lump, c, kmin, v, vertices, limit_rows):
 
     The consistent weighting additionally bounds the parameter so that no cell takes
     more out of a node's row than that node's own share of the cell mass. Where that
-    bound binds, the parameter is that share over the streamline derivative of the
-    node attaining it, which no longer depends on the element length; its derivative
-    follows from the same expression. A point where the bound is exactly at its
-    switch, or where two nodes tie for it, is rejected for the same reason a branch
-    switch is.
+    bound binds, the parameter is the smallest nodal share over the Euclidean norm of
+    the cell's streamline derivatives, which no longer depends on the element length;
+    its derivative follows from the same expression. A point where the bound is
+    exactly at its switch is rejected for the same reason a branch switch is.
     """
     norm = np.linalg.norm(v, axis=1)
     h = np.max(np.linalg.norm(vertices[:, :, None] - vertices[:, None, :], axis=3), axis=(1, 2))
