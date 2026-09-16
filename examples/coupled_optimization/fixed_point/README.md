@@ -222,3 +222,29 @@ retains the unstarted comparisons in the audit as `withdrawn_before_execution`,
 without displaying them as measured comparisons. It cannot exclude an existing
 record. Audit the replacement population separately with its version-3 protocol;
 the two sources do not share a timing population.
+
+## Agreement across complete trajectories
+
+Compare the temperature and velocity fields at every stored time level after
+the forward trajectories finish. The baseline and candidates must use the same
+saved source, mesh, time levels, physical inputs, accuracy criteria and numerical
+source. Each trajectory must meet its reported equation and conservation tests.
+
+```bash
+uv run python examples/coupled_optimization/fixed_point/trajectory_agreement.py \
+  --baseline "$V2_OUTPUT/trajectory/original/newton/rep-0" \
+  --candidate "$V2_OUTPUT/trajectory/original/newton/rep-1" \
+    "$V2_OUTPUT/trajectory/original/newton/rep-2" \
+    "$V2_OUTPUT/trajectory/original/anderson5/rep-0" \
+    "$V2_OUTPUT/trajectory/original/anderson5/rep-1" \
+    "$V2_OUTPUT/trajectory/original/anderson5/rep-2" \
+  --output "$TRAJECTORY_AGREEMENT"
+```
+
+The example verifies file hashes and computes maximum nodal temperature
+differences in kelvin and maximum velocity-vector differences in metres per
+second. The JSON output identifies the time and array index of each maximum.
+It compares stored fields without re-solving the equations. Agreement between
+solvers at the same discretization establishes neither uniqueness nor spatial
+or temporal resolution. Failed and incomplete trajectories remain in the main
+outcome audit and cannot enter this complete-trajectory comparison.
