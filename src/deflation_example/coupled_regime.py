@@ -102,14 +102,37 @@ def optima_agree(first, second):
     return abs(first["objective"] - second["objective"]) / scale <= OBJECTIVE_TOLERANCE
 
 
+def row_directory(root, row, repetition):
+    """Where a row's record is, allowing for the matched-cap fallback.
+
+    When a pre-check kill switch fires, the design's fallback runs every row with
+    a matched outer-iteration cap, and the runner names that directory with a
+    ``-cap`` suffix so it sits beside the uncapped one instead of replacing it.
+    The uncapped record is preferred when both exist.
+    """
+    parent = root / f"{row['tangent']}-{row['method']}-r{row['rank']}"
+    plain = parent / f"rep-{repetition}"
+    if (plain / "record.json").exists():
+        return plain, None
+    capped = sorted(parent.glob(f"rep-{repetition}-cap*"))
+    for candidate in capped:
+        if (candidate / "record.json").exists():
+            return candidate, int(candidate.name.rsplit("cap", 1)[1])
+    return plain, None
+
+
 def tangent_analysis(design, root):
     """Apply the tangent design's rules to whatever of its rows have been measured."""
     root = Path(root)
     arms, rows = {}, []
+    caps = set()
     for row in design["rows"]:
         repetition = row.get("repetition", 0)
-        directory = root / f"{row['tangent']}-{row['method']}-r{row['rank']}" / f"rep-{repetition}"
+        directory, cap = row_directory(root, row, repetition)
         arm = load_arm(directory)
+        if arm is not None and cap is not None:
+            arm["matched_outer_iteration_cap"] = cap
+            caps.add(cap)
         key = (row["tangent"], row["method"], repetition)
         arms[key] = arm
         rows.append({**row, "repetition": repetition, "arm": arm})
@@ -144,6 +167,7 @@ def tangent_analysis(design, root):
         "pairs": pairs,
         "outer_iteration_inflation": inflation,
         "repeated_speedups": repetitions,
+        "matched_outer_iteration_caps": sorted(caps),
         "verdict": verdict,
     }
 
@@ -153,6 +177,37 @@ def tangent_verdict(design, arms, pairs, inflation, repetitions):
     frozen, coupled = pairs.get("frozen"), pairs.get("coupled")
     if frozen is None or coupled is None:
         return {"status": "pending", "reason": "Not every arm of both models has been measured"}
+    capped = sorted(
+        {
+            arm["matched_outer_iteration_cap"]
+            for arm in arms.values()
+            if arm and "matched_outer_iteration_cap" in arm
+        }
+    )
+    if capped:
+        # A pre-check kill switch fired, so the design directs the comparison to be
+        # made at equal outer-iteration count. That comparison does not depend on
+        # the inflation, and a capped arm is unverified by construction.
+        return {
+            "status": "inconclusive",
+            "reason": (
+                "A pre-check kill switch fired, so these rows are the declared "
+                f"comparison at a matched cap of {capped[0]} outer iterations, which "
+                "does not depend on the outer-iteration inflation"
+            ),
+            "matched_outer_iteration_caps": capped,
+            "equal_outer_iteration_comparison": {
+                name: None
+                if measured is None
+                else {
+                    "per_iteration_wall": measured["S_per_iteration"],
+                    "C": measured["C"],
+                    "B": measured["B"],
+                    "equal_outer_iterations": measured["equal_outer_iterations"],
+                }
+                for name, measured in pairs.items()
+            },
+        }
     unverified = [
         f"{key[0]} {key[1]}"
         for key, arm in arms.items()

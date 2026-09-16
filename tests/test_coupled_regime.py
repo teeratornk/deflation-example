@@ -233,3 +233,31 @@ def test_tangent_verdict_refuses_to_guess_without_both_models():
         tangent_verdict(tangent_design(), {}, {"frozen": None, "coupled": None}, {}, {})["status"]
         == "pending"
     )
+
+
+def test_the_matched_cap_fallback_is_found_and_read_as_the_declared_comparison(tmp_path):
+    """A fired kill switch renames the rows; the analysis must still find and read them."""
+    populate(tmp_path)
+    for name in ("frozen-jacobi-r0", "frozen-reference-r100"):
+        plain = tmp_path / name / "rep-0"
+        plain.rename(tmp_path / name / "rep-0-cap44")
+    analysis = tangent_analysis(tangent_design(), tmp_path)
+    assert analysis["matched_outer_iteration_caps"] == [44]
+    verdict = analysis["verdict"]
+    assert verdict["status"] == "inconclusive"
+    assert "matched cap of 44" in verdict["reason"]
+    # The numbers are still reported, because the comparison is the declared fallback.
+    frozen = verdict["equal_outer_iteration_comparison"]["frozen"]
+    assert frozen["equal_outer_iterations"] and frozen["C"] > 1
+    assert analysis["pairs"]["frozen"]["S"] < 1
+
+
+def test_an_uncapped_record_wins_over_a_capped_one(tmp_path):
+    populate(tmp_path)
+    source = tmp_path / "frozen-jacobi-r0" / "rep-0"
+    capped = tmp_path / "frozen-jacobi-r0" / "rep-0-cap44"
+    capped.mkdir()
+    (capped / "record.json").write_text((source / "record.json").read_text())
+    analysis = tangent_analysis(tangent_design(), tmp_path)
+    assert analysis["matched_outer_iteration_caps"] == []
+    assert analysis["verdict"]["status"] == "supported"
