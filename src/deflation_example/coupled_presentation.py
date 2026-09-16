@@ -269,7 +269,7 @@ def build(summary_directory, output, screen_directories=(), plots=False, regime=
     write_report(output / "summary.json", report)
     write_tables(report, output)
     if plots:
-        plot_positions(report, output)
+        plot_positions(report, output, records)
     return report
 
 
@@ -525,7 +525,30 @@ def write_tables(report, output):
             stream.write("\n".join(rows) + "\n")
 
 
-def plot_positions(report, output):
+def iterate_series(records):
+    """Conjugate gradient iterations per outer iterate, concatenated over the sequence."""
+    if not records:
+        return []
+    series = []
+    for record in records:
+        if not record.get("all_problems_verified"):
+            continue
+        counts = []
+        for case in record["cases"]:
+            for row in case.get("history") or []:
+                total = 0
+                for attempt in row.get("attempts", []):
+                    for step in attempt.get("qp_history", []):
+                        total += step.get("linear_iterations") or 0
+                counts.append(total)
+        series.append(counts)
+    if not series:
+        return []
+    width = min(len(row) for row in series)
+    return [float(np.median([row[index] for row in series])) for index in range(width)]
+
+
+def plot_positions(report, output, records=None):
     import matplotlib
 
     matplotlib.use("Agg")
@@ -542,6 +565,27 @@ def plot_positions(report, output):
     axis.legend()
     for extension in ("pdf", "png"):
         figure.savefig(output / f"cumulative.{extension}", dpi=220)
+    plt.close(figure)
+    if not records:
+        return
+    # The mechanism, one point per outer iterate: the reduction is sustained across
+    # the whole sequence rather than concentrated in a few early solves.
+    series = {method: iterate_series(records.get(method) or []) for method in METHODS}
+    if not any(series.values()):
+        return
+    figure, axis = plt.subplots(figsize=(6.4, 3.6), layout="constrained")
+    for method in METHODS:
+        counts = series[method]
+        if counts:
+            axis.plot(range(1, len(counts) + 1), counts, label=LABELS[method], linewidth=1.2)
+    axis.set(
+        xlabel="Gauss--Newton iterate over the sequence",
+        ylabel="CG iterations per iterate (median)",
+    )
+    axis.grid(alpha=0.25)
+    axis.legend()
+    for extension in ("pdf", "png"):
+        figure.savefig(output / f"iterations.{extension}", dpi=220)
     plt.close(figure)
 
 

@@ -1,5 +1,6 @@
 """Presentation tables come only from assembled, verified records."""
 
+from copy import deepcopy
 import json
 
 from omegaconf import OmegaConf
@@ -72,6 +73,20 @@ def test_presentation_reports_split_ratios_and_screen(monkeypatch, tmp_path):
     assert "\\newcommand{\\coupledReferenceVerified}{1}" in macros
     assert "\\newcommand{\\coupledRecyclingMedianHours}{---}" in macros
     assert (tmp_path / "tables" / "cumulative.pdf").is_file()
+    # The mechanism figure: one point per outer iterate, both methods on one axis.
+    assert (tmp_path / "tables" / "iterations.pdf").is_file()
+    series = presentation.iterate_series(
+        [r for r in records if r["configuration"]["method"] == "reference"]
+    )
+    zero = presentation.iterate_series(
+        [r for r in records if r["configuration"]["method"] == "jacobi"]
+    )
+    assert series and zero and len(series) == len(zero)
+    assert all(count > 0 for count in series + zero)
+    # An unverified sequence never enters the median.
+    unverified = deepcopy(records[0])
+    unverified["all_problems_verified"] = False
+    assert presentation.iterate_series([unverified]) == []
     stored = json.loads((tmp_path / "tables" / "summary.json").read_text())
     assert "generator_environment" in stored
     with pytest.raises(FileExistsError):
