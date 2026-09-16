@@ -41,6 +41,115 @@ def read_disposition(path, protocol_path):
     return {**disposition, "declaration_sha256": file_sha256(path)}
 
 
+def reference_repair(path, protocol_path, root, replacement_root, selection):
+    """Validate an explicit launcher correction; retain both original setup errors."""
+    if path is None and replacement_root is None:
+        return None
+    if path is None or replacement_root is None or selection is None:
+        raise ValueError("Reference repair requires a declaration, replacement root and selection")
+    declaration = read(path)
+    if declaration.get("schema") != "fixed-point-reference-setup-amendment-v1":
+        raise ValueError("Unknown reference setup amendment schema")
+    if declaration.get("protocol_sha256") != file_sha256(protocol_path):
+        raise ValueError("Reference setup amendment belongs to a different protocol")
+    if (
+        declaration.get("changed_setting") != "reference_baseline_directory"
+        or declaration.get("new_value", "missing") is not None
+    ):
+        raise ValueError("Only the documented same-mesh reference setup correction is supported")
+    if declaration.get("replacement_tasks") != [2, 3, 8, 9, 14, 15] or declaration.get(
+        "withdrawn_before_execution_tasks"
+    ) != [8, 9, 14, 15]:
+        raise ValueError("Reference setup amendment has a different task population")
+    if selection["environment"]["git_head"] != declaration.get("numerical_source"):
+        raise ValueError("Reference setup amendment has a different numerical source")
+    policies = ("newton", selection["families"]["momentum"]["selected"])
+    gate_hashes = {"selection.json": file_sha256(root / "selection.json")}
+    for policy in policies:
+        relative = f"derivatives/{policy}/derivatives/record.json"
+        gate = read(root / relative)
+        if (
+            gate.get("status") != "verified"
+            or gate["environment"]["source_sha256"] != selection["environment"]["source_sha256"]
+        ):
+            raise ValueError("Reference correction requires both matching derivative gates")
+        gate_hashes[relative] = file_sha256(root / relative)
+    expected = {f"optimize/{p}/reference/rep-0/record.json" for p in policies}
+    entries = declaration.get("original_setup_errors", [])
+    if len(entries) != 2 or {e["record"] for e in entries} != expected:
+        raise ValueError("The two original reference setup errors must remain explicit")
+    originals, templates = [], {}
+    for entry in entries:
+        relative = entry["record"]
+        original_path = root / relative
+        if file_sha256(original_path) != entry["sha256"]:
+            raise ValueError("Original setup-error record checksum differs")
+        original = read(original_path)
+        if (
+            original.get("status") != "sequence_error"
+            or original.get("error_type") != "ValueError"
+            or original.get("cases") != []
+        ):
+            raise ValueError("A numerical solve cannot be replaced as a setup error")
+        if original["environment"]["source_sha256"] != selection["environment"]["source_sha256"]:
+            raise ValueError("Original setup-error source differs")
+        policy = relative.split("/")[1]
+        spec = {"phase": "optimize", "group": "reference", "policy": policy, "repetition": 0}
+        row, _ = outcome(original_path, spec)
+        if row["seconds"] is None:
+            raise ValueError("The original setup-error interval must be recorded")
+        originals.append({"record": relative, **row})
+        templates[policy] = original
+    for policy, rep in itertools.product(policies, (1, 2)):
+        if (root / f"optimize/{policy}/reference/rep-{rep}/record.json").exists():
+            raise ValueError("A declared unstarted reference task already has a record")
+    return {
+        "declaration": {**declaration, "declaration_sha256": file_sha256(path)},
+        "original_setup_errors": originals,
+        "templates": templates,
+        "gate_hashes": gate_hashes,
+    }
+
+
+def repaired_reference_outcome(root, relative, spec, repair):
+    row, record = outcome(root / relative, spec)
+    prior = next(r for r in repair["original_setup_errors"] if r["policy"] == spec["policy"])
+    # The other four reference tasks were held before execution, with no cost.
+    prior_seconds = prior["seconds"] if spec["repetition"] == 0 else 0.0
+    row["original_setup_error_seconds"] = prior_seconds
+    row["all_attempt_sequence_seconds"] = (
+        row["seconds"] + prior_seconds if row["seconds"] is not None else None
+    )
+    if record is not None:
+        template = repair["templates"][spec["policy"]]
+        expected = {**template["configuration"], "repetition": spec["repetition"]}
+        if record["configuration"] != expected:
+            raise ValueError("Corrected reference changed an optimization setting or baseline")
+        # The initial live record precedes problem assembly. Its final record
+        # must contain the baseline identity; a live placeholder proves nothing.
+        if record.get("status") == "running" and "baseline_sha256" not in record:
+            row["input_identity_status"] = "awaiting_final_record"
+        elif record.get("baseline_sha256") != template["baseline_sha256"]:
+            raise ValueError("Corrected reference changed an optimization setting or baseline")
+        attempt_path = (root / relative).parent.parent / (
+            (root / relative).parent.name + "-attempt.json"
+        )
+        attempt = read(attempt_path)
+        if (
+            attempt.get("reference_setup_policy")
+            != "same-mesh-reference-no-separate-coarse-baseline-v1"
+        ):
+            raise ValueError("Corrected reference lacks its launcher policy")
+        if (
+            attempt.get("protocol_sha256") != repair["declaration"]["protocol_sha256"]
+            or attempt.get("gate_record_sha256") != repair["gate_hashes"]
+        ):
+            raise ValueError("Corrected reference protocol or gate hashes differ")
+        row["launcher_sha256"] = attempt["launcher_sha256"]
+        row["gate_record_sha256"] = attempt["gate_record_sha256"]
+    return row, record
+
+
 def declared_records(protocol, selection=None):
     for family, case, policy in itertools.product(
         protocol["families"], protocol["cases"], protocol["policies"]
@@ -416,6 +525,8 @@ def audit(
     root_policy="newton",
     protocol_path=None,
     disposition_path=None,
+    reference_repair_root=None,
+    reference_repair_path=None,
 ):
     protocol_path = HERE / "protocol.json" if protocol_path is None else Path(protocol_path)
     protocol = read(protocol_path)
@@ -423,6 +534,9 @@ def audit(
     selection = read(root / "selection.json") if (root / "selection.json").exists() else None
     if selection is not None and selection["protocol_sha256"] != file_sha256(protocol_path):
         raise ValueError("Selection belongs to a different protocol")
+    repair = reference_repair(
+        reference_repair_path, protocol_path, root, reference_repair_root, selection
+    )
     rows, sources = [], set()
     if selection is not None:
         sources.add(json.dumps(selection["environment"]["source_sha256"], sort_keys=True))
@@ -445,8 +559,21 @@ def audit(
                 }
             )
             continue
-        row, record = outcome(root / relative, spec)
-        rows.append({"record": relative, **row})
+        repaired = (
+            repair is not None and spec["phase"] == "optimize" and spec["group"] == "reference"
+        )
+        row, record = (
+            repaired_reference_outcome(reference_repair_root, relative, spec, repair)
+            if repaired
+            else outcome(root / relative, spec)
+        )
+        rows.append(
+            {
+                "record": relative,
+                "record_root": "reference_repair" if repaired else "original",
+                **row,
+            }
+        )
         if record is not None:
             if disposition is not None and (
                 record["environment"]["git_head"] != disposition["numerical_source"]
@@ -460,8 +587,15 @@ def audit(
         "protocol_sha256": file_sha256(protocol_path),
         "selection_complete": selection is not None,
         "followup_disposition": disposition,
+        "reference_setup_amendment": None if repair is None else repair["declaration"],
+        "original_setup_errors": [] if repair is None else repair["original_setup_errors"],
         "rows": rows,
         "groups": groups(rows),
+        "groups_including_original_setup_costs": groups(
+            [{**r, "seconds": r.get("all_attempt_sequence_seconds", r["seconds"])} for r in rows]
+        )
+        if repair is not None
+        else [],
         "root_agreement": [
             row
             for family in protocol["families"]
@@ -515,6 +649,8 @@ def main():
         default="newton",
         help="Verified local root used only for field agreement; this does not select a numerical policy",
     )
+    parser.add_argument("--reference-repair-root", type=Path)
+    parser.add_argument("--reference-repair-declaration", type=Path)
     args = parser.parse_args()
     audit(
         args.root,
@@ -522,6 +658,8 @@ def main():
         root_policy=args.root_policy,
         protocol_path=args.protocol,
         disposition_path=args.disposition,
+        reference_repair_root=args.reference_repair_root,
+        reference_repair_path=args.reference_repair_declaration,
     )
 
 

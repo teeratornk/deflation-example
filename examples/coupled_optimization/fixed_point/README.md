@@ -78,6 +78,26 @@ Every command supports `--dry-run` to inspect its exact arguments.
 
 ## Numerical policies and interpretation
 
+For the version-3 momentum follow-up, the same-mesh reference launcher correction
+has its own output root. The numerical solver files are unchanged. Audit it with
+the explicit amendment shipped with `study/fixed-point-launcher-v3`:
+
+```bash
+uv run python examples/coupled_optimization/fixed_point/audit.py \
+  --protocol "$MOMENTUM_PROTOCOL" --root "$MOMENTUM_OUTPUT" \
+  --reference-repair-root "$CORRECTED_REFERENCE_OUTPUT" \
+  --reference-repair-declaration "$REFERENCE_SETUP_AMENDMENT" \
+  --output "$COMBINED_AUDIT"
+```
+
+The audit retains both original setup errors, checks their hashes, and refuses
+to replace any completed or failed numerical solve as a setup error. It checks
+the corrected configuration against the original settings and verifies the gate
+hashes. Summary groups report corrected sequence intervals and, separately, those
+intervals plus the original setup-error work. Missing or failed repetitions have
+no complete-comparison median. The four unstarted duplicate setup tasks remain
+identified in the amendment.
+
 The relaxed policies use factors 0.25, 0.5 and 1. Anderson histories contain at
 most three or five differences, with damping 0.5. Pivoted QR uses relative rank
 threshold `1e-12`; difference-coefficient one-norm above 10 triggers the relaxed
