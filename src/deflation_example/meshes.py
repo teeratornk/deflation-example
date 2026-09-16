@@ -139,6 +139,10 @@ class ThermalAssembly:
     # default and every earlier record reproduces exactly.
     stabilized_storage: sparse.csr_matrix = None
     stabilized_source: sparse.csr_matrix = None
+    # Per cell, the factor the row limit applied to the streamline parameter. One
+    # wherever the limit was inactive, which is almost everywhere. Empty unless the
+    # consistent weighting was asked for, so nothing else carries it.
+    streamline_limit: np.ndarray = None
 
     @property
     def stiffness(self):
@@ -291,17 +295,18 @@ def assemble_thermal(
     transport_gradient = c[:, None] * np.einsum("ed,eid->ei", v, grad)
     stabilization = np.zeros_like(diffusion)
     stabilized_storage = stabilized_source = None
-    stabilized_load = None
+    stabilized_load = streamline_limit = None
     if streamline:
         verts = mesh.nodes[mesh.cells]
         h = np.max(np.linalg.norm(verts[:, :, None] - verts[:, None, :], axis=3), axis=(1, 2))
         if streamline_length == "flow":
             # The length along the flow rather than the longest edge. It bounds the
-            # streamline weight, which keeps the assembled source action positive, but
-            # it only ever lowers the parameter on a mesh like the transformer's, and
-            # lowering it removes stabilisation the advection-dominated problem needs.
-            # Measured there: never above the longest edge, median ratio 0.95, and the
-            # forward solve is worse with it than without. Hence not the default.
+            # streamline weight everywhere, but it only ever lowers the parameter on a
+            # mesh like the transformer's, and lowering it removes stabilisation the
+            # advection-dominated problem needs. Measured there: never above the longest
+            # edge, median ratio 0.95. The consistent weighting gets its bound from the
+            # row limit below instead, which is inactive wherever it is not needed, so
+            # this stays available and stays out of the default.
             directional = np.abs(np.einsum("ed,eid->ei", v, grad)).sum(axis=1)
             h = 2 * np.linalg.norm(v, axis=1) / np.maximum(directional, np.finfo(float).tiny)
         speed = c * np.linalg.norm(v, axis=1)
@@ -309,17 +314,24 @@ def assemble_thermal(
             h / (2 * np.maximum(speed, np.finfo(float).tiny)), h**2 / (12 * eigenvalues[:, 0])
         )
         if streamline_length == "flow":
-            # A cell must not take more out of a node's source action than that node's
-            # own share of the cell mass, or the assembled action loses positive row
-            # sums. The limit scales the parameter itself, so all three pieces of the
-            # term keep one value; scaling the assembled terms instead cost a factor of
-            # two in the convergence rate.
+            # A cell must not take more out of a node's row than that node's own share
+            # of the cell mass, or the assembled storage and source action lose their
+            # positive row sums and the step operator they sit inside turns nearly
+            # singular. On the transformer mesh the parameter taken from the longest
+            # edge reverses the sign of thirty-five rows of ten thousand eight hundred
+            # and thirty, which is enough: the forward Newton's best step then reduces
+            # the residual by a few parts in ten million and the solve crawls.
+            #
+            # The limit scales the parameter itself, so all three pieces of the term
+            # keep one value; scaling the assembled terms instead cost a factor of two
+            # in the convergence rate.
             share = lump / measure[:, None]
             reach = np.max(
                 np.abs(tau[:, None] * transport_gradient) / np.maximum(share, np.finfo(float).tiny),
                 axis=1,
             )
-            tau = tau / np.maximum(reach, 1.0)
+            streamline_limit = 1.0 / np.maximum(reach, 1.0)
+            tau = tau * streamline_limit
         stabilization = (measure * tau)[:, None, None] * (
             transport_gradient[:, :, None] * transport_gradient[:, None, :]
         )
@@ -357,6 +369,7 @@ def assemble_thermal(
         vector(q[:, None] * lump) + (0.0 if stabilized_load is None else vector(stabilized_load)),
         None if stabilized_storage is None else matrix(stabilized_storage),
         None if stabilized_source is None else matrix(stabilized_source),
+        streamline_limit,
     )
 
 
