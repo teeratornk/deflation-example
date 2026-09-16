@@ -102,7 +102,15 @@ class ControlJacobian(LinearOperator):
     backwards, including the final block. All LU factors are fixed at creation.
     """
 
-    def __init__(self, thermal, velocity_actions, buoyancy, factors, history):
+    def __init__(
+        self, thermal, velocity_actions, buoyancy, factors, history, source_factors=None
+    ):
+        # With a consistent stabilisation the source is weighted by the streamline
+        # test function, so the control is recovered through a factored action
+        # rather than a division by the lumped mass. The thermal and velocity blocks
+        # are then unnormalised and the action is applied here, which is exact
+        # because J = S^-1 R gives J^T = R^T S^-T.
+        self.source_factors = None if source_factors is None else tuple(source_factors)
         self.thermal = sparse.csr_matrix(thermal)
         self.velocity_actions = tuple(sparse.csr_matrix(A, copy=True) for A in velocity_actions)
         for action in self.velocity_actions:
@@ -116,6 +124,8 @@ class ControlJacobian(LinearOperator):
             raise ValueError("Control derivative dimensions do not match the trajectory")
         if len(self.velocity_actions) != self.slabs or len(self.history) != self.slabs:
             raise ValueError("Each time slab needs thermal, momentum and history blocks")
+        if self.source_factors is not None and len(self.source_factors) != self.slabs:
+            raise ValueError("Each time slab needs its own source action factor")
         super().__init__(dtype=np.dtype(float), shape=self.thermal.shape)
 
     def _matvec(self, direction):
@@ -126,14 +136,31 @@ class ControlJacobian(LinearOperator):
         if not columns:
             return np.empty_like(directions)
         if self.thermal_only:
-            return self.thermal @ directions
+            return self._normalize((self.thermal @ directions).copy())
         dy = np.asarray(directions).reshape(self.slabs, self.spatial_size, columns)
         result = (self.thermal @ directions).reshape(dy.shape)
         previous = np.zeros((self.buoyancy.shape[0], columns))
         for n, factor in enumerate(self.factors):
             previous = factor.solve(self.buoyancy @ dy[n] + self.history[n] @ previous)
             result[n] += self.velocity_actions[n] @ previous
-        return result.reshape(self.shape[0], columns)
+        return self._normalize(result.reshape(self.shape[0], columns))
+
+    def _normalize(self, values):
+        """Apply the source action inverse slab by slab, if there is one."""
+        if self.source_factors is None:
+            return values
+        blocks = values.reshape(self.slabs, self.spatial_size, -1)
+        for n, factor in enumerate(self.source_factors):
+            blocks[n] = factor.solve(blocks[n])
+        return blocks.reshape(values.shape)
+
+    def _normalize_transpose(self, values):
+        if self.source_factors is None:
+            return values
+        blocks = np.array(values, dtype=float).reshape(self.slabs, self.spatial_size, -1)
+        for n, factor in enumerate(self.source_factors):
+            blocks[n] = factor.solve(blocks[n], trans="T")
+        return blocks.reshape(np.shape(values))
 
     def _rmatvec(self, vector):
         return self._rmatmat(np.asarray(vector).reshape(-1, 1)).ravel()
@@ -142,6 +169,7 @@ class ControlJacobian(LinearOperator):
         columns = vectors.shape[1]
         if not columns:
             return np.empty_like(vectors)
+        vectors = self._normalize_transpose(vectors)
         if self.thermal_only:
             return self.thermal.T @ vectors
         z = np.asarray(vectors).reshape(self.slabs, self.spatial_size, columns)

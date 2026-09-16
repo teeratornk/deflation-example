@@ -197,6 +197,7 @@ class CoupledControlProblem:
         zero_trajectory = not np.any(state) and not np.any(self.thermal_boundary)
         previous_flow, previous_temperature = self.initial_flow, self.initial
         factors, history, velocity_actions, diagonals, lower = [], [], [], [], []
+        source_factors = []
         controls, flows, metrics = [], [], []
         for n, yn in enumerate(Y):
             full = self.full_temperature(yn)
@@ -237,14 +238,39 @@ class CoupledControlProblem:
             assembly = self.assemble(result.velocity)
             mass = assembly.mass[self.free]
             inverse_mass = sparse.diags(1 / mass)
-            A = (inverse_mass @ assembly.stiffness[self.free][:, self.free]).tocsr()
-            control = (assembly.stiffness @ full - assembly.load)[self.free] / mass
+            # A consistent stabilisation weights the source by the streamline test
+            # function, so the control is no longer recovered by dividing by the
+            # lumped mass. The action is factored once per slab and applied where
+            # the momentum factors already are, rather than inverted into a matrix
+            # that would be dense.
+            action = None
+            if assembly.consistent:
+                action = splu(assembly.source_action[self.free][:, self.free].tocsc())
+                source_factors.append(action)
+            raw = assembly.stiffness[self.free][:, self.free].tocsr()
+            residual = (assembly.stiffness @ full - assembly.load)[self.free]
+            storage = None
             if dt is not None:
-                C = assembly.capacity[self.free] / mass / self.steps[n]
-                control += C * (yn - previous_temperature)
-                A += sparse.diags(C)
-                if n:
-                    lower.append(-sparse.diags(C))
+                if assembly.consistent:
+                    storage = (
+                        assembly.storage[self.free][:, self.free] / self.steps[n]
+                    ).tocsr()
+                else:
+                    storage = sparse.diags(assembly.capacity[self.free] / self.steps[n])
+                residual = residual + storage @ (yn - previous_temperature)
+                raw = raw + storage
+            if action is None:
+                A = (inverse_mass @ raw).tocsr()
+                control = residual / mass
+                if dt is not None and n:
+                    lower.append(-sparse.diags(assembly.capacity[self.free] / mass / self.steps[n]))
+            else:
+                # The raw blocks are kept unnormalised; the factor is applied by the
+                # Jacobian, which is exact because J = S^-1 R gives J^T = R^T S^-T.
+                A = raw
+                control = action.solve(residual)
+                if dt is not None and n:
+                    lower.append(-storage)
             derivative = thermal_velocity_jacobian(
                 self.flow,
                 result.velocity,
@@ -253,8 +279,9 @@ class CoupledControlProblem:
                 self.conductivity,
                 self.velocity_scale,
             )
+            block = derivative[self.free][:, self.flow_free]
             velocity_actions.append(
-                (inverse_mass @ derivative[self.free][:, self.flow_free]).tocsr()
+                block.tocsr() if action is not None else (inverse_mass @ block).tocsr()
             )
             if zero_trajectory:
                 # Every thermal velocity sensitivity is exactly zero. No
@@ -297,15 +324,28 @@ class CoupledControlProblem:
             if n:
                 blocks[n][n - 1] = lower[n - 1]
         thermal = sparse.bmat(blocks, format="csr")
+        # The preconditioner and the coarse space read this operator. When the
+        # stabilisation is consistent the blocks above are unnormalised, so give
+        # them the lumped normalisation here: both are preconditioner ingredients
+        # and every solve is still accepted on the true original residual.
+        frozen = thermal
+        if source_factors:
+            lumped = sparse.diags(np.tile(1.0 / self.assembly.mass[self.free], self.slabs))
+            frozen = (lumped @ thermal).tocsr()
         jacobian = ControlJacobian(
-            thermal, velocity_actions, self.load_derivative, factors, history
+            thermal,
+            velocity_actions,
+            self.load_derivative,
+            factors,
+            history,
+            source_factors=tuple(source_factors) or None,
         )
         return CoupledEvaluation(
             state,
             np.concatenate(controls),
             tuple(flows),
             jacobian,
-            thermal,
+            frozen,
             tuple(metrics),
             time.perf_counter() - start,
         )
