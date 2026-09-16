@@ -302,3 +302,54 @@ def test_a_stalled_replay_keeps_the_length_it_was_meant_to_have(tmp_path):
     assert stalled["declared_levels"] == 64 and stalled["slabs"] == 64
     assert stalled["complete"] is False
     assert stalled["procedure"]["procedure"] == "monolithic_newton"
+
+
+def resolution_trajectory(directory, *, original_slabs, reached, subdivision=1, horizon=1.0):
+    """A spatial-resolution record, which names its length only in its configuration."""
+    directory.mkdir(parents=True, exist_ok=True)
+    times = np.cumsum(np.full(reached, horizon / (original_slabs * subdivision)))
+    (directory / "record.json").write_text(
+        json.dumps(
+            {
+                "schema": "coupled-fixed-control-spatial-resolution-v1",
+                "status": "newton_line_search_stagnation",
+                "subdivision": subdivision,
+                "configuration": {"slabs": original_slabs},
+                "optimization_field_sha256": "src",
+                "forward_solver": {"procedure": "monolithic_newton"},
+                "steps": [{"time_s": float(t), "status": "converged"} for t in times]
+                + [{"time_s": 0.0, "status": "newton_line_search_stagnation"}],
+            }
+        )
+    )
+    np.savez(
+        directory / "states.npz",
+        state=np.linspace(0.0, 1.0, reached * 6).reshape(reached, 6),
+        times_s=times,
+    )
+    return directory
+
+
+def test_every_record_shape_reports_the_length_it_was_meant_to_have(tmp_path):
+    """Three records name it three ways, and a stalled one must not report its own.
+
+    Two runs that stalled at different points would otherwise look like two different
+    time grids, and a pure spatial comparison would be refused for a reason that has
+    nothing to do with its time grid.
+    """
+    replay = load_trajectory(
+        replay_trajectory(tmp_path / "replay", slabs=64, reached=64), allow_partial=True
+    )
+    resolution = load_trajectory(
+        resolution_trajectory(tmp_path / "resolution", original_slabs=64, reached=7),
+        allow_partial=True,
+    )
+    assert replay["declared_levels"] == resolution["declared_levels"] == 64
+    assert resolution["levels_reached"] == 7 and resolution["complete"] is False
+    subdivided = load_trajectory(
+        resolution_trajectory(
+            tmp_path / "subdivided", original_slabs=64, reached=5, subdivision=2
+        ),
+        allow_partial=True,
+    )
+    assert subdivided["declared_levels"] == 128

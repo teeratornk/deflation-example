@@ -161,6 +161,26 @@ def trajectory_states(directory, converged):
     return np.vstack(states), np.array(times)
 
 
+def declared_levels(record, reached):
+    """How long the trajectory was meant to be, which is not how far it got.
+
+    The three records this reads name it three ways: a study record says slabs, a
+    forward replay says forward_slabs, and a spatial-resolution record says neither
+    and leaves it to be read off the optimization it replays, times the subdivision
+    it declared. Falling back to what was reached would make a stalled run look like
+    a complete short one, and two runs that stalled at different points would then
+    look like two different time grids.
+    """
+    for key in ("slabs", "forward_slabs"):
+        if record.get(key) is not None:
+            return integer(record[key], "Declared time levels", 1)
+    original = (record.get("configuration") or {}).get("slabs")
+    if original is not None:
+        subdivision = integer(record.get("subdivision", 1), "Time subdivision", 1)
+        return integer(original, "Original time levels", 1) * subdivision
+    return reached
+
+
 def load_trajectory(directory, allow_partial=False):
     """One trajectory, with the levels it actually reached.
 
@@ -183,10 +203,7 @@ def load_trajectory(directory, allow_partial=False):
     if reached < 1:
         raise ValueError(f"{directory} reached no converged time level")
     state, times = state[:reached], times[:reached]
-    # How long the trajectory was meant to be, which is not how far it got. A replay
-    # names it forward_slabs and a study record names it slabs; falling back to what
-    # was reached would make a stalled run look complete.
-    declared = record.get("slabs", record.get("forward_slabs", len(state)))
+    declared = declared_levels(record, len(state))
     return {
         "complete": complete,
         "terminating_status": (
