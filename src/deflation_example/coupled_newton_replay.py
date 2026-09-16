@@ -326,6 +326,11 @@ def main():
     )
     parser.add_argument("--backtrack-cap", type=int, default=21)
     parser.add_argument("--threads", type=int, default=8)
+    parser.add_argument(
+        "--consistent-stabilization",
+        action="store_true",
+        help="Weight the storage and the source by the streamline test function",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     subdivision = integer(args.subdivision, "Time subdivision", 1)
@@ -339,7 +344,12 @@ def main():
         if not cfg["transient"]:
             raise ValueError("Temporal replay requires a saved transient optimization")
         problem, baseline = load_problem(
-            {**cfg, "baseline_directory": str(args.baseline), "slabs": original_slabs * subdivision}
+            {
+                **cfg,
+                "baseline_directory": str(args.baseline),
+                "slabs": original_slabs * subdivision,
+                "consistent_stabilization": args.consistent_stabilization,
+            }
         )
         require_matching_baseline(record, baseline)
         controls = fields["control"].reshape(original_slabs, problem.spatial_size)
