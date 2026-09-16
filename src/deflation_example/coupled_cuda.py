@@ -37,7 +37,25 @@ class CudaControlJacobian:
             if self.thermal_only
             else tuple(PersistentSuperLU(factor) for factor in jacobian.factors)
         )
+        # A consistent stabilisation recovers the control through a factored source
+        # action rather than a division by the lumped mass, so the tangent is
+        # S^-1 R and the transpose R^T S^-T. Without these the device would apply R
+        # alone: not a slower answer but a different operator, and one that still
+        # converges, which is the worst kind of wrong.
+        self.source_factors = (
+            None
+            if jacobian.source_factors is None
+            else tuple(PersistentSuperLU(factor) for factor in jacobian.source_factors)
+        )
         cp.cuda.get_current_stream().synchronize()
+
+    def _normalize(self, blocks, transpose):
+        """Apply the source action inverse slab by slab, if there is one."""
+        if self.source_factors is None:
+            return blocks
+        for n, factor in enumerate(self.source_factors):
+            blocks[n] = factor.solve(blocks[n], trans="T" if transpose else "N")
+        return blocks
 
     def apply(self, vectors, *, transpose=False):
         cp = self.cp
@@ -49,9 +67,17 @@ class CudaControlJacobian:
         columns = x.shape[1]
         if not columns:
             return cp.empty_like(x)
+        if transpose and self.source_factors is not None:
+            # The transpose applies the transposed factor first, which is what makes
+            # it the exact adjoint of a tangent that applies the factor last.
+            x = self._normalize(x.reshape(self.slabs, self.spatial_size, columns), True).reshape(
+                self.shape[0], columns
+            )
         blocks = x.reshape(self.slabs, self.spatial_size, columns)
         result = ((self.thermal.T if transpose else self.thermal) @ x).reshape(blocks.shape)
         if self.thermal_only:
+            if not transpose:
+                result = self._normalize(result, False)
             return result.ravel() if vector else result.reshape(self.shape[0], columns)
         adjacent = cp.zeros((self.buoyancy.shape[0], columns))
         if transpose:
@@ -66,18 +92,20 @@ class CudaControlJacobian:
                 rhs = self.buoyancy @ blocks[n] + self.history[n] @ adjacent
                 adjacent = self.factors[n].solve(rhs)
                 result[n] += self.velocity_actions[n] @ adjacent
+            result = self._normalize(result, False)
         return result.ravel() if vector else result.reshape(self.shape[0], columns)
 
     def storage_bytes(self):
+        resident = tuple(self.factors) + tuple(self.source_factors or ())
         matrices = [self.thermal, self.buoyancy, *self.velocity_actions, *self.history]
-        matrices += [A for factor in self.factors for A in (factor.L, factor.U)]
+        matrices += [A for factor in resident for A in (factor.L, factor.U)]
         total = sum(A.data.nbytes + A.indices.nbytes + A.indptr.nbytes for A in matrices)
-        total += sum(factor.perm_r.nbytes + factor.perm_c.nbytes for factor in self.factors)
-        total += sum(factor.storage_bytes() for factor in self.factors)
+        total += sum(factor.perm_r.nbytes + factor.perm_c.nbytes for factor in resident)
+        total += sum(factor.storage_bytes() for factor in resident)
         return int(total)
 
     def close(self):
-        for factor in self.factors:
+        for factor in tuple(self.factors) + tuple(self.source_factors or ()):
             factor.close()
 
 

@@ -334,10 +334,17 @@ class CoupledControlProblem:
             velocity_actions.append(
                 block.tocsr() if action is not None else (inverse_mass @ block).tocsr()
             )
-            if zero_trajectory:
-                # Every thermal velocity sensitivity is exactly zero. No
-                # momentum derivative factor is needed for this evaluation.
-                # All original momentum equations are still solved and checked.
+            if zero_trajectory and not velocity_actions[-1].nnz:
+                # This slab's thermal velocity sensitivity is exactly zero, so no
+                # momentum derivative factor is needed for it. All original momentum
+                # equations are still solved and checked.
+                #
+                # The test is the sensitivity itself rather than a zero trajectory,
+                # which only implies it for the lumped model. A consistent weighting
+                # makes the background source's own streamline weight move with the
+                # velocity, so its sensitivity is non-zero even from a zero control,
+                # and taking the shortcut there left a factor of None for the
+                # transpose to call solve on.
                 factors.append(None)
             else:
                 J = self.flow.operator(
@@ -374,6 +381,11 @@ class CoupledControlProblem:
             blocks[n][n] = A
             if n:
                 blocks[n][n - 1] = lower[n - 1]
+        if any(factor is None for factor in factors) and any(A.nnz for A in velocity_actions):
+            raise ValueError(
+                "A slab without a momentum factor needs a zero velocity sensitivity in every "
+                "slab, because the tangent's traversal is all or nothing"
+            )
         thermal = sparse.bmat(blocks, format="csr")
         # The preconditioner and the coarse space read this operator. When the
         # stabilisation is consistent the blocks above are unnormalised, so give
