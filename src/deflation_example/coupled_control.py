@@ -487,12 +487,16 @@ class CoupledControlProblem:
             u[self.free] = un
             dt = self.physical_steps[n] if len(self.physical_steps) else None
             assembly = self.assemble(flow_result.velocity)
+            # Both forms come from the assembly, so this checks the equation that was
+            # solved. A lumped assembly returns the diagonals and the arithmetic is
+            # what it always was; a consistent one returns the streamline-weighted
+            # operators, and checking against the lumped ones would certify nothing.
             storage = (
                 np.zeros_like(y)
                 if dt is None
-                else assembly.capacity * (y - previous_y) / self.steps[n]
+                else assembly.storage @ (y - previous_y) / self.steps[n]
             )
-            rhs = assembly.load + assembly.mass * u
+            rhs = assembly.load + assembly.source_action @ u
             reaction = assembly.stiffness @ y + storage - rhs
             acceleration = self.acceleration + self.flow.buoyancy(
                 self.temperature_offset + self.temperature_scale * y,
@@ -516,7 +520,7 @@ class CoupledControlProblem:
                     * fluid_capacity[0]
                     * self.flow.boundary_flux(flow_result.velocity, scalar=y).sum()
                 ),
-                "control_input": float(assembly.mass @ u),
+                "control_input": float((assembly.source_action @ u).sum()),
                 "background_input": float(assembly.load.sum()),
                 "dirichlet_supply": float(reaction[self.mesh.dirichlet].sum()),
             }
