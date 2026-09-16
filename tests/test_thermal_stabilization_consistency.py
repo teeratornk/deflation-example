@@ -128,3 +128,41 @@ def test_the_stabilisation_is_what_costs_the_accuracy():
         f"stabilised {stabilised} should be far worse than unstabilised {plain}"
     )
     assert max(ratio) < 3, f"stabilised convergence should be first order, got {ratio}"
+
+
+def consistent_thermal_assembly():
+    """A small streamline-weighted assembly, for the paths that must refuse one."""
+    from deflation_example.meshes import assemble_thermal
+    from test_axisymmetric_flow import annular_rectangle
+
+    mesh = annular_rectangle(3)
+    cells = len(mesh.cells)
+    velocity = np.zeros((cells, 6, 2))
+    velocity[:, :, 1] = SPEED
+    return assemble_thermal(
+        mesh,
+        CONDUCTIVITY * np.tile(np.eye(2), (cells, 1, 1)),
+        np.ones(cells),
+        velocity,
+        streamline=True,
+        consistent=True,
+    )
+
+
+def test_the_lumped_only_paths_refuse_a_consistent_assembly():
+    """Neither path can represent a weighted storage, so neither may pretend to.
+
+    One eliminates the control by dividing by the lumped mass and builds its
+    transient operator as a Kronecker sum with a scalar capacity per node; the other
+    forms a pencil from that same scalar. Given a streamline-weighted assembly both
+    would return a number for a different problem, which is worse than an error.
+    """
+    from deflation_example.mesh_control import build_mesh_control
+    from deflation_example.temporal_stability import amplification_mode
+
+    assembly = consistent_thermal_assembly()
+    assert assembly.consistent
+    with pytest.raises(ValueError, match="lumped thermal assembly"):
+        build_mesh_control(assembly)
+    with pytest.raises(ValueError, match="lumped thermal assembly"):
+        amplification_mode(assembly, 0.1)
