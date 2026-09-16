@@ -1,6 +1,7 @@
 """Verify the coupled current/history Jacobian and the amplification pencil."""
 
 import numpy as np
+import pytest
 from scipy import sparse
 
 from deflation_example.coupled_step_spectrum import step_linearization, amplification_spectrum
@@ -8,8 +9,20 @@ from deflation_example.coupled_resolution import forward_model
 from test_coupled_derivatives import small_coupled_problem
 
 
-def test_current_and_previous_derivatives_against_complete_equations():
+@pytest.mark.parametrize("consistent", [False, True])
+def test_current_and_previous_derivatives_against_complete_equations(consistent):
+    """The step Jacobian is the derivative of the step the runner actually solves.
+
+    With a consistent stabilisation the storage, the source and the control's action
+    are all weighted by the streamline test function, so all three move with the
+    velocity and all three belong in this derivative. The control and the previous
+    state are handed over as complete nodal fields, the way the runner holds them.
+    """
     problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+    if consistent:
+        problem.consistent_stabilization = True
+        problem.assembly = problem.assemble(problem.initial_flow.velocity)
+    assert problem.assemble(problem.initial_flow.velocity).consistent is consistent
     Y = np.linspace(0.04, 0.08, problem.size)
     evaluation = problem.evaluate(Y)
     model = forward_model(problem)
@@ -20,7 +33,14 @@ def test_current_and_previous_derivatives_against_complete_equations():
     previous = problem.full_temperature(Y.reshape(2, -1)[n - 1])
     control = np.zeros_like(state)
     control[problem.free] = evaluation.control.reshape(2, -1)[n]
-    H, C, _, _ = step_linearization(problem, state[problem.free], flow.velocity, n)
+    H, C, _, _ = step_linearization(
+        problem, state[problem.free], flow.velocity, n, control=control, previous=previous
+    )
+    if consistent:
+        lumped = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+        L = step_linearization(lumped, state[lumped.free], flow.velocity, n)[0]
+        share = abs(H - L).max() / abs(L).max()
+        assert share > 1e-3, f"the weighting moves the step by only {share}, so this proves nothing"
     rng = np.random.default_rng(842)
     direction = rng.normal(size=H.shape[0])
     nv = len(problem.flow_free)

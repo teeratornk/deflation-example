@@ -142,7 +142,7 @@ def newton_step(
             flow.velocity,
             slab,
             control=source,
-            previous=None if previous_state is None else previous_state[problem.free],
+            previous=previous_state,
         )[0]
         scaling = 1 / np.maximum(abs(H).max(axis=1).toarray().ravel(), np.finfo(float).tiny)
         try:

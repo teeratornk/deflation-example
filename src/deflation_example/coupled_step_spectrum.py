@@ -62,6 +62,27 @@ def step_linearization(problem, state, velocity, slab, control=None, previous=No
     return H, C, thermal.tocsc(), thermal_mass.tocsr()
 
 
+def nodal_field(problem, values, name, *, prescribed):
+    """Accept a field given over every mesh node or over the free ones only.
+
+    The runner carries the source and the temperatures over every node and the
+    optimizer carries them over the free ones, and this derivative is reached from
+    both. A free-only temperature is completed by the Dirichlet data it is solved
+    against; a free-only control is completed by zero, because no control acts on a
+    prescribed node.
+    """
+    values = np.asarray(values, dtype=float).reshape(-1)
+    if values.shape == (len(problem.mesh.nodes),):
+        return values
+    if values.shape != (problem.spatial_size,):
+        raise ValueError(f"{name} must cover the free or every temperature node")
+    if prescribed == "dirichlet":
+        return problem.full_temperature(values)
+    spread = np.zeros(len(problem.mesh.nodes))
+    spread[problem.free] = values
+    return spread
+
+
 def consistent_step_velocity(problem, assembly, velocity, state, control, previous, slab):
     """Velocity derivative of the pieces a consistent weighting adds to one step.
 
@@ -78,12 +99,12 @@ def consistent_step_velocity(problem, assembly, velocity, state, control, previo
     cells, local_mass = mesh.cells[fluid], lump[fluid]
     scalar = -local_mass.sum(axis=1) * np.asarray(problem.source)[fluid]
     if control is not None:
-        given = np.zeros(len(mesh.nodes))
-        given[problem.free] = np.asarray(control, dtype=float).reshape(-1)
+        given = nodal_field(problem, control, "The control", prescribed="zero")
         scalar = scalar - np.einsum("ei,ei->e", local_mass, given[cells])
     if previous is not None:
-        change = np.zeros(len(mesh.nodes))
-        change[problem.free] = state - np.asarray(previous, dtype=float).reshape(-1)
+        change = problem.full_temperature(state) - nodal_field(
+            problem, previous, "The previous temperature", prescribed="dirichlet"
+        )
         scalar = scalar + np.asarray(problem.capacity)[fluid] * np.einsum(
             "ei,ei->e", local_mass, change[cells]
         ) / problem.steps[slab]
