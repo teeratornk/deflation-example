@@ -73,6 +73,24 @@ def pair_statistics(coarse_dir, fine_dir, mesh, mass, scale, initial_value):
     )
 
 
+def pair_split(coarse_dir, fine_dir, mesh, mass, scale, protocol, digest, whole):
+    """One refinement pair against the declared horizon split.
+
+    The same rule and the same file the spatial comparison is read against, so a
+    temporal and a spatial assessment cannot drift apart on where pointwise agreement
+    is required. The coarse trajectory is interpolated onto the fine times exactly as
+    the version two statistics do it.
+    """
+    from .coupled_spatial_pair import split_assessment
+
+    coarse_state, coarse_times = load_states(coarse_dir)
+    fine_state, fine_times = load_states(fine_dir)
+    lifted = interpolate_coarse(coarse_state, coarse_times, fine_times, 0.0)
+    return split_assessment(
+        protocol, digest, lifted, fine_times, fine_state, fine_times, mesh, mass, scale, whole
+    )
+
+
 def statistics_from_arrays(
     coarse_state, coarse_times, fine_state, fine_times, mesh, mass, scale, initial_value
 ):
@@ -194,11 +212,29 @@ def assess(directories, baseline_directory, upper_K, protocol=None, cross_scheme
     mass = assemble_thermal(mesh, conductivity, capacity).mass[mesh.free]
     summary = summarize(directories, scale, initial_value=0.0, cross_scheme=cross_scheme)
     paths = {Path(directory).name: Path(directory) for directory in directories}
+    declared = digest = None
+    if protocol is not None:
+        from .coupled_spatial_pair import load_protocol
+
+        declared, digest = load_protocol(protocol)
     pairs = []
     for pair in summary["pairs"]:
-        statistics = pair_statistics(
-            paths[pair["coarse_case"]], paths[pair["fine_case"]], mesh, mass, scale, 0.0
-        )
+        coarse_path, fine_path = paths[pair["coarse_case"]], paths[pair["fine_case"]]
+        statistics = pair_statistics(coarse_path, fine_path, mesh, mass, scale, 0.0)
+        split = None
+        if declared is not None:
+            complete = [row for row in summary["rows"] if row.get("complete")]
+            reached = {row["case"] for row in complete}
+            split = pair_split(
+                coarse_path,
+                fine_path,
+                mesh,
+                mass,
+                scale,
+                declared,
+                digest,
+                whole=pair["coarse_case"] in reached and pair["fine_case"] in reached,
+            )
         pairs.append(
             {
                 "coarse_case": pair["coarse_case"],
@@ -207,6 +243,7 @@ def assess(directories, baseline_directory, upper_K, protocol=None, cross_scheme
                 "v1_maximum_all_refined_time_difference_K": pair.get(
                     "maximum_all_refined_time_difference_K"
                 ),
+                "declared_split": split,
                 **statistics,
             }
         )
@@ -287,6 +324,10 @@ def assess(directories, baseline_directory, upper_K, protocol=None, cross_scheme
         "cross_scheme": bool(cross_scheme),
         "protocol_sha256": None if protocol is None else file_digest(protocol),
         "v1_resolution_assessment": summary["resolution_assessment"],
+        # The declared split is applied pair by pair above; this says plainly whether
+        # a rule was supplied at all, so a report without one cannot be read as one
+        # that passed it.
+        "declared_split_applied": declared is not None,
         "rows": rows,
         "pairs": pairs,
         "assessment_v2": assessment,
