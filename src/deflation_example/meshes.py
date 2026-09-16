@@ -283,10 +283,33 @@ def assemble_thermal(
     if streamline:
         verts = mesh.nodes[mesh.cells]
         h = np.max(np.linalg.norm(verts[:, :, None] - verts[:, None, :], axis=3), axis=(1, 2))
+        if consistent:
+            # The longest edge overestimates the element length for a stretched cell,
+            # and the streamline weight is proportional to it. On this mesh that put
+            # the weight at eighteen times the lumped mass and reversed the sign of
+            # the source action on some rows. The length along the flow keeps the
+            # weight at most one by construction, because it divides by exactly the
+            # sum of the directional derivatives it is built from.
+            directional = np.abs(np.einsum("ed,eid->ei", v, grad)).sum(axis=1)
+            h = 2 * np.linalg.norm(v, axis=1) / np.maximum(directional, np.finfo(float).tiny)
         speed = c * np.linalg.norm(v, axis=1)
         tau = np.minimum(
             h / (2 * np.maximum(speed, np.finfo(float).tiny)), h**2 / (12 * eigenvalues[:, 0])
         )
+        if consistent:
+            # A cell must not take more out of a node's source action than that node's
+            # own share of the cell mass, or the assembled action loses positive row
+            # sums and the recovered control changes sign. The limit scales the
+            # parameter itself, so all three pieces of the term keep one value and the
+            # weighting stays consistent; where the classical value is already safe it
+            # is left alone.
+            share = lump / measure[:, None]
+            reach = np.max(
+                np.abs(tau[:, None] * transport_gradient)
+                / np.maximum(share, np.finfo(float).tiny),
+                axis=1,
+            )
+            tau = tau / np.maximum(reach, 1.0)
         stabilization = (measure * tau)[:, None, None] * (
             transport_gradient[:, :, None] * transport_gradient[:, None, :]
         )
