@@ -146,15 +146,24 @@ class ThermalAssembly:
 
     @property
     def storage(self):
-        """Capacity acting on the time derivative, lumped plus any streamline weight."""
+        """Capacity acting on the time derivative, lumped plus any streamline weight.
+
+        Compressed rows in both cases, so a caller may restrict it to the free nodes
+        without knowing which model it was handed. A diagonal times a vector is the
+        same number either way.
+        """
         lumped = sparse.diags(self.capacity)
-        return lumped if self.stabilized_storage is None else lumped + self.stabilized_storage
+        if self.stabilized_storage is None:
+            return lumped.tocsr()
+        return (lumped + self.stabilized_storage).tocsr()
 
     @property
     def source_action(self):
         """How a nodal source enters the equation, lumped plus any streamline weight."""
         lumped = sparse.diags(self.mass)
-        return lumped if self.stabilized_source is None else lumped + self.stabilized_source
+        if self.stabilized_source is None:
+            return lumped.tocsr()
+        return (lumped + self.stabilized_source).tocsr()
 
     @property
     def consistent(self):
