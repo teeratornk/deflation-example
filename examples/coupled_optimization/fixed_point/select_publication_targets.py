@@ -102,6 +102,18 @@ def main():
             "environment": environment(),
             "driver_sha256": file_sha256(Path(__file__)),
             "configuration_record_sha256": file_sha256(args.configuration_record),
+            "configuration": {
+                key: value
+                for key, value in configuration.items()
+                if key
+                not in {
+                    "baseline_directory",
+                    "reference_baseline_directory",
+                    "initial_control_directory",
+                    "output",
+                    "stage",
+                }
+            },
             "baseline_sha256": baseline["baseline_sha256"],
             "quantity": "Weighted RMS desired-temperature difference from the initial field, in kelvin; positive space-time tracking weights",
             "selection_order": "target 7, closest to the population median excluding target 7, highest remaining amplitude; ties use the lowest index",
