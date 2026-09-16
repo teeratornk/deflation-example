@@ -70,6 +70,7 @@ class CoupledControlProblem:
         flow_continuation=False,
         momentum_factor_policy="retained",
         transport_form="advective",
+        consistent_stabilization=False,
     ):
         self.flow, self.mesh = flow, flow.mesh
         self.free = self.mesh.free.copy()
@@ -136,6 +137,9 @@ class CoupledControlProblem:
         if transport_form not in {"advective", "skew"}:
             raise ValueError("Choose advective or skew thermal transport")
         self.transport_form = transport_form
+        if not isinstance(consistent_stabilization, bool):
+            raise ValueError("Consistent stabilisation is a Boolean choice")
+        self.consistent_stabilization = consistent_stabilization
         self.evaluation_callback = None
         self.evaluation_count = 0
         self.assembly = self.assemble(initial_flow.velocity)
@@ -165,6 +169,7 @@ class CoupledControlProblem:
             self.source,
             streamline=True,
             transport_form=self.transport_form,
+            consistent=self.consistent_stabilization,
         )
 
     def full_temperature(self, state):

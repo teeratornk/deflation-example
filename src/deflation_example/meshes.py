@@ -279,6 +279,7 @@ def assemble_thermal(
     transport_gradient = c[:, None] * np.einsum("ed,eid->ei", v, grad)
     stabilization = np.zeros_like(diffusion)
     stabilized_storage = stabilized_source = None
+    stabilized_load = None
     if streamline:
         verts = mesh.nodes[mesh.cells]
         h = np.max(np.linalg.norm(verts[:, :, None] - verts[:, None, :], axis=3), axis=(1, 2))
@@ -300,6 +301,9 @@ def assemble_thermal(
             weighted = tau[:, None] * transport_gradient
             stabilized_storage = c[:, None, None] * weighted[:, :, None] * lump[:, None, :]
             stabilized_source = weighted[:, :, None] * lump[:, None, :]
+            # The background source is cell constant, so its streamline weight is the
+            # same integral with the cell measure rather than the local mass.
+            stabilized_load = (measure * q)[:, None] * weighted
     size = len(mesh.nodes)
     rows = np.repeat(mesh.cells, d + 1, axis=1).ravel()
     cols = np.tile(mesh.cells, (1, d + 1)).ravel()
@@ -317,7 +321,7 @@ def assemble_thermal(
         matrix(diffusion),
         matrix(transport),
         matrix(stabilization),
-        vector(q[:, None] * lump),
+        vector(q[:, None] * lump) + (0.0 if stabilized_load is None else vector(stabilized_load)),
         None if stabilized_storage is None else matrix(stabilized_storage),
         None if stabilized_source is None else matrix(stabilized_source),
     )
