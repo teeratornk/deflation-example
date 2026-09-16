@@ -39,15 +39,6 @@ def test_the_consistent_control_jacobian_is_an_exact_transpose(steps):
     assert abs(forward - backward) <= 1e-10 * max(abs(forward), abs(backward), 1e-30)
 
 
-@pytest.mark.xfail(
-    reason=(
-        "thermal_velocity_jacobian does not yet differentiate the two consistent terms. "
-        "The source action, the stabilised storage and the stabilised load all depend on "
-        "the velocity through tau and v.grad N, so du/dv needs "
-        "S^-1 (dR/dv - (dS/dv) u) and today carries only the first part."
-    ),
-    strict=True,
-)
 @pytest.mark.parametrize("steps", [None, [0.2, 0.35]])
 def test_the_consistent_tangent_is_the_derivative_of_the_recovered_control(steps):
     problem = consistent_problem(steps)

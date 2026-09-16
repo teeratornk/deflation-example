@@ -307,8 +307,7 @@ def assemble_thermal(
             # two in the convergence rate.
             share = lump / measure[:, None]
             reach = np.max(
-                np.abs(tau[:, None] * transport_gradient)
-                / np.maximum(share, np.finfo(float).tiny),
+                np.abs(tau[:, None] * transport_gradient) / np.maximum(share, np.finfo(float).tiny),
                 axis=1,
             )
             tau = tau / np.maximum(reach, 1.0)

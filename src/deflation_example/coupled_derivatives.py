@@ -102,9 +102,7 @@ class ControlJacobian(LinearOperator):
     backwards, including the final block. All LU factors are fixed at creation.
     """
 
-    def __init__(
-        self, thermal, velocity_actions, buoyancy, factors, history, source_factors=None
-    ):
+    def __init__(self, thermal, velocity_actions, buoyancy, factors, history, source_factors=None):
         # With a consistent stabilisation the source is weighted by the streamline
         # test function, so the control is recovered through a factored action
         # rather than a division by the lumped mass. The thermal and velocity blocks
@@ -251,3 +249,50 @@ class GaussNewtonOperator(LinearOperator):
         operator.coupled_parent = self
         operator.inactive_indices = indices.copy()
         return operator
+
+
+def consistent_velocity_jacobian(flow, velocity, weights, capacity, conductivity, velocity_scale):
+    """Velocity derivative of the three residual pieces a consistent weighting adds.
+
+    Each of them has the same shape: the streamline weight on the test function,
+    ``w_i = tau * c * (v . grad N_i)``, multiplied by one scalar per cell. So they
+    share one derivative and differ only in that scalar, which the caller supplies
+    already combined. The scalar is held fixed here because it is built from the
+    state, the control and the source, not from the velocity.
+
+    The branch guard lives in the symmetric term's derivative, which the caller
+    evaluates first, so a branch switch is rejected before this is reached.
+    """
+    mesh = flow.mesh
+    weights = np.asarray(weights, dtype=float)
+    flow.sampled_velocity(velocity)
+    grad, lump = simplex_geometry(mesh)
+    cells = mesh.cells[flow.fluid_cells]
+    grad = grad[flow.fluid_cells]
+    if weights.shape != (len(cells),) or not np.isfinite(weights).all():
+        raise ValueError("The consistent derivative needs one finite scalar per fluid cell")
+    c = np.asarray(capacity)[flow.fluid_cells]
+    kmin = np.linalg.eigvalsh(np.asarray(conductivity)[flow.fluid_cells])[:, 0]
+    vertices = mesh.nodes[cells]
+    center_shape = np.array([-1, -1, -1, 4, 4, 4]) / 9
+    v = velocity_scale * np.einsum("a,ead->ed", center_shape, velocity[flow.p2])
+    norm = np.linalg.norm(v, axis=1)
+    h = np.max(np.linalg.norm(vertices[:, :, None] - vertices[:, None, :], axis=3), axis=(1, 2))
+    diffusion_tau = h**2 / (12 * kmin)
+    advection_tau = np.full_like(norm, np.inf)
+    np.divide(h, 2 * c * norm, out=advection_tau, where=norm > 0)
+    tau = np.minimum(advection_tau, diffusion_tau)
+    dtau = np.zeros_like(v)
+    advective = advection_tau < diffusion_tau
+    dtau[advective] = -tau[advective, None] * v[advective] / norm[advective, None] ** 2
+    g = c[:, None] * np.einsum("eid,ed->ei", grad, v)
+    # The derivative of the streamline weight that every one of the three shares.
+    dw = tau[:, None, None] * c[:, None, None] * grad + dtau[:, None, :] * g[:, :, None]
+    local = velocity_scale * (
+        (dw * weights[:, None, None])[:, :, None, :] * center_shape[None, None, :, None]
+    )
+    blocks = [
+        flow._matrix(local[:, :, :, d], cells, flow.p2, (len(mesh.nodes), flow.nv))
+        for d in range(2)
+    ]
+    return sparse.hstack(blocks + [sparse.csr_matrix((len(mesh.nodes), flow.np))], format="csr")

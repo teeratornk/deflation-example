@@ -13,11 +13,16 @@ import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import splu
 
-from .coupled_derivatives import ControlJacobian, buoyancy_jacobian, thermal_velocity_jacobian
+from .coupled_derivatives import (
+    ControlJacobian,
+    buoyancy_jacobian,
+    consistent_velocity_jacobian,
+    thermal_velocity_jacobian,
+)
 from .coupled_flow_solve import solve_momentum
 from .coupled_factor_storage import RecomputedLU
 from .mesh_control import WeightedReducedOperator
-from .meshes import assemble_thermal
+from .meshes import assemble_thermal, simplex_geometry
 from .solvers import relative_norm
 from .validation import integer, positive_real
 
@@ -252,9 +257,7 @@ class CoupledControlProblem:
             storage = None
             if dt is not None:
                 if assembly.consistent:
-                    storage = (
-                        assembly.storage[self.free][:, self.free] / self.steps[n]
-                    ).tocsr()
+                    storage = (assembly.storage[self.free][:, self.free] / self.steps[n]).tocsr()
                 else:
                     storage = sparse.diags(assembly.capacity[self.free] / self.steps[n])
                 residual = residual + storage @ (yn - previous_temperature)
@@ -279,6 +282,37 @@ class CoupledControlProblem:
                 self.conductivity,
                 self.velocity_scale,
             )
+            if action is not None:
+                # The consistent weighting puts the same streamline factor on the
+                # storage, the source and the control's own action, so all three
+                # move with the velocity. Their shared scalar per fluid cell is
+                # assembled here, where the state, the control and the source are
+                # to hand, and differentiated together.
+                grad, lump = simplex_geometry(self.mesh)
+                fluid = self.flow.fluid_cells
+                cells = self.mesh.cells[fluid]
+                local_mass = lump[fluid]
+                recovered = np.zeros(len(self.mesh.nodes))
+                recovered[self.free] = control
+                scalar = -np.einsum("ei,ei->e", local_mass, recovered[cells])
+                scalar = scalar - local_mass.sum(axis=1) * np.asarray(self.source)[fluid]
+                if dt is not None:
+                    change = np.zeros(len(self.mesh.nodes))
+                    change[self.free] = yn - previous_temperature
+                    scalar = (
+                        scalar
+                        + np.asarray(self.capacity)[fluid]
+                        * np.einsum("ei,ei->e", local_mass, change[cells])
+                        / self.steps[n]
+                    )
+                derivative = derivative + consistent_velocity_jacobian(
+                    self.flow,
+                    result.velocity,
+                    scalar,
+                    self.capacity,
+                    self.conductivity,
+                    self.velocity_scale,
+                )
             block = derivative[self.free][:, self.flow_free]
             velocity_actions.append(
                 block.tocsr() if action is not None else (inverse_mass @ block).tocsr()
