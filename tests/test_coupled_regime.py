@@ -261,3 +261,51 @@ def test_an_uncapped_record_wins_over_a_capped_one(tmp_path):
     analysis = tangent_analysis(tangent_design(), tmp_path)
     assert analysis["matched_outer_iteration_caps"] == []
     assert analysis["verdict"]["status"] == "supported"
+
+
+def test_the_device_comparison_separates_the_reduction_from_the_cost(tmp_path):
+    """A device changes what the correction costs, not how much the space reduces."""
+    from deflation_example.coupled_regime import device_analysis
+
+    # Same conjugate gradient counts on both devices; only the per-iteration cost differs.
+    write(tmp_path, "cpu-jacobi", stage_record("coupled", "jacobi", 0, 44, 1400, 2.0, 141993.0))
+    write(
+        tmp_path, "cpu-reference", stage_record("coupled", "reference", 200, 44, 715, 2.6, 101872.0)
+    )
+    write(tmp_path, "gpu-jacobi", stage_record("coupled", "jacobi", 0, 44, 1400, 1.9, 134000.0))
+    write(
+        tmp_path, "gpu-reference", stage_record("coupled", "reference", 200, 44, 715, 2.1, 79000.0)
+    )
+    analysis = device_analysis(
+        {
+            "cpu": (tmp_path / "cpu-jacobi", tmp_path / "cpu-reference"),
+            "hybrid": (tmp_path / "gpu-jacobi", tmp_path / "gpu-reference"),
+        }
+    )
+    assert set(analysis["devices"]) == {"cpu", "hybrid"}
+    cpu, hybrid = analysis["devices"]["cpu"], analysis["devices"]["hybrid"]
+    assert cpu["C"] == pytest.approx(hybrid["C"]), "the reduction is device independent"
+    assert hybrid["B"] < cpu["B"], "the device is what makes the correction cheaper"
+    assert hybrid["S"] > cpu["S"]
+    comparison = analysis["comparison"]
+    assert abs(comparison["iteration_reduction_change"]) < 1e-12
+    assert comparison["per_iteration_cost_change"] < 0
+    assert "for the reason the method predicts" in comparison["reading"]
+    values = macros({"tangent": None, "scaling": None, "device": analysis})
+    assert values["coupledHybridCgReduction"] == values["coupledCpuCgReduction"]
+    assert float(values["coupledHybridPerCgCost"]) < float(values["coupledCpuPerCgCost"])
+
+
+def test_an_unverified_device_arm_carries_no_ratio(tmp_path):
+    from deflation_example.coupled_regime import device_analysis
+
+    write(tmp_path, "zero", stage_record("coupled", "jacobi", 0, 44, 1400, 2.0, 141993.0))
+    path = write(
+        tmp_path, "deflated", stage_record("coupled", "reference", 200, 44, 715, 2.6, 101872.0)
+    )
+    record = json.loads((path / "record.json").read_text())
+    record["cases"][0]["verified"] = False
+    (path / "record.json").write_text(json.dumps(record))
+    analysis = device_analysis({"cpu": (tmp_path / "zero", tmp_path / "deflated")})
+    assert analysis["devices"] == {}
+    assert "not verified" in analysis["notes"][0]

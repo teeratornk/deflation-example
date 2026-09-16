@@ -339,12 +339,67 @@ def scaling_verdict(arms, ratios, budget):
     return {"status": "supported", "relative_change": change}
 
 
-def build(tangent_design, tangent_root, scaling_design, scaling_root, output):
+def device_analysis(pairs):
+    """The same comparison on two devices, at matched rank on one problem.
+
+    The device changes no mathematics: both arms solve the same quadratics to the
+    same tolerance, so the iteration reduction the coarse space delivers is a
+    property of the operator and the space, not of where the arithmetic runs. What
+    the device changes is the cost the coarse correction adds per iteration. That
+    makes this the cleanest statement of why the method suits a device: it moves B,
+    leaves C, and the advantage follows.
+    """
+    measured, note = {}, []
+    for name, (zero_dir, deflated_dir) in pairs.items():
+        zero, deflated = load_arm(zero_dir), load_arm(deflated_dir)
+        if not zero or not deflated or "sequence_seconds" not in zero:
+            note.append(f"{name}: the rank-zero arm is not a complete record")
+            continue
+        if "sequence_seconds" not in deflated:
+            note.append(f"{name}: the deflated arm is not a complete record")
+            continue
+        if not (zero.get("verified") and deflated.get("verified")):
+            note.append(f"{name}: an arm is not verified and cannot carry a ratio")
+            continue
+        row = pair(zero, deflated)
+        row["outer_iterations_match"] = row["equal_outer_iterations"]
+        row["arms"] = {"rank_zero": zero["directory"], "deflated": deflated["directory"]}
+        row["rank"] = deflated["rank"]
+        measured[name] = row
+    comparison = None
+    if len(measured) == 2:
+        first, second = sorted(measured)
+        a, b = measured[first], measured[second]
+        comparison = {
+            "devices": [first, second],
+            "iteration_reduction_change": b["C"] / a["C"] - 1,
+            "per_iteration_cost_change": b["B"] / a["B"] - 1 if a["B"] else None,
+            "speedup_change": b["S"] / a["S"] - 1,
+            "reading": (
+                "The iteration reduction is essentially unchanged and the per-iteration "
+                "cost of the coarse correction falls, so the advantage grows for the "
+                "reason the method predicts."
+                if abs(b["C"] / a["C"] - 1) < 0.15 and b["B"] < a["B"]
+                else "The two devices differ in both quantities; report them separately."
+            ),
+        }
+    return {
+        "devices": measured,
+        "comparison": comparison,
+        "notes": note,
+        "provenance": "Separate measurement campaigns on the same problem at the same rank. "
+        "Each ratio is formed within one device from arms run under the same conditions, so "
+        "the ratios are comparable even though the absolute times are not.",
+    }
+
+
+def build(tangent_design, tangent_root, scaling_design, scaling_root, output, devices=None):
     report = {
         "schema": SCHEMA,
         "generator_environment": environment(),
         "tangent": None,
         "scaling": None,
+        "device": None if not devices else device_analysis(devices),
     }
     if tangent_design is not None:
         design = json.loads(Path(tangent_design).read_text())
@@ -433,6 +488,11 @@ def macros(report):
     scaling_verdict = (scaling.get("verdict") or {}).get("status")
     if scaling_verdict:
         values["coupledScalingVerdict"] = scaling_verdict
+    for name, measured in ((report.get("device") or {}).get("devices") or {}).items():
+        label = "".join(part.capitalize() for part in str(name).split("_"))
+        values[f"coupled{label}Speedup"] = _fmt(measured["S"], ".2f")
+        values[f"coupled{label}CgReduction"] = _fmt(measured["C"], ".2f")
+        values[f"coupled{label}PerCgCost"] = _fmt(measured["B"], ".2f")
     return values
 
 
@@ -442,15 +502,30 @@ def main():
     parser.add_argument("--tangent-runs", type=Path)
     parser.add_argument("--scaling-design", type=Path)
     parser.add_argument("--scaling-runs", type=Path)
+    parser.add_argument(
+        "--device",
+        action="append",
+        default=[],
+        metavar="NAME=RANK_ZERO_DIR,DEFLATED_DIR",
+        help="One device's matched pair, given twice to compare two devices",
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--print", action="store_true", help="Print a readable summary")
     args = parser.parse_args()
+    devices = {}
+    for entry in args.device:
+        name, separator, directories = entry.partition("=")
+        zero, comma, deflated = directories.partition(",")
+        if not separator or not comma or name in devices:
+            raise ValueError("Each device needs a distinct NAME=RANK_ZERO_DIR,DEFLATED_DIR")
+        devices[name] = (Path(zero), Path(deflated))
     report = build(
         args.tangent_design,
         args.tangent_runs,
         args.scaling_design,
         args.scaling_runs,
         args.output,
+        devices,
     )
     if args.print:
         print(json.dumps({"macros": macros(report)}, indent=1))
@@ -458,6 +533,10 @@ def main():
             section = report.get(name)
             if section:
                 print(name, json.dumps(section["verdict"], indent=1))
+        if report.get("device"):
+            print("device", json.dumps(report["device"]["comparison"], indent=1))
+            for note in report["device"]["notes"]:
+                print("  note:", note)
 
 
 if __name__ == "__main__":
