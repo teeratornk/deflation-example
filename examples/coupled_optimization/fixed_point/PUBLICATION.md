@@ -38,6 +38,21 @@ step time, and nested nonlinear time are distinct and must not be added together
 
 ## Evidence required before manuscript inclusion
 
+Freeze the three final targets using the desired temperature fields alone:
+
+```bash
+uv run python examples/coupled_optimization/fixed_point/select_publication_targets.py \
+  --configuration-record "$NOMINAL_RECORD" --baseline "$BASELINE" \
+  --threads 8 --output "$NEW_TARGET_SELECTION"
+```
+
+The selection measure is the weighted root-mean-square (RMS) desired-temperature
+rise from the initial field, using the nominal mesh's space-time tracking weights.
+The rule retains target 7, selects the nearest population-median RMS among the
+remaining targets, then selects the largest remaining RMS. Equal amplitudes use
+the lowest target index. Duplicate desired fields are rejected. Solver outcomes,
+controls and timing records are not selection inputs.
+
 1. Complete optimization satisfies independently evaluated residual and KKT
    criteria. The coupled problem supports a stationary-point claim, without a
    global-optimality conclusion.
