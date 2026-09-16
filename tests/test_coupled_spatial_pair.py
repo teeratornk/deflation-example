@@ -353,3 +353,25 @@ def test_every_record_shape_reports_the_length_it_was_meant_to_have(tmp_path):
         allow_partial=True,
     )
     assert subdivided["declared_levels"] == 128
+
+
+def test_the_mesh_size_comes_from_the_saved_field_when_the_record_is_silent(tmp_path):
+    """Two records that both decline to name it would look like one mesh twice."""
+    coarse = load_trajectory(
+        replay_trajectory(tmp_path / "coarse", slabs=4, reached=4), allow_partial=True
+    )
+    assert coarse["spatial_state_dofs"] == 6
+    fine = load_trajectory(trajectory(tmp_path / "fine", dofs=24, slabs=4))
+    assert fine["spatial_state_dofs"] == 24
+    assert checked_pair(coarse, fine, "src") == 4
+
+
+def test_two_trajectories_on_one_mesh_are_refused(tmp_path):
+    left = load_trajectory(
+        replay_trajectory(tmp_path / "left", slabs=4, reached=4), allow_partial=True
+    )
+    right = load_trajectory(
+        replay_trajectory(tmp_path / "right", slabs=4, reached=4), allow_partial=True
+    )
+    with pytest.raises(ValueError, match="same mesh"):
+        checked_pair(left, right, "src")

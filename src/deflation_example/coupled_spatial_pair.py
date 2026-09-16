@@ -222,7 +222,10 @@ def load_trajectory(directory, allow_partial=False):
         "state": state,
         "times_s": times,
         "slabs": declared,
-        "spatial_state_dofs": record.get("spatial_state_dofs"),
+        # The saved field is the honest count: a study record names it, the other two
+        # records this reads do not, and two trajectories that both declined to name
+        # it would otherwise look like one mesh compared with itself.
+        "spatial_state_dofs": record.get("spatial_state_dofs") or int(state.shape[1]),
         "subdivision": record.get("subdivision", 1),
         "time_scheme": record.get("time_scheme", "backward_euler"),
         "procedure": procedure_of(record),
