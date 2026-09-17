@@ -7,6 +7,11 @@ unchanged. No coupled application speedup has been established.
 These commands use the development source, rather than the frozen v0.6.2
 implementation underlying the earlier timing release.
 
+The current corrected-formulation work follows the
+[completion protocol and reproduction instructions](full_validation/completion.md).
+Earlier operating-point, optimization and timing commands below retain their
+original experimental roles; they do not establish the later resolution gates.
+
 The trial variable is the complete temperature trajectory. Each evaluation
 solves momentum and continuity, then recovers the source from the thermal
 equations. Sparse factorizations of the converged momentum Jacobians supply

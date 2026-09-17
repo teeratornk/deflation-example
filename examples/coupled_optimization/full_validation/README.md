@@ -4,6 +4,12 @@ This development example implements the full-validation protocol in
 [`protocol.json`](protocol.json). It does not change the prescribed-flow
 manuscript or the numerical sources used for earlier timing records.
 
+The subsequent [completion protocol](completion_protocol.json) adds bounded
+Newton diagnostics, local time comparisons, checkpointed forward runs and an
+explicit resolution-based design margin. Its [reproduction instructions](completion.md)
+use a pinned numerical source. These steps remain separate from the earlier
+timing populations.
+
 ## Formulation audit
 
 The experimental residual-weighted thermal assembly now includes the complete

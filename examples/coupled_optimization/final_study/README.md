@@ -1,5 +1,12 @@
 # Final coupled comparison
 
+This document preserves the earlier five-problem study design. The current
+corrected-formulation work uses the separate
+[completion protocol](../full_validation/completion_protocol.json) and its
+[reproduction instructions](../full_validation/completion.md): three targets,
+three repeated solver sequences per method, and an optional resolution-based
+optimization margin. Results from these designs must remain separate.
+
 The [study design](protocol.json) fixes the physical problem, comparison
 population, numerical targets and selection rules. Spatial resolution, temporal
 resolution and rank selection are still in progress. `frozen_selection` is
