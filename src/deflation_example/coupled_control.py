@@ -76,6 +76,7 @@ class CoupledControlProblem:
         momentum_factor_policy="retained",
         transport_form="advective",
         consistent_stabilization=False,
+        reference_stabilization="shipped",
     ):
         self.flow, self.mesh = flow, flow.mesh
         self.free = self.mesh.free.copy()
@@ -145,6 +146,9 @@ class CoupledControlProblem:
         if not isinstance(consistent_stabilization, bool):
             raise ValueError("Consistent stabilisation is a Boolean choice")
         self.consistent_stabilization = consistent_stabilization
+        if reference_stabilization not in {"shipped", "matched"}:
+            raise ValueError("Choose shipped or matched reference stabilisation")
+        self.reference_stabilization = reference_stabilization
         self.evaluation_callback = None
         self.evaluation_count = 0
         self.assembly = self.assemble(initial_flow.velocity)
@@ -154,11 +158,24 @@ class CoupledControlProblem:
         # original residual, and the construction eliminates the control by dividing
         # by the lumped mass and forms its transient operator as a Kronecker sum,
         # neither of which a weighted storage is.
-        self.reference_assembly = (
-            self.assemble(initial_flow.velocity, consistent=False)
-            if self.consistent_stabilization
-            else self.assembly
-        )
+        #
+        # Which lumped assembly is a separate question, and it matters more. Asking
+        # for the lumped assembly also reverts the streamline parameter to its
+        # unbounded value, and on the corrected model that carries about three times
+        # the artificial diffusion of the operator actually being solved, so the
+        # coarse space is built from the slow modes of a much more diffusive operator.
+        # "matched" keeps the bound, so the stiffness is the corrected model's own and
+        # only the storage and the source are lumped. "shipped" is what every record
+        # up to the corrected-operator screen used, and stays the default so those
+        # records reproduce.
+        if not self.consistent_stabilization:
+            self.reference_assembly = self.assembly
+        else:
+            self.reference_assembly = self.assemble(
+                initial_flow.velocity,
+                consistent=False,
+                bound_streamline=reference_stabilization == "matched",
+            )
         mass = self.assembly.mass[self.free]
         self.weights = mass / mass.mean()
         self.objective_scale = float(mass.mean())
@@ -176,11 +193,13 @@ class CoupledControlProblem:
             (flow.mass, flow.mass, sparse.csr_matrix((flow.np, flow.np))), format="csr"
         )[self.flow_free][:, self.flow_free]
 
-    def assemble(self, velocity, consistent=None):
+    def assemble(self, velocity, consistent=None, bound_streamline=None):
         """The thermal assembly at one velocity.
 
         ``consistent`` overrides the problem's own setting, which the reference
-        construction uses to ask for the lumped assembly deliberately.
+        construction uses to ask for the lumped assembly deliberately, and
+        ``bound_streamline`` lets it keep the corrected model's bounded streamline
+        parameter while doing so.
         """
         return assemble_thermal(
             self.mesh,
@@ -191,6 +210,7 @@ class CoupledControlProblem:
             streamline=True,
             transport_form=self.transport_form,
             consistent=self.consistent_stabilization if consistent is None else consistent,
+            bound_streamline=bound_streamline,
         )
 
     def full_temperature(self, state):

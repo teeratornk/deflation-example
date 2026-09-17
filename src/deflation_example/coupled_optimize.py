@@ -89,6 +89,7 @@ def load_problem(config):
         momentum_factor_policy=policy,
         transport_form=config.get("transport_form", "advective"),
         consistent_stabilization=config.get("consistent_stabilization", False),
+        reference_stabilization=config.get("reference_stabilization", "shipped"),
     )
     return problem, record
 

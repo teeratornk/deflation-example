@@ -81,7 +81,14 @@ def test_independent_momentum_adjoint_checks_detect_an_incorrect_transpose_solve
     assert failed["maximum_momentum_adjoint_relative_residual"] > 0.9
 
 
-def small_coupled_problem(steps=None, feedback=0.003, uniform_capacity=False, inlet=0.02):
+def small_coupled_problem(
+    steps=None,
+    feedback=0.003,
+    uniform_capacity=False,
+    inlet=0.02,
+    consistent=False,
+    reference_stabilization="shipped",
+):
     """The shared small coupled problem.
 
     ``inlet`` raises the through-flow. At the default this problem is slow enough
@@ -121,6 +128,8 @@ def small_coupled_problem(steps=None, feedback=0.003, uniform_capacity=False, in
         initial_temperature=np.full(len(mesh.free), 0.04),
         thermal_boundary=0.03,
         flow_tolerance=1e-11,
+        consistent_stabilization=consistent,
+        reference_stabilization=reference_stabilization,
     )
 
 

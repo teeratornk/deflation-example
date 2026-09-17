@@ -31,6 +31,7 @@ flow_continuation: false
 momentum_factor_policy: retained
 transport_form: advective
 consistent_stabilization: false
+reference_stabilization: shipped
 nonlinear_tolerance: 1.0e-8
 nonlinear_cap: 100
 backtracking: halving

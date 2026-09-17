@@ -201,6 +201,7 @@ def assemble_thermal(
     transport_form="advective",
     consistent=False,
     streamline_length="edge",
+    bound_streamline=None,
 ):
     """Assemble diffusion, nonconservative transport, and optional streamline diffusion.
 
@@ -238,6 +239,13 @@ def assemble_thermal(
         raise ValueError("Choose advective or skew thermal transport")
     if consistent and not streamline:
         raise ValueError("A consistent stabilisation needs the streamline term it weights")
+    # The row bound belongs to the consistent weighting, so it follows that choice
+    # unless asked for on its own. Asking for it without the weighting gives the
+    # corrected model's stiffness with lumped storage and source, which is what a
+    # coarse space built by a Kronecker-sum construction can represent.
+    bound_streamline = consistent if bound_streamline is None else bool(bound_streamline)
+    if bound_streamline and not streamline:
+        raise ValueError("A streamline bound needs the streamline term it bounds")
     if streamline_length not in {"edge", "flow"}:
         raise ValueError("Choose the longest edge or the length along the flow")
     if transport_form == "skew" and not quadratic_flow:
@@ -313,7 +321,7 @@ def assemble_thermal(
         tau = np.minimum(
             h / (2 * np.maximum(speed, np.finfo(float).tiny)), h**2 / (12 * eigenvalues[:, 0])
         )
-        if consistent:
+        if bound_streamline:
             # A cell must not take more out of a node's row than that node's own share
             # of the cell mass, or the assembled storage and source action lose their
             # positive row sums and the step operator they sit inside turns nearly
