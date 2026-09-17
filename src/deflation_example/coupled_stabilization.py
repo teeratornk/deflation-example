@@ -88,9 +88,7 @@ def _structure(record):
             "storage_nonpositive_rows": checks["storage_over_step"]["rows_with_nonpositive_sum"],
             "storage_diagonal_minimum": checks["storage_over_step"]["diagonal_minimum"],
             "step_operator_nonpositive_rows": checks["step_operator"]["rows_with_nonpositive_sum"],
-            "pivot_magnitude_ratio": entry["step_operator_factorisation"][
-                "pivot_magnitude_ratio"
-            ],
+            "pivot_magnitude_ratio": entry["step_operator_factorisation"]["pivot_magnitude_ratio"],
             "rows": checks["source_action"]["rows"],
             "row_bound": entry.get("row_limit"),
         }
@@ -188,14 +186,10 @@ def macros(report):
     values["coupledStabPivotImprovement"] = _fmt(report["conditioning"]["pivot_improvement"], ".1f")
     bound = bounded.get("row_bound") or {}
     if bound:
-        values["coupledStabBoundedFraction"] = _fmt(
-            100 * bound["fraction_limited"], ".1f"
-        )
+        values["coupledStabBoundedFraction"] = _fmt(100 * bound["fraction_limited"], ".1f")
         values["coupledStabBoundMedianFactor"] = _fmt(bound["median_factor"], ".3f")
     for row in report["forward_cost"]:
         label = "Weighted" if row["consistent_stabilization"] else "Shipped"
         if row["median_newton_iterations"] is not None:
-            values[f"coupledStab{label}NewtonMedian"] = _fmt(
-                row["median_newton_iterations"], ".0f"
-            )
+            values[f"coupledStab{label}NewtonMedian"] = _fmt(row["median_newton_iterations"], ".0f")
     return values

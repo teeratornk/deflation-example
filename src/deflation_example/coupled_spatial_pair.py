@@ -54,8 +54,9 @@ def load_protocol(path):
     return protocol, hashlib.sha256(raw).hexdigest()
 
 
-def split_assessment(protocol, digest, lifted, coarse_times, fine_state, fine_times, mesh, mass,
-                     scale, whole):
+def split_assessment(
+    protocol, digest, lifted, coarse_times, fine_state, fine_times, mesh, mass, scale, whole
+):
     """Apply the declared split: pointwise inside the interval, functional outside.
 
     Outside the interval the coupled linearisation amplifies a perturbation by about
@@ -74,8 +75,14 @@ def split_assessment(protocol, digest, lifted, coarse_times, fine_state, fine_ti
     interval = None
     if inside.any():
         interval = statistics_from_arrays(
-            lifted[inside], coarse_times[inside], fine_state[inside], fine_times[inside],
-            mesh, mass, scale, 0.0,
+            lifted[inside],
+            coarse_times[inside],
+            fine_state[inside],
+            fine_times[inside],
+            mesh,
+            mass,
+            scale,
+            0.0,
         )
     pointwise_limit = float(criteria["pointwise_interval"]["maximum_temperature_difference_K"])
     rms_limit = float(criteria["pointwise_interval"]["mass_weighted_rms_difference_K"])

@@ -45,8 +45,12 @@ def convergence_record(tmp_path, unstabilised=(5e-14, 1.6e-14, 6e-15)):
                         (2.0e-2, 4.8e-3, 1.2e-3),
                         True,
                         True,
-                        {"cells": 512, "cells_bounded": 512, "smallest_factor": 0.33,
-                         "median_factor": 0.33},
+                        {
+                            "cells": 512,
+                            "cells_bounded": 512,
+                            "smallest_factor": 0.33,
+                            "median_factor": 0.33,
+                        },
                     ),
                 ],
             }
@@ -129,8 +133,13 @@ def test_the_report_reads_the_correction_from_its_records(tmp_path):
             "after",
             0,
             1.06e-3,
-            {"fluid_cells": 14848, "cells_limited": 14828, "fraction_limited": 0.9987,
-             "smallest_factor": 0.009, "median_factor": 0.457},
+            {
+                "fluid_cells": 14848,
+                "cells_limited": 14828,
+                "fraction_limited": 0.9987,
+                "smallest_factor": 0.009,
+                "median_factor": 0.457,
+            },
         ),
         replays=[replay_record(tmp_path, "shipped", False, ["converged"] * 4, [4, 5, 4, 3])],
     )
@@ -199,8 +208,13 @@ def test_the_stabilisation_macros_are_written_and_gated(tmp_path):
             "after",
             0,
             1.06e-3,
-            {"fluid_cells": 14848, "cells_limited": 14828, "fraction_limited": 0.9987,
-             "smallest_factor": 0.009, "median_factor": 0.457},
+            {
+                "fluid_cells": 14848,
+                "cells_limited": 14828,
+                "fraction_limited": 0.9987,
+                "smallest_factor": 0.009,
+                "median_factor": 0.457,
+            },
         ),
     )
     write_stabilization({"stabilization": report}, output)

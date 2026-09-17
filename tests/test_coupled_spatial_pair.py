@@ -277,9 +277,7 @@ def replay_trajectory(directory, *, slabs, reached, subdivision=1, horizon=1.0):
                 "subdivision": subdivision,
                 "optimization_field_sha256": "src",
                 "forward_solver": {"procedure": "monolithic_newton"},
-                "steps": [
-                    {"time_s": float(t), "status": "converged"} for t in times
-                ]
+                "steps": [{"time_s": float(t), "status": "converged"} for t in times]
                 + [{"time_s": 0.0, "status": "newton_line_search_stagnation"}],
             }
         )
@@ -347,9 +345,7 @@ def test_every_record_shape_reports_the_length_it_was_meant_to_have(tmp_path):
     assert replay["declared_levels"] == resolution["declared_levels"] == 64
     assert resolution["levels_reached"] == 7 and resolution["complete"] is False
     subdivided = load_trajectory(
-        resolution_trajectory(
-            tmp_path / "subdivided", original_slabs=64, reached=5, subdivision=2
-        ),
+        resolution_trajectory(tmp_path / "subdivided", original_slabs=64, reached=5, subdivision=2),
         allow_partial=True,
     )
     assert subdivided["declared_levels"] == 128
