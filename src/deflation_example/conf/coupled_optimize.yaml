@@ -21,6 +21,7 @@ query: 7
 target_count: 16
 lower_K: 337.3
 upper_K: 357.3
+temperature_margin_K: 0.0 # Inward optimization margin; physical assessment bounds stay unchanged.
 methods: [jacobi, reference, recycling]
 device: cpu
 rank: 20

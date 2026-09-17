@@ -17,6 +17,7 @@ from threadpoolctl import threadpool_limits
 from .assess_transformer import transformer_boundaries
 from .axisymmetric_flow import AxisymmetricFlow, FlowResult
 from .coupled_control import CoupledControlProblem, FlowEvaluationError
+from .coupled_bounds import temperature_bounds
 from .coupled_optimizer import NUMERICAL_POLICY, minimize_coupled
 from .coupled_pilot import transformer_inputs
 from .coupled_reference import configured_reference
@@ -307,8 +308,14 @@ def run(config):
                     },
                 )
                 return
-            lower = (cfg["lower_K"] - problem.temperature_offset) / problem.temperature_scale
-            upper = (cfg["upper_K"] - problem.temperature_offset) / problem.temperature_scale
+            bounds = temperature_bounds(cfg)
+            metadata["temperature_bounds"] = bounds
+            lower = (
+                bounds["optimization_lower_K"] - problem.temperature_offset
+            ) / problem.temperature_scale
+            upper = (
+                bounds["optimization_upper_K"] - problem.temperature_offset
+            ) / problem.temperature_scale
             initial_state = None
             if cfg.get("initial_control_directory"):
                 initial_state, metadata["initial_control"] = prolonged_initial_state(

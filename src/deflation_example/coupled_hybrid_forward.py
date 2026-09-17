@@ -25,6 +25,7 @@ def hybrid_step(
     trust_region=None,
     anderson_cap=300,
     flow_cap=100,
+    attempt_callback=None,
 ):
     """Verify every returned candidate against the unchanged coupled equations.
 
@@ -74,6 +75,10 @@ def hybrid_step(
                 "independent_equations": metrics,
             }
         )
+        if attempt_callback is not None:
+            # Observational persistence; preserve a returned Newton state even
+            # if the subsequent fallback is interrupted by a scheduler limit.
+            attempt_callback(candidate, attempts[-1])
         return metrics
 
     first_metrics = verified(

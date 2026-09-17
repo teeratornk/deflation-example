@@ -26,6 +26,7 @@ from omegaconf import OmegaConf
 from threadpoolctl import threadpool_limits
 
 from .axisymmetric_flow import FlowResult
+from .coupled_bounds import temperature_bounds
 from .coupled_control import FlowEvaluationError
 from .coupled_optimize import (
     equations_verified,
@@ -283,7 +284,6 @@ def optimize_targets(
     iterate for the first selected problem when no warm start is restored.
     """
     cases, fields = [], []
-    lower = (cfg["lower_K"] - problem.temperature_offset) / problem.temperature_scale
     positions = list(range(len(cfg["queries"]))) if positions is None else list(positions)
     for index, position in enumerate(positions):
         query = cfg["queries"][position]
@@ -291,8 +291,19 @@ def optimize_targets(
         desired = desired_temperature(
             problem, query["target"], cfg["target_count"], cfg.get("target_startup_s", 0.0)
         )
-        upper = (query["upper_K"] - problem.temperature_offset) / problem.temperature_scale
-        row = {"position": position, **query, "warm_start_used": previous is not None}
+        bounds = temperature_bounds(cfg, upper_K=query["upper_K"])
+        lower = (
+            bounds["optimization_lower_K"] - problem.temperature_offset
+        ) / problem.temperature_scale
+        upper = (
+            bounds["optimization_upper_K"] - problem.temperature_offset
+        ) / problem.temperature_scale
+        row = {
+            "position": position,
+            **query,
+            "temperature_bounds": bounds,
+            "warm_start_used": previous is not None,
+        }
         restart = resume if resume is not None and index == 0 else None
         if restart is not None:
             row["resumed_from_iteration"] = int(restart["iteration"])

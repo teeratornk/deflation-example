@@ -134,3 +134,15 @@ def test_the_unrestricted_search_is_what_it_always_was():
 
     for function in (newton_step, newton_trajectory):
         assert inspect.signature(function).parameters["trust_region"].default is None
+
+
+def test_pressure_is_not_used_as_a_velocity_scale():
+    from deflation_example.coupled_newton_replay import trust_scale
+
+    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+    count = len(problem.flow_free)
+    update = np.zeros(count + problem.spatial_size)
+    update[:count][problem.flow_free >= 2 * problem.flow.nv] = 1e6
+    assert trust_scale(problem, problem.initial_flow, update, 0.05) == 1
+    update[count:] = 1.0
+    assert trust_scale(problem, problem.initial_flow, update, 0.05) == pytest.approx(0.05)

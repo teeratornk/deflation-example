@@ -16,6 +16,7 @@ from threadpoolctl import threadpool_limits
 
 from .axisymmetric_flow import FlowResult
 from .coupled_forward import CoupledResult
+from .coupled_forward_checkpoint import load_steps, save_snapshot, save_step
 from .coupled_derivatives import StabilizationBranchError
 from .coupled_optimize import load_problem
 from .coupled_resolution import forward_model
@@ -23,7 +24,7 @@ from .coupled_saved import load_saved_solution, require_matching_baseline
 from .coupled_step_spectrum import step_linearization
 from .coupled_targets import desired_temperature
 from .coupled_time_integration import effective_step
-from .reporting import environment, write_fields, write_report
+from .reporting import environment, file_sha256, write_fields, write_report
 from .validation import integer, positive_real, real_array
 
 
@@ -88,9 +89,16 @@ def trust_scale(problem, flow, update, limit):
     fraction of the current peak speed in the velocity, so one number sets both.
     """
     limit = positive_real(limit, "Newton trust region")
+    # The free momentum block also contains pressure. Pressure has different
+    # units and must not be compared with a velocity increment. The line search
+    # checks its effect through the complete momentum/continuity residual.
+    update = real_array(update, "Newton update")
     nv = len(problem.flow_free)
-    velocity = float(np.max(np.abs(update[:nv]))) if nv else 0.0
-    temperature = float(np.max(np.abs(update[nv:]))) if len(update) > nv else 0.0
+    if update.shape != (nv + problem.spatial_size,) or not np.isfinite(update).all():
+        raise ValueError("Newton update must match the coupled free variables")
+    velocity_part = update[:nv][problem.flow_free < 2 * problem.flow.nv]
+    velocity = float(np.max(np.abs(velocity_part), initial=0.0))
+    temperature = float(np.max(np.abs(update[nv:]), initial=0.0))
     speed = max(float(np.max(np.abs(flow.velocity))), np.finfo(float).tiny)
     excess = max(temperature / limit, velocity / (limit * speed), 1.0)
     return 1.0 / excess
@@ -380,6 +388,11 @@ def main():
         help="Weight the full cell-interior thermal residual, storage, and source",
     )
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--resume-from",
+        type=Path,
+        help="Read verified per-step checkpoints into a new output directory",
+    )
     args = parser.parse_args()
     subdivision = integer(args.subdivision, "Time subdivision", 1)
     if args.output.exists():
@@ -461,12 +474,91 @@ def main():
             "trajectory_comparison": "Forward states versus piecewise-linear interpolation of the optimized states, including the initial condition.",
             "scope": "Forward verification of the fixed saved source, with the declared temporal subdivision; no reoptimization or clipping.",
         }
+        checkpoint_protocol = {
+            "source_sha256": metadata["environment"]["source_sha256"],
+            "optimization_field_sha256": digest,
+            "baseline_sha256": baseline["baseline_sha256"],
+            "forward_slabs": problem.slabs,
+            "forward_solver": metadata["forward_solver"],
+            "forward_formulation": metadata["forward_formulation"],
+            "configuration": metadata["configuration"],
+        }
+        metadata["checkpoint_timing"] = (
+            "Per-attempt and per-step persistence is included; resumed records are separate from uninterrupted runs."
+        )
+        metadata["resumed"] = args.resume_from is not None
+        checkpoints = args.output / "checkpoints"
+        entries = []
         write_report(args.output / "record.json", {**metadata, "status": "running", "steps": []})
         state, flow = problem.full_temperature(problem.initial), problem.initial_flow
         older_state, older_flow = None, None
         states, velocities, pressures, rows = [], [], [], []
+        if args.resume_from is not None:
+            restored = load_steps(args.resume_from / "checkpoints", checkpoint_protocol)
+            metadata["resume_record_sha256"] = file_sha256(args.resume_from / "record.json")
+            for document, arrays in restored:
+                if document["status"] != "converged":
+                    break
+                result = CoupledResult(
+                    arrays["state"],
+                    FlowResult(arrays["velocity"], arrays["pressure"], "restored", []),
+                    document["status"],
+                    document["details"]["history"],
+                    document["seconds"],
+                )
+                if (
+                    result.state.shape != state.shape
+                    or result.flow.velocity.shape != flow.velocity.shape
+                    or result.flow.pressure.shape != flow.pressure.shape
+                ):
+                    raise ValueError("Restart fields differ from the model dimensions")
+                rows.append(document["details"])
+                states.append(result.state[problem.free].copy())
+                velocities.append(result.flow.velocity.copy())
+                pressures.append(result.flow.pressure.copy())
+                entries = save_step(
+                    checkpoints,
+                    len(entries),
+                    result,
+                    document["details"],
+                    checkpoint_protocol,
+                    entries,
+                )
+                older_state, older_flow = state, flow
+                state, flow = result.state, result.flow
+            if not rows or len(rows) == problem.slabs:
+                raise ValueError(
+                    "Restart requires an incomplete trajectory with a verified preceding step"
+                )
+            # Recompute the last retained step against its own stored physical
+            # history before any continuation. Hash checks alone are insufficient.
+            n = len(rows) - 1
+            from .coupled_time_integration import saved_history
+
+            effective, hs, hf, _ = saved_history(
+                problem,
+                np.stack(states),
+                np.stack(velocities),
+                np.stack(pressures),
+                n,
+                args.time_scheme,
+                restart=n % subdivision == 0,
+            )
+            source = np.zeros(len(problem.mesh.nodes))
+            source[problem.free] = controls[n]
+            _, restart_checks = step_equations(
+                effective, forward_model(effective), state, flow, source, hs, hf, n
+            )
+            if not criteria_met(restart_checks, args.tolerance):
+                raise ValueError(
+                    "The restarted state fails independent original-equation verification"
+                )
+            metadata["restart_verification"] = restart_checks
+            metadata["restored_steps"] = len(rows)
+            metadata["previous_completed_step_seconds"] = float(sum(row["seconds"] for row in rows))
         start = time.perf_counter()
-        for n, values in enumerate(controls):
+        for n in range(len(rows), len(controls)):
+            values = controls[n]
             source = np.zeros(len(problem.mesh.nodes))
             source[problem.free] = values
             effective, history_state, history_flow, coefficients = effective_step(
@@ -480,10 +572,22 @@ def main():
                 restart=n % subdivision == 0,
             )
             solve_step = newton_step
+            extra = {}
+
+            def persist_attempt(candidate, details):
+                save_snapshot(
+                    checkpoints,
+                    f"step-{n:05d}-{details['procedure']}",
+                    candidate,
+                    {"slab_zero_based": n, **details},
+                    checkpoint_protocol,
+                )
+
             if args.forward_policy == "newton_anderson":
                 from .coupled_hybrid_forward import hybrid_step
 
                 solve_step = hybrid_step
+                extra["attempt_callback"] = persist_attempt
             result = solve_step(
                 effective,
                 source,
@@ -497,7 +601,27 @@ def main():
                 trust_region=args.trust_region,
                 initial_state=state,
                 initial_flow=flow,
+                **extra,
             )
+            if args.forward_policy == "newton":
+                _, metrics = step_equations(
+                    effective,
+                    forward_model(effective),
+                    result.state,
+                    result.flow,
+                    source,
+                    history_state,
+                    history_flow,
+                    n,
+                )
+                persist_attempt(
+                    result,
+                    {
+                        "procedure": "newton",
+                        "history": result.history,
+                        "independent_equations": metrics,
+                    },
+                )
             states.append(result.state[problem.free].copy())
             velocities.append(result.flow.velocity.copy())
             pressures.append(result.flow.pressure.copy())
@@ -514,6 +638,7 @@ def main():
                     ),
                 }
             )
+            entries = save_step(checkpoints, n, result, rows[-1], checkpoint_protocol, entries)
             write_report(
                 args.output / "record.json", {**metadata, "status": "running", "steps": rows}
             )
