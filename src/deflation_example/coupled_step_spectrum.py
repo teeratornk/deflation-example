@@ -50,6 +50,7 @@ def step_linearization(problem, state, velocity, slab, control=None, previous=No
         problem.conductivity,
         problem.velocity_scale,
         limit_rows=assembly.consistent,
+        residual_weighted=assembly.consistent,
     )[problem.free][:, problem.flow_free]
     if assembly.consistent:
         thermal_mass = (
@@ -111,9 +112,12 @@ def consistent_step_velocity(problem, assembly, velocity, state, control, previo
         change = problem.full_temperature(state) - nodal_field(
             problem, previous, "The previous temperature", prescribed="dirichlet"
         )
-        scalar = scalar + np.asarray(problem.capacity)[fluid] * np.einsum(
-            "ei,ei->e", local_mass, change[cells]
-        ) / problem.steps[slab]
+        scalar = (
+            scalar
+            + np.asarray(problem.capacity)[fluid]
+            * np.einsum("ei,ei->e", local_mass, change[cells])
+            / problem.steps[slab]
+        )
     return consistent_velocity_jacobian(
         problem.flow,
         velocity,

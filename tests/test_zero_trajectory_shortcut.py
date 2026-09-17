@@ -25,9 +25,7 @@ def consistent(steps=None, inlet=0.3):
     problem = small_coupled_problem(steps, uniform_capacity=True, inlet=inlet)
     problem.consistent_stabilization = True
     problem.assembly = problem.assemble(problem.initial_flow.velocity)
-    problem.reference_assembly = problem.assemble(
-        problem.initial_flow.velocity, consistent=False
-    )
+    problem.reference_assembly = problem.assemble(problem.initial_flow.velocity, consistent=False)
     return problem
 
 

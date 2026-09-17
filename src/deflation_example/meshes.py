@@ -210,11 +210,11 @@ def assemble_thermal(
     artificial-diffusion term to the discrete state equation. On its own that term
     is not weighted against the rest of the residual, so it does not vanish for the
     exact solution and leaves an error proportional to the element size. Asking for
-    ``consistent`` adds the other two pieces of the same streamline weighting, the
-    storage and the source, which restores the rate the elements can give; on P1
-    cells with cell-constant conductivity the diffusive part of the residual is
-    identically zero and needs no term. The exact transpose of the resulting
-    equation is used.
+    ``consistent`` weights storage, source, and the cell-interior strong thermal
+    residual with the same cell-constant streamline test function. Quadratic
+    velocities are integrated in the residual. In axisymmetric coordinates the
+    strong diffusion includes (K grad T)_r/r, even for P1 temperature elements.
+    The exact transpose of the resulting discrete equation is used.
     For a continuous quadratic 2D velocity, ``skew`` adds half the cellwise
     divergence times temperature. Its quadratic form is the boundary heat flux
     plus any interelement capacity-flux jumps. Axisymmetric divergence includes
@@ -239,6 +239,8 @@ def assemble_thermal(
         raise ValueError("Choose advective or skew thermal transport")
     if consistent and not streamline:
         raise ValueError("A consistent stabilisation needs the streamline term it weights")
+    if consistent and transport_form != "advective":
+        raise ValueError("Residual-weighted stabilization currently requires advective transport")
     # The row bound belongs to the consistent weighting, so it follows that choice
     # unless asked for on its own. Asking for it without the weighting gives the
     # corrected model's stiffness with lumped storage and source, which is what a
@@ -358,14 +360,20 @@ def assemble_thermal(
             transport_gradient[:, :, None] * transport_gradient[:, None, :]
         )
         if consistent:
-            # The same streamline weight applied to the rest of the residual, so the
-            # whole term vanishes for the exact solution instead of adding an
-            # artificial diffusivity proportional to the element size. On P1 cells
-            # with cell-constant conductivity the diffusive part of the residual is
-            # identically zero, so only the storage and the source remain.
-            # The local mass already carries the cell measure, so the streamline
-            # weight must not carry it a second time.
             weighted = tau[:, None] * transport_gradient
+            # The test weight uses the centroid velocity. The residual uses the
+            # same P2 velocity as the Galerkin transport, integrated over the cell.
+            # Replacing that velocity by its centroid value changes the equation.
+            convection = measure[:, None] * transport_gradient
+            if quadratic_flow:
+                convection = c[:, None] * np.einsum("ed,ejd->ej", moments.sum(axis=1), grad)
+            if mesh.axisymmetric:
+                # The cylindrical 1/r cancels the 2*pi*r volume weight. The
+                # remaining integral is exact for cell-constant K and P1 T.
+                area = np.linalg.det(verts[:, 1:] - verts[:, :1]) / 2
+                radial_flux = np.einsum("ed,ejd->ej", k[:, 0, :], grad)
+                convection -= (2 * np.pi * area)[:, None] * radial_flux
+            stabilization = weighted[:, :, None] * convection[:, None, :]
             stabilized_storage = c[:, None, None] * weighted[:, :, None] * lump[:, None, :]
             stabilized_source = weighted[:, :, None] * lump[:, None, :]
             # The background source is cell constant, so its streamline weight is the

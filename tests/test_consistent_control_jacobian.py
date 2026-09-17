@@ -77,8 +77,6 @@ def test_the_consistent_equations_are_verified_against_their_own_forms(steps):
     linear shape functions sum to zero, so they move heat between nodes and create
     none. That is asserted here rather than assumed.
     """
-    from deflation_example.coupled_control import CoupledControlProblem
-
     problem = small_coupled_problem(steps, uniform_capacity=True)
     problem.consistent_stabilization = True
     problem.assembly = problem.assemble(problem.initial_flow.velocity)

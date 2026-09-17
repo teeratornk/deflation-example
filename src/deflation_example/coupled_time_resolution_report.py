@@ -45,12 +45,18 @@ def assess_resolution(rows, pairs):
     thresholds = bool(
         last is not None and last["shared_time_thresholds_met"] and last[temperature_key] <= 0.05
     )
-    passed = complete and thresholds and trend is True
+    both_thresholds = bool(
+        prior is not None
+        and thresholds
+        and prior["shared_time_thresholds_met"]
+        and prior[temperature_key] <= 0.05
+    )
+    passed = complete and both_thresholds and trend is True
     if not complete:
         status = "incomplete_declared_refinements"
     elif prior is None:
         status = "insufficient_refinements_for_trend"
-    elif not thresholds:
+    elif not both_thresholds:
         status = "resolution_thresholds_exceeded"
     elif not trend:
         status = "refinement_trend_not_decreasing"
@@ -62,12 +68,13 @@ def assess_resolution(rows, pairs):
         "temperature_threshold_K": 0.05,
         "tracking_relative_threshold": 0.01,
         "last_pair_thresholds_met": thresholds,
+        "last_two_pairs_thresholds_met": both_thresholds,
         "last_two_changes_nonincreasing": trend,
         "discrete_time_resolution_met": passed,
         "temperature_comparison": "all refined times versus linear coarse interpolation"
         if full_trajectory
         else "shared endpoints only",
-        "scope": "The last two temperature and tracking changes must decrease to within roundoff; the finest pair must meet both thresholds. The reported sampling defines the temperature comparison. Spatial resolution, reoptimization and bound satisfaction require separate checks.",
+        "scope": "Both of the last two temperature and tracking comparisons must meet the thresholds, and the changes must decrease to within roundoff. The reported sampling defines the temperature comparison; full-horizon validation requires all refined times. Spatial resolution, reoptimization and bound satisfaction require separate checks.",
     }
 
 
@@ -95,6 +102,8 @@ def summarize(directories, temperature_scale, initial_value=None, cross_scheme=F
             record["baseline_sha256"],
             record["configuration"],
             None if cross_scheme else record["forward_solver"],
+            record.get("forward_formulation"),
+            record["environment"]["git_head"],
         )
         if identity is not None and key != identity:
             raise ValueError(

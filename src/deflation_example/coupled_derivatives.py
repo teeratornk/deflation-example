@@ -82,7 +82,14 @@ def streamline_parameter(grad, lump, c, kmin, v, vertices, limit_rows):
 
 
 def thermal_velocity_jacobian(
-    flow, velocity, state, capacity, conductivity, velocity_scale, limit_rows=False
+    flow,
+    velocity,
+    state,
+    capacity,
+    conductivity,
+    velocity_scale,
+    limit_rows=False,
+    residual_weighted=False,
 ):
     """Derivative of K(v)y, including the active streamline-diffusion branch.
 
@@ -134,6 +141,27 @@ def thermal_velocity_jacobian(
     local = velocity_scale * (
         transport + derivative[:, :, None, :] * center_shape[None, None, :, None]
     )
+    if residual_weighted:
+        # Differentiate w_i * integral(c*v.grad(T) - div(K grad(T))).
+        # Both the streamline test weight and the integrated P2 velocity vary.
+        integrated_shape = np.einsum("eq,qa->ea", measure, shape)
+        integrated_velocity = velocity_scale * np.einsum(
+            "ea,ead->ed", integrated_shape, velocity[flow.p2]
+        )
+        scalar = c * np.einsum("ed,ed->e", integrated_velocity, gradient_y)
+        if mesh.axisymmetric:
+            k = np.asarray(conductivity)[flow.fluid_cells]
+            scalar -= 2 * np.pi * area * np.einsum("ed,ed->e", k[:, 0, :], gradient_y)
+        dw = tau[:, None, None] * c[:, None, None] * grad + dtau[:, None, :] * g[:, :, None]
+        weighted = tau[:, None] * g
+        local = velocity_scale * (
+            transport
+            + (dw * scalar[:, None, None])[:, :, None, :] * center_shape[None, None, :, None]
+            + weighted[:, :, None, None]
+            * c[:, None, None, None]
+            * integrated_shape[:, None, :, None]
+            * gradient_y[:, None, None, :]
+        )
     blocks = [
         flow._matrix(local[:, :, :, d], cells, flow.p2, (len(mesh.nodes), flow.nv))
         for d in range(2)

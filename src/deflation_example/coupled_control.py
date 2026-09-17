@@ -6,7 +6,7 @@ equations. A differentiable, locally unique flow branch is required. Frozen
 Jacobian factors define the exact discrete tangent and adjoint at that point.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import time
 
 import numpy as np
@@ -170,11 +170,15 @@ class CoupledControlProblem:
         # records reproduce.
         if not self.consistent_stabilization:
             self.reference_assembly = self.assembly
+        elif reference_stabilization == "matched":
+            self.reference_assembly = replace(
+                self.assembly, stabilized_storage=None, stabilized_source=None
+            )
         else:
             self.reference_assembly = self.assemble(
                 initial_flow.velocity,
                 consistent=False,
-                bound_streamline=reference_stabilization == "matched",
+                bound_streamline=False,
             )
         mass = self.assembly.mass[self.free]
         self.weights = mass / mass.mean()
@@ -318,6 +322,7 @@ class CoupledControlProblem:
                 self.conductivity,
                 self.velocity_scale,
                 limit_rows=assembly.consistent,
+                residual_weighted=assembly.consistent,
             )
             if action is not None:
                 # The consistent weighting puts the same streamline factor on the

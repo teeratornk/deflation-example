@@ -92,7 +92,9 @@ def test_the_two_references_give_different_spaces():
 
 def test_the_lumped_model_is_untouched_by_the_option():
     for choice in ("shipped", "matched"):
-        problem = small_coupled_problem(STEPS, uniform_capacity=True, reference_stabilization=choice)
+        problem = small_coupled_problem(
+            STEPS, uniform_capacity=True, reference_stabilization=choice
+        )
         assert problem.reference_assembly is problem.assembly
 
 

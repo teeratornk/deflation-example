@@ -73,6 +73,8 @@ def test_partial_and_missing_computations_remain_visible(tmp_path):
         ("baseline_sha256", "different"),
         ("configuration", {"slabs": 3}),
         ("forward_solver", {"procedure": "monolithic_newton", "tolerance": 1e-8}),
+        ("forward_formulation", {"consistent_stabilization": True}),
+        ("environment", {"git_head": "another-source"}),
         ("tracking_integral_refined_K2_m3_s", -1),
         ("maximum_recorded_upper_violation_K", -1),
         ("maximum_recorded_lower_violation_K", float("nan")),
@@ -196,16 +198,24 @@ def test_intermediate_time_differences_can_fail_despite_identical_endpoints(tmp_
 
 
 def test_all_time_comparison_includes_initial_interval_and_has_decreasing_error(tmp_path):
-    runs = [case(tmp_path, n) for n in (2, 4, 8)]
+    runs = [case(tmp_path, n) for n in (4, 8, 16)]
     result = summarize(runs, 1, initial_value=0)
     assert result["resolution_assessment"]["discrete_time_resolution_met"]
     pair = result["pairs"][-1]
-    assert pair["maximum_all_refined_time_difference_K"] == pytest.approx(0.015625)
-    assert pair["maximum_interpolated_difference_K"][0] == pytest.approx(0.015625)
-    assert len(pair["refined_times_s"]) == 16
+    assert pair["maximum_all_refined_time_difference_K"] == pytest.approx(0.00390625)
+    assert pair["maximum_interpolated_difference_K"][0] == pytest.approx(0.00390625)
+    assert len(pair["refined_times_s"]) == 32
     changed_initial = summarize(runs, 1, initial_value=1)
     assert changed_initial["pairs"][-1]["maximum_all_refined_time_difference_K"] > 0.49
     assert not changed_initial["resolution_assessment"]["discrete_time_resolution_met"]
+
+
+def test_one_passing_pair_does_not_satisfy_two_successive_comparisons(tmp_path):
+    runs = [case(tmp_path, n) for n in (2, 4, 8)]
+    gate = summarize(runs, 1, initial_value=0)["resolution_assessment"]
+    assert gate["last_pair_thresholds_met"]
+    assert not gate["last_two_pairs_thresholds_met"]
+    assert not gate["discrete_time_resolution_met"]
 
 
 def test_nonfinite_initial_value_is_rejected(tmp_path):

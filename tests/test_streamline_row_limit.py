@@ -23,9 +23,7 @@ from test_coupled_derivatives import small_coupled_problem
 
 
 def assemblies(problem):
-    velocity = problem.velocity_scale * problem.flow.thermal_velocity(
-        problem.initial_flow.velocity
-    )
+    velocity = problem.velocity_scale * problem.flow.thermal_velocity(problem.initial_flow.velocity)
     built = {}
     for consistent in (False, True):
         built[consistent] = assemble_thermal(
@@ -131,9 +129,7 @@ def test_the_bounded_parameter_is_the_derivative_of_itself():
         plus = streamline_parameter(grad, lump, c, kmin, v + epsilon * step, vertices, True)[0]
         minus = streamline_parameter(grad, lump, c, kmin, v - epsilon * step, vertices, True)[0]
         numerical = (plus - minus) / (2 * epsilon)
-        errors.append(
-            float(np.max(np.abs(numerical - exact)) / max(np.max(np.abs(exact)), 1e-30))
-        )
+        errors.append(float(np.max(np.abs(numerical - exact)) / max(np.max(np.abs(exact)), 1e-30)))
     assert min(errors) < 1e-7, f"relative errors {errors}"
 
 
@@ -166,6 +162,4 @@ def test_the_switch_onto_the_bound_is_refused():
     )
     np.testing.assert_allclose(tau, 1 / 6, rtol=1e-14)
     with pytest.raises(StabilizationBranchError, match="row limit"):
-        streamline_parameter(
-            grad, lump, c, kmin, np.array([[np.sqrt(2), 0.0]]), vertices, True
-        )
+        streamline_parameter(grad, lump, c, kmin, np.array([[np.sqrt(2), 0.0]]), vertices, True)

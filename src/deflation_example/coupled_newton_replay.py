@@ -16,6 +16,7 @@ from threadpoolctl import threadpool_limits
 
 from .axisymmetric_flow import FlowResult
 from .coupled_forward import CoupledResult
+from .coupled_derivatives import StabilizationBranchError
 from .coupled_optimize import load_problem
 from .coupled_resolution import forward_model
 from .coupled_saved import load_saved_solution, require_matching_baseline
@@ -159,14 +160,19 @@ def newton_step(
             break
         if iteration == max_iterations:
             break
-        H = step_linearization(
-            problem,
-            state[problem.free],
-            flow.velocity,
-            slab,
-            control=source,
-            previous=previous_state,
-        )[0]
+        try:
+            H = step_linearization(
+                problem,
+                state[problem.free],
+                flow.velocity,
+                slab,
+                control=source,
+                previous=previous_state,
+            )[0]
+        except StabilizationBranchError:
+            status = "newton_stabilization_switch"
+            history.append({"iteration": iteration + 1, "status": status, **metrics})
+            break
         scaling = 1 / np.maximum(abs(H).max(axis=1).toarray().ravel(), np.finfo(float).tiny)
         try:
             factor = splu((sparse.diags(scaling) @ H).tocsc())
@@ -351,6 +357,7 @@ def main():
     parser.add_argument("--target-position", type=int)
     parser.add_argument("--tolerance", type=float, default=1e-12)
     parser.add_argument("--cap", type=int, default=30)
+    parser.add_argument("--forward-policy", choices=("newton", "newton_anderson"), default="newton")
     parser.add_argument("--subdivision", type=int, default=1)
     parser.add_argument(
         "--time-scheme", choices=("backward_euler", "bdf2"), default="backward_euler"
@@ -370,7 +377,7 @@ def main():
     parser.add_argument(
         "--consistent-stabilization",
         action="store_true",
-        help="Weight the storage and the source by the streamline test function",
+        help="Weight the full cell-interior thermal residual, storage, and source",
     )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -413,7 +420,7 @@ def main():
             "subdivision": subdivision,
             "forward_slabs": problem.slabs,
             "forward_solver": {
-                "procedure": "monolithic_newton",
+                "procedure": args.forward_policy,
                 "tolerance": args.tolerance,
                 "newton_cap": args.cap,
                 "linear_internal_target": 1e-10,
@@ -427,6 +434,22 @@ def main():
                 "trust_region": args.trust_region,
                 "time_scheme": args.time_scheme,
                 "time_integrator_restart": "Backward Euler on the first substep of every original piecewise-constant source interval",
+                "fallback": None
+                if args.forward_policy == "newton"
+                else {
+                    "procedure": "complete-field Anderson",
+                    "depth": 5,
+                    "relaxation": 0.5,
+                    "cap": 300,
+                    "flow_cap": 100,
+                    "all_attempts_included": True,
+                },
+            },
+            "forward_formulation": {
+                "consistent_stabilization": args.consistent_stabilization,
+                "residual_weighting": "integrated P2 advection and cylindrical P1 diffusion"
+                if args.consistent_stabilization
+                else "legacy symmetric streamline term",
             },
             "target_position": args.target_position,
             "configuration": {
@@ -456,7 +479,12 @@ def main():
                 args.time_scheme,
                 restart=n % subdivision == 0,
             )
-            result = newton_step(
+            solve_step = newton_step
+            if args.forward_policy == "newton_anderson":
+                from .coupled_hybrid_forward import hybrid_step
+
+                solve_step = hybrid_step
+            result = solve_step(
                 effective,
                 source,
                 history_state,
