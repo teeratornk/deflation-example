@@ -28,14 +28,21 @@ def buoyancy_jacobian(flow, expansion, temperature_scale, gravity=(0.0, -9.81)):
     )
 
 
-def thermal_velocity_jacobian(flow, velocity, state, capacity, conductivity, velocity_scale):
+def thermal_velocity_jacobian(
+    flow, velocity, state, capacity, conductivity, velocity_scale, *, branch_policy="strict"
+):
     """Derivative of K(v)y, including the active streamline-diffusion branch.
 
     K is exactly the P2-velocity thermal operator in assemble_thermal. At a
-    switch between its two stabilization branches the derivative is undefined;
-    such a point is explicitly rejected. At zero velocity the diffusion-limited
-    branch is smooth and has zero stabilization derivative.
+    switch between its two stabilization branches the classical derivative is
+    undefined. The default strict policy rejects a switch. The active policy
+    uses the derivative of the selected minimum branch, with the diffusion
+    branch at an exact tie. This is a local forward-solver choice, not a claim
+    of differentiability or global convergence. At zero velocity the
+    diffusion-limited branch has zero stabilization derivative.
     """
+    if branch_policy not in {"strict", "active"}:
+        raise ValueError("Choose strict or active stabilization branch policy")
     mesh = flow.mesh
     state = np.asarray(state, dtype=float)
     if state.shape != (len(mesh.nodes),) or not np.isfinite(state).all():
@@ -69,7 +76,9 @@ def thermal_velocity_jacobian(flow, velocity, state, capacity, conductivity, vel
     diffusion_tau = h**2 / (12 * kmin)
     advection_tau = np.full_like(norm, np.inf)
     np.divide(h, 2 * c * norm, out=advection_tau, where=norm > 0)
-    if np.any(np.isclose(advection_tau, diffusion_tau, rtol=1e-12, atol=0)):
+    if branch_policy == "strict" and np.any(
+        np.isclose(advection_tau, diffusion_tau, rtol=1e-12, atol=0)
+    ):
         raise StabilizationBranchError(
             "Streamline stabilization is at a nondifferentiable branch switch"
         )

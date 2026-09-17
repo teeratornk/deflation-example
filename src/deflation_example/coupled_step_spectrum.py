@@ -21,8 +21,8 @@ from .reporting import environment, write_report
 from .validation import integer
 
 
-def step_linearization(problem, state, velocity, slab):
-    """Return exact current-state and previous-state derivatives of one step."""
+def step_linearization(problem, state, velocity, slab, *, branch_policy="strict"):
+    """Return step derivatives, or an explicitly selected branch linearization."""
     slab = integer(slab, "Slab index", 0)
     if not len(problem.physical_steps) or slab >= problem.slabs:
         raise ValueError("Select an existing transient time slab")
@@ -36,7 +36,13 @@ def step_linearization(problem, state, velocity, slab):
     flow_jacobian += problem.flow.convection_derivative(velocity)
     flow_jacobian = flow_jacobian[problem.flow_free][:, problem.flow_free]
     thermal_jacobian = thermal_velocity_jacobian(
-        problem.flow, velocity, full, problem.capacity, problem.conductivity, problem.velocity_scale
+        problem.flow,
+        velocity,
+        full,
+        problem.capacity,
+        problem.conductivity,
+        problem.velocity_scale,
+        branch_policy=branch_policy,
     )[problem.free][:, problem.flow_free]
     thermal_mass = sparse.diags(assembly.capacity[problem.free] / problem.steps[slab])
     thermal = assembly.stiffness[problem.free][:, problem.free] + thermal_mass

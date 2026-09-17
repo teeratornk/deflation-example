@@ -15,6 +15,7 @@ from scipy.sparse.linalg import splu
 from threadpoolctl import threadpool_limits
 
 from .axisymmetric_flow import FlowResult
+from .coupled_derivatives import StabilizationBranchError
 from .coupled_forward import CoupledResult
 from .coupled_optimize import load_problem
 from .coupled_resolution import forward_model
@@ -94,6 +95,7 @@ def newton_step(
     initial_flow=None,
     line_search="equation_max",
     backtrack_cap=21,
+    branch_policy="strict",
 ):
     """Solve one unchanged transient step, starting from past fields by default."""
     slab = integer(slab, "Slab index", 0)
@@ -105,6 +107,8 @@ def newton_step(
     max_iterations = integer(max_iterations, "Newton iteration cap", 0)
     if line_search not in {"equation_max", "fixed_scaled"}:
         raise ValueError("Choose equation_max or fixed_scaled Newton line search")
+    if branch_policy not in {"strict", "active"}:
+        raise ValueError("Choose strict or active stabilization branch policy")
     backtrack_cap = integer(backtrack_cap, "Backtracking trial cap", 1)
     source = real_array(source, "Fixed source").copy()
     previous_state = real_array(previous_state, "Previous temperature").copy()
@@ -136,7 +140,14 @@ def newton_step(
             break
         if iteration == max_iterations:
             break
-        H = step_linearization(problem, state[problem.free], flow.velocity, slab)[0]
+        try:
+            H = step_linearization(
+                problem, state[problem.free], flow.velocity, slab, branch_policy=branch_policy
+            )[0]
+        except StabilizationBranchError:
+            status = "newton_stabilization_switch"
+            history.append({"iteration": iteration + 1, "status": status, **metrics})
+            break
         scaling = 1 / np.maximum(abs(H).max(axis=1).toarray().ravel(), np.finfo(float).tiny)
         try:
             factor = splu((sparse.diags(scaling) @ H).tocsc())
