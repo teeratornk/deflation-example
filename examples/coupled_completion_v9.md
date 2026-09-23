@@ -110,6 +110,22 @@ repetitions for confirmation. It checks complete timing sums, unchanged final
 tolerances, source/deployment matching and agreement of saved states and
 objectives. Missing, failed or unverified comparisons cannot produce a speedup.
 
+Generate the performance figure from the same settings and records:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_confirmation_figures \
+  --settings FROZEN_SETTINGS.json --records RUN_A/record.json RUN_B/record.json \
+  --output COMPLETE_SEQUENCE_FIGURES
+```
+
+The figure retains every independently timed repetition. Its cumulative curves
+end at the measured sequence totals. Stacked components belong to one actual
+middle-ranked run, so they sum to that run's total. The memory panel shows sampled
+whole-process allocations. Failed runs remain visible, and missing comparisons
+withhold the speedup summary. The output records input hashes and all plotted
+values. Use `coupled_figures` for saved temperatures, applied source fields and
+fluid velocities; those plots use stored discrete time levels.
+
 Use compute nodes for numerical work and request a GPU only for CUDA-enabled
 tests and block products. Preserve every capped, cancelled, memory-limited or
 failed attempt. Temporal resolution requires separate checks for each applied
