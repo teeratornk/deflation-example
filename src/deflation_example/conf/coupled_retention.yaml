@@ -1,0 +1,14 @@
+defaults:
+  - coupled_refinement
+  - _self_
+
+# Diagnostic capture is a fresh rerun, not a replacement for frozen timings.
+output: runs/coupled-retention
+slabs: 64
+method: jacobi
+rank: 0
+recycle_window: 1
+capture_linear_systems: true
+reference_selection: thermal
+reference_candidates: 400
+reference_selection_tolerance: 1.0e-12

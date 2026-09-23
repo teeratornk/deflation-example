@@ -74,6 +74,9 @@ def forward_model(problem):
             problem.velocity_scale * velocity,
             problem.source,
             streamline=True,
+            transport_form=getattr(problem, "transport_form", "advective"),
+            consistent=getattr(problem, "consistent_stabilization", False),
+            streamline_rule=getattr(problem, "streamline_rule", "hard_min"),
         )
 
     return CoupledForward(

@@ -347,9 +347,14 @@ class AxisymmetricFlow:
             force += (self.mass @ previous) / positive_real(time_step, "Physical time step")
         rhs = np.r_[force[:, 0], force[:, 1], np.zeros(self.np)]
         history, status = [], "iteration_cap"
+        # The operator assembled at the end of an iteration, to measure the residual,
+        # is the operator this loop needs at the start of the next one: nothing
+        # between them changes the velocity. Carrying it halves the assemblies.
+        carried = None
         for iteration in range(1, max_iterations + 1):
             velocity = np.column_stack((x[: self.nv], x[self.nv : 2 * self.nv]))
-            A = self.operator(velocity, time_step, convection)
+            A = self.operator(velocity, time_step, convection) if carried is None else carried
+            carried = None
             if method == "newton" and convection:
                 linear_operator = A + self.convection_derivative(velocity)
                 linear_rhs = (rhs - A @ x)[free]
@@ -423,6 +428,7 @@ class AxisymmetricFlow:
             # Rebuild convection at the updated velocity; the lagged linear
             # residual alone cannot establish a nonlinear solution.
             updated = self.operator(velocity, time_step, convection)
+            carried = updated
             metrics = self._residual_metrics(updated, x, rhs, constrained, prescribed)
             history.append(
                 {

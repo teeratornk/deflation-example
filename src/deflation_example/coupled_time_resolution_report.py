@@ -45,12 +45,18 @@ def assess_resolution(rows, pairs):
     thresholds = bool(
         last is not None and last["shared_time_thresholds_met"] and last[temperature_key] <= 0.05
     )
-    passed = complete and thresholds and trend is True
+    both_thresholds = bool(
+        prior is not None
+        and thresholds
+        and prior["shared_time_thresholds_met"]
+        and prior[temperature_key] <= 0.05
+    )
+    passed = complete and both_thresholds and trend is True
     if not complete:
         status = "incomplete_declared_refinements"
     elif prior is None:
         status = "insufficient_refinements_for_trend"
-    elif not thresholds:
+    elif not both_thresholds:
         status = "resolution_thresholds_exceeded"
     elif not trend:
         status = "refinement_trend_not_decreasing"
@@ -62,27 +68,97 @@ def assess_resolution(rows, pairs):
         "temperature_threshold_K": 0.05,
         "tracking_relative_threshold": 0.01,
         "last_pair_thresholds_met": thresholds,
+        "last_two_pairs_thresholds_met": both_thresholds,
         "last_two_changes_nonincreasing": trend,
         "discrete_time_resolution_met": passed,
         "temperature_comparison": "all refined times versus linear coarse interpolation"
         if full_trajectory
         else "shared endpoints only",
-        "scope": "The last two temperature and tracking changes must decrease to within roundoff; the finest pair must meet both thresholds. The reported sampling defines the temperature comparison. Spatial resolution, reoptimization and bound satisfaction require separate checks.",
+        "scope": "Both of the last two temperature and tracking comparisons must meet the thresholds, and the changes must decrease to within roundoff. The reported sampling defines the temperature comparison; full-horizon validation requires all refined times. Spatial resolution, reoptimization and bound satisfaction require separate checks.",
     }
 
 
-def summarize(directories, temperature_scale, initial_value=None):
+def audit_forward_equations(record):
+    """Check each returned state's recorded independent equations, not its label.
+
+    The strict assessment uses the corrected study's 1e-12 equation and 1e-6
+    conservation criteria. An unsuccessful final step remains in the record;
+    its verified prefix cannot qualify the complete trajectory.
+    """
+    from .coupled_prefix_diagnostics import verified_prefix
+
+    try:
+        tolerance = positive_real(record["forward_solver"]["tolerance"], "Forward tolerance")
+        if tolerance > 1e-12:
+            raise ValueError("The strict assessment requires a forward target at most 1e-12")
+        count = verified_prefix(record)
+        slabs = integer(record["forward_slabs"], "Forward slabs", 1)
+        expected_slabs = integer(record["configuration"]["slabs"], "Original slabs", 1) * integer(
+            record["subdivision"], "Time subdivision", 1
+        )
+        if slabs != expected_slabs or len(record["steps"]) > slabs:
+            raise ValueError("Forward slab counts differ from the declared subdivision")
+        horizon = positive_real(record["configuration"]["horizon_s"], "Physical horizon")
+        times = np.asarray([row["time_s"] for row in record["steps"]], dtype=float)
+        expected = np.arange(1, len(times) + 1) * horizon / slabs
+        if not np.isfinite(times).all() or not np.allclose(times, expected, rtol=0, atol=1e-10):
+            raise ValueError("Verified steps must use the declared physical time grid")
+        if record["status"] == "converged" and count != slabs:
+            raise ValueError("A complete trajectory requires every step's independent equations")
+        names = (
+            "momentum_relative_residual",
+            "continuity_relative_residual",
+            "thermal_relative_residual",
+            "mass_relative_imbalance",
+            "energy_relative_defect",
+        )
+        return {
+            "verified_steps": count,
+            "all_steps_verified": record["status"] == "converged" and count == slabs,
+            "verified_prefix_maxima": {
+                name: max(
+                    (row["history"][-1][name] for row in record["steps"][:count]), default=None
+                )
+                for name in names
+            },
+        }
+    except (KeyError, IndexError, TypeError) as error:
+        raise ValueError(
+            "The strict assessment requires each returned state's equation checks"
+        ) from error
+
+
+def summarize(
+    directories,
+    temperature_scale,
+    initial_value=None,
+    cross_scheme=False,
+    *,
+    verify_equations=False,
+    equation_audits=None,
+):
     """Retain every run and compute endpoint differences between complete refinements.
 
     This comparison uses the saved fields rather than the original-optimization
     differences printed by each run. Tracking integrals use the separately
-    recorded physical quadrature for each temporal resolution.
+    recorded physical quadrature for each temporal resolution. With
+    ``cross_scheme`` the forward time-integration policy may differ between
+    runs; each run's policy stays in its row and the summary says so.
     """
     scale = positive_real(temperature_scale, "Temperature scale")
+    directories = list(map(Path, directories))
+    if equation_audits is not None:
+        equation_audits = list(map(Path, equation_audits))
+        if not verify_equations or len(equation_audits) != len(directories):
+            raise ValueError("Supply one independent audit per replay with equation verification")
+    if verify_equations and initial_value is None:
+        raise ValueError(
+            "The strict assessment requires the initial temperature for all-time comparison"
+        )
     if initial_value is not None:
         initial_value = finite_real(initial_value, "Uniform initial dimensionless temperature")
     rows, complete, identity = [], [], None
-    for directory in map(Path, directories):
+    for index, directory in enumerate(directories):
         path = directory / "record.json"
         if not path.exists():
             rows.append({"case": directory.name, "status": "missing", "complete": False})
@@ -92,7 +168,9 @@ def summarize(directories, temperature_scale, initial_value=None):
             record["optimization_field_sha256"],
             record["baseline_sha256"],
             record["configuration"],
-            record["forward_solver"],
+            None if cross_scheme else record["forward_solver"],
+            record.get("forward_formulation"),
+            record["environment"]["git_head"],
         )
         if identity is not None and key != identity:
             raise ValueError(
@@ -106,11 +184,21 @@ def summarize(directories, temperature_scale, initial_value=None):
             "status": record["status"],
             "complete": False,
             "subdivision": subdivision,
+            "declared_slabs": original_slabs * subdivision,
             "forward_solver": record["forward_solver"],
             "source": record["environment"]["git_head"],
             "record_sha256": file_digest(path),
             "seconds": record.get("seconds"),
         }
+        if verify_equations:
+            if equation_audits is None:
+                row["independent_equations"] = audit_forward_equations(record)
+            else:
+                from .coupled_external_audit import read_equation_audit
+
+                row["independent_equations"] = read_equation_audit(
+                    directory, record, equation_audits[index]
+                )
         for name in ("maximum_recorded_upper_violation_K", "maximum_recorded_lower_violation_K"):
             value = record.get(name)
             if value is not None:
@@ -140,10 +228,17 @@ def summarize(directories, temperature_scale, initial_value=None):
                 len(state) == original_slabs * subdivision
                 and all(r["status"] == "converged" for r in steps)
                 and record["status"] == "converged"
+                and (not verify_equations or row["independent_equations"]["all_steps_verified"])
             )
             row.update(
                 complete=is_complete, recorded_slabs=len(state), field_sha256=file_digest(fields)
             )
+            row["last_recorded_time_s"] = float(times[-1])
+            if verify_equations:
+                verified_count = row["independent_equations"]["verified_steps"]
+                row["last_verified_time_s"] = (
+                    float(times[verified_count - 1]) if verified_count else 0.0
+                )
             if is_complete:
                 tracking = finite_real(
                     record["tracking_integral_refined_K2_m3_s"], "Physical tracking integral"
@@ -240,6 +335,7 @@ def summarize(directories, temperature_scale, initial_value=None):
         "schema": "coupled-nested-time-resolution-summary-v1",
         "temperature_scale_K": scale,
         "initial_dimensionless_value": initial_value,
+        "independent_equation_audit": verify_equations,
         "scope": "Pairwise fixed-source comparisons using each grid's physical tracking quadrature. When the uniform initial temperature is supplied, temperatures are also compared at every refined level with linear interpolation of the coarse trajectory. This is not reoptimization or a continuous-time feasibility certificate.",
         "rows": rows,
         "pairs": pairs,
@@ -258,8 +354,25 @@ def main():
     )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--plot", action="store_true")
+    parser.add_argument(
+        "--equation-audits",
+        type=Path,
+        nargs="+",
+        help="Separate equation-check JSON files in replay order; checksums bind them to the unchanged records and fields.",
+    )
+    parser.add_argument(
+        "--verify-equations",
+        action="store_true",
+        help="Require independently evaluated equations at every returned step, the declared time grid, and all-refined-time comparison. Uses 1e-12 equation and 1e-6 conservation thresholds.",
+    )
     args = parser.parse_args()
-    report = summarize(args.replays, args.temperature_scale, args.initial_value)
+    report = summarize(
+        args.replays,
+        args.temperature_scale,
+        args.initial_value,
+        verify_equations=args.verify_equations,
+        equation_audits=args.equation_audits,
+    )
     args.output.mkdir(parents=True, exist_ok=False)
     write_report(args.output / "summary.json", report)
     if args.plot:
@@ -272,10 +385,21 @@ def main():
                 pair.get("maximum_interpolated_difference_K", pair["maximum_difference_K"]),
                 label=f"{pair['coarse_slabs']} and {pair['fine_slabs']} time levels",
             )
+        for row in report["rows"]:
+            if row["complete"] or "last_recorded_time_s" not in row:
+                continue
+            total = row["declared_slabs"]
+            axis.axvline(
+                row["last_recorded_time_s"],
+                color="0.4",
+                linestyle="--",
+                linewidth=1,
+                label=f"{total}-step replay stopped (incomplete)",
+            )
         axis.set(xlabel="Physical time (s)", ylabel="Maximum temperature difference (K)")
         axis.axhline(0.05, color="black", linestyle=":", linewidth=1, label="0.05 K threshold")
         axis.grid(alpha=0.25)
-        if report["pairs"]:
+        if axis.get_legend_handles_labels()[0]:
             axis.legend(fontsize=8)
         for extension in ("pdf", "png"):
             figure.savefig(args.output / f"time_resolution.{extension}", dpi=220)

@@ -31,7 +31,16 @@ def inspect_step(problem, source, previous_state, previous_flow, state, flow, sl
     residual, metrics = step_equations(
         problem, model, state, flow, source, previous_state, previous_flow, slab
     )
-    H = step_linearization(problem, state[problem.free], flow.velocity, slab)[0]
+    # The consistent weighting's velocity term needs both, and this caller has
+    # them; without them the linearization silently omits it.
+    H = step_linearization(
+        problem,
+        state[problem.free],
+        flow.velocity,
+        slab,
+        control=source,
+        previous=previous_state,
+    )[0]
     scaling = 1 / np.maximum(abs(H).max(axis=1).toarray().ravel(), np.finfo(float).tiny)
     factor = splu((sparse.diags(scaling) @ H).tocsc())
     update = factor.solve(-scaling * residual)

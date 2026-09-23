@@ -13,6 +13,10 @@ presets. Separate benchmarks reproduce the matched GPU comparison, complete
 CHT sequences, scaled Ritz control, conditional spectral examples,
 history-based recycling control and matrix-free rank study.
 
+The [coupled reference-reuse development example](examples/coupled_completion_v9.md)
+adds matched velocity-frozen preconditioning, full-domain Ritz construction and
+evidence checks. Its development runs are separate from the published timings.
+
 The [relocated-study guide](docs/reproduce-relocated-studies.md) provides a tested
 runner for the archived figures and tables, plus versioned numerical reruns.
 The [detailed supplementary tables](docs/supplementary-tables.md) provide
@@ -143,6 +147,13 @@ temperature-dependent buoyancy and nonlinear optimization. Its discrete
 derivatives and optimizer have small-problem verification tests. Transformer
 application and resolution pilots are in progress; the prescribed-flow timing
 records above remain separate.
+
+The [coupled reference-retention study](examples/coupled_retention_v8.md)
+provides matched inactive-system replays, nominal coupled reference selection,
+and accuracy-gated complete comparisons. Its diagnostic feedback variations
+remain separate from the fixed-physics application. The
+[time-refinement example](examples/coupled_refinement_v7.md) describes the
+independent forward-resolution checks.
 
 ## Diagnostic tutorials
 

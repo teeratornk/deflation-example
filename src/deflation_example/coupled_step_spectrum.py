@@ -14,15 +14,22 @@ from scipy import sparse
 from scipy.sparse.linalg import LinearOperator, ArpackNoConvergence, eigs, splu
 from threadpoolctl import threadpool_limits
 
-from .coupled_derivatives import thermal_velocity_jacobian
+from .coupled_derivatives import consistent_velocity_jacobian, thermal_velocity_jacobian
 from .coupled_optimize import load_problem
 from .coupled_saved import load_saved_solution, require_matching_baseline
 from .reporting import environment, write_report
 from .validation import integer
 
 
-def step_linearization(problem, state, velocity, slab):
-    """Return exact current-state and previous-state derivatives of one step."""
+def step_linearization(problem, state, velocity, slab, control=None, previous=None):
+    """Return exact current-state and previous-state derivatives of one step.
+
+    A consistent stabilisation weights the storage and the source by the same
+    streamline test function, so both enter the derivative: the storage block is
+    no longer the lumped capacity, and the velocity block gains the term those
+    weights contribute. The control and the previous state are needed for that
+    second part and are optional only because the lumped model does not use them.
+    """
     slab = integer(slab, "Slab index", 0)
     if not len(problem.physical_steps) or slab >= problem.slabs:
         raise ValueError("Select an existing transient time slab")
@@ -36,15 +43,110 @@ def step_linearization(problem, state, velocity, slab):
     flow_jacobian += problem.flow.convection_derivative(velocity)
     flow_jacobian = flow_jacobian[problem.flow_free][:, problem.flow_free]
     thermal_jacobian = thermal_velocity_jacobian(
-        problem.flow, velocity, full, problem.capacity, problem.conductivity, problem.velocity_scale
+        problem.flow,
+        velocity,
+        full,
+        problem.capacity,
+        problem.conductivity,
+        problem.velocity_scale,
+        limit_rows=assembly.consistent,
+        residual_weighted=assembly.consistent,
+        streamline_rule=getattr(problem, "streamline_rule", "hard_min"),
     )[problem.free][:, problem.flow_free]
-    thermal_mass = sparse.diags(assembly.capacity[problem.free] / problem.steps[slab])
+    if assembly.consistent:
+        thermal_mass = (
+            assembly.storage[problem.free][:, problem.free] / problem.steps[slab]
+        ).tocsr()
+        thermal_jacobian = thermal_jacobian + consistent_step_velocity(
+            problem, assembly, velocity, state, control, previous, slab
+        )
+    else:
+        thermal_mass = sparse.diags(assembly.capacity[problem.free] / problem.steps[slab])
     thermal = assembly.stiffness[problem.free][:, problem.free] + thermal_mass
     H = sparse.bmat(
         [[flow_jacobian, -problem.load_derivative], [thermal_jacobian, thermal]], format="csc"
     )
     C = sparse.block_diag((problem.momentum_mass / dt, thermal_mass), format="csr")
     return H, C, thermal.tocsc(), thermal_mass.tocsr()
+
+
+def nodal_field(problem, values, name, *, prescribed):
+    """Accept a field given over every mesh node or over the free ones only.
+
+    The runner carries the source and the temperatures over every node and the
+    optimizer carries them over the free ones, and this derivative is reached from
+    both. A free-only temperature is completed by the Dirichlet data it is solved
+    against; a free-only control is completed by zero, because no control acts on a
+    prescribed node.
+    """
+    values = np.asarray(values, dtype=float).reshape(-1)
+    if values.shape == (len(problem.mesh.nodes),):
+        return values
+    if values.shape != (problem.spatial_size,):
+        raise ValueError(f"{name} must cover the free or every temperature node")
+    if prescribed == "dirichlet":
+        return problem.full_temperature(values)
+    spread = np.zeros(len(problem.mesh.nodes))
+    spread[problem.free] = values
+    return spread
+
+
+def consistent_step_velocity(problem, assembly, velocity, state, control, previous, slab):
+    """Velocity derivative of the pieces a consistent weighting adds to one step.
+
+    All three share the streamline weight on the test function and differ only in a
+    scalar per fluid cell, so they are differentiated together. A control or a
+    previous state that is not supplied contributes nothing, which is what the
+    lumped model needs and what a steady step needs.
+    """
+    from .meshes import simplex_geometry
+
+    mesh = problem.mesh
+    _, lump = simplex_geometry(mesh)
+    fluid = problem.flow.fluid_cells
+    cells, local_mass = mesh.cells[fluid], lump[fluid]
+    scalar = -local_mass.sum(axis=1) * np.asarray(problem.source)[fluid]
+    if control is not None:
+        given = nodal_field(problem, control, "The control", prescribed="zero")
+        scalar = scalar - np.einsum("ei,ei->e", local_mass, given[cells])
+    if previous is not None:
+        change = problem.full_temperature(state) - nodal_field(
+            problem, previous, "The previous temperature", prescribed="dirichlet"
+        )
+        scalar = (
+            scalar
+            + np.asarray(problem.capacity)[fluid]
+            * np.einsum("ei,ei->e", local_mass, change[cells])
+            / problem.steps[slab]
+        )
+    return consistent_velocity_jacobian(
+        problem.flow,
+        velocity,
+        scalar,
+        problem.capacity,
+        problem.conductivity,
+        problem.velocity_scale,
+        streamline_rule=getattr(problem, "streamline_rule", "hard_min"),
+    )[problem.free][:, problem.flow_free]
+
+
+def saved_step_linearization(problem, fields, velocity, slab):
+    """Include saved source and temporal history in a consistent step derivative."""
+    slab = integer(slab, "Slab index", 0)
+    if slab >= problem.slabs:
+        raise ValueError("Select an existing transient time slab")
+    shape = (problem.slabs, problem.spatial_size)
+    state = np.asarray(fields["state"]).reshape(shape)
+    control = np.asarray(fields["control"]).reshape(shape)
+    previous = problem.initial if slab == 0 else state[slab - 1]
+    return step_linearization(
+        problem,
+        state[slab],
+        velocity[slab],
+        slab,
+        control=control[slab],
+        previous=previous,
+    )
 
 
 def amplification_spectrum(H, C, modes=4):
@@ -101,6 +203,12 @@ def main():
     parser.add_argument("--slabs", type=int, nargs="+", default=[0, 15, 27])
     parser.add_argument("--modes", type=int, default=4)
     parser.add_argument("--threads", type=int, default=4)
+    parser.add_argument(
+        "--transport-form",
+        choices=("advective", "skew"),
+        default="advective",
+        help="Thermal transport form of the linearised operator",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
@@ -109,9 +217,14 @@ def main():
         record, cfg, fields, digest = load_saved_solution(
             args.optimization, args.method, args.target_position
         )
-        problem, baseline = load_problem({**cfg, "baseline_directory": str(args.baseline)})
+        problem, baseline = load_problem(
+            {
+                **cfg,
+                "baseline_directory": str(args.baseline),
+                "transport_form": args.transport_form,
+            }
+        )
         require_matching_baseline(record, baseline)
-        state = fields["state"].reshape(problem.slabs, problem.spatial_size)
         filename = (
             args.method + "-fields.npz"
             if args.target_position is None
@@ -126,12 +239,17 @@ def main():
             "optimization_source": record["environment"]["git_head"],
             "optimization_field_sha256": digest,
             "target_position": args.target_position,
+            "transport_form": args.transport_form,
+            "streamline_rule": problem.streamline_rule,
+            "consistent_stabilization": problem.consistent_stabilization,
+            "baseline_sha256": baseline["baseline_sha256"],
+            "derivative_scope": "Current and previous state, including the fixed saved control and streamline-weighted storage/source terms.",
             "scope": "Local linearized fixed-source propagation factors; no full-trajectory or physical stability certificate.",
         }
         rows = []
         write_report(args.output / "record.json", {**metadata, "status": "running", "rows": rows})
         for n in args.slabs:
-            H, C, B, T = step_linearization(problem, state[n], velocity[n], n)
+            H, C, B, T = saved_step_linearization(problem, fields, velocity, n)
             rows.append(
                 {
                     "slab_zero_based": n,

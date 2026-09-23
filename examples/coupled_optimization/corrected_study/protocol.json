@@ -1,0 +1,52 @@
+{
+  "schema": "coupled-corrected-study-v4",
+  "stage": "target-7 optimization pilots; final timing campaign remains gated",
+  "formulation_source": "71ba1baeae7334e90f756b37f7878b852f7bcd40",
+  "configuration": "coupled_corrected",
+  "formulation": "Axisymmetric Taylor-Hood momentum and residual-weighted P1 thermal equation, including cylindrical strong diffusion, integrated P2 trial advection, weighted storage, source and background. Exact coupled derivatives; backward-Euler optimization.",
+  "baseline_sha256": "7d7344d22282217cb2e120b064beb015ddab7bf40612fab795a9cbe5689259a0",
+  "thermal_nodes": 10849,
+  "flow_unknowns": 78004,
+  "pilots": [
+    {"case": 0, "alpha": 1e-14, "method": "jacobi", "rank": 0},
+    {"case": 1, "alpha": 1e-14, "method": "reference", "rank": 200},
+    {"case": 2, "alpha": 1e-11, "method": "jacobi", "rank": 0},
+    {"case": 3, "alpha": 1e-11, "method": "reference", "rank": 200}
+  ],
+  "pilot_policy": {
+    "target": 7, "slabs": 64, "horizon_s": 600, "startup_s": 60,
+    "lower_K": 337.3, "upper_K": 357.3, "inward_margin_K": 0,
+    "outer_cap": 100, "flow_cap": 100, "inner_cap": 50000,
+    "flow_and_final_equations": 1e-12, "mass_and_energy": 1e-6,
+    "original_inner_residual": 1e-10, "KKT": 1e-8,
+    "adjoint_relative_residual": 1e-8,
+    "backtracking": "quadratic", "secant_memory": 10,
+    "checkpoint": "every retained nonlinear iterate; no automatic cap extension",
+    "device": "matched hybrid CPU vectors and GPU block/coarse work after memory screening",
+    "scope": "Independent pilots proceed concurrently with old-control resolution diagnostics. Their fields, failures and timings remain distinct from older formulations. No completed-solve ratio from capped runs."
+  },
+  "conservation": {
+    "acceptance": "Independently reassembled momentum, weak continuity and thermal residuals; integrated external volume flux and discrete thermal-energy balance.",
+    "local_diagnostics": "Independent P2 face integration, cylindrical divergence theorem, interior-face cancellation, net flux per element and divergence RMS. Continuous P1 pressure imposes weak continuity, not exact cellwise conservation.",
+    "correction_policy": "Diagnose significant local defects before changing transport or reconstructing velocity. Any such discretization change requires its own derivative, adjoint, conservation and optimization verification."
+  },
+  "resolution": {
+    "fixed_sources": true, "successive_temporal_comparisons": 2,
+    "successive_nested_spatial_comparisons": 2,
+    "maximum_temperature_difference_K": 0.05, "relative_tracking_difference": 0.01,
+    "time_transfer": "piecewise-constant saved source; exact interval boundaries",
+    "space_transfer": "exact nested P1 prolongation",
+    "stop_rule": "Two non-improving refinement comparisons require diagnosis, not a larger cap or relaxed tolerance.",
+    "margin_K": "max(0.01, 2*(e_t+e_h)); at most 0.1; reoptimize and reassess the new source independently"
+  },
+  "final_campaign": {
+    "status": "not authorized by pilot completion alone; requires resolution and physical-bound gates",
+    "targets": [7, 8, 15], "rank_screen_on_target_7": [100, 200, 400],
+    "methods": ["jacobi", "reference", "recycling"],
+    "recycling": "Jacobi-scaled selection retaining existing coarse vectors and new Krylov information; transfer and update costs included",
+    "repetitions": 3, "sequences_per_alpha": 9, "optimizations_per_alpha": 27,
+    "comparison": "Each alpha is a separate problem group. Match criteria, device, starts and declared rank/memory policy; rotate method order. Charge every attempt, construction, solve, transfer, verification and cleanup; preparation separately.",
+    "same_solution": {"relative_objective": 1e-6, "maximum_temperature_difference_K": 0.001},
+    "interpretation": "Evidence validity does not depend on the sign of the measured speedup. Only matching completed solutions support speedup claims."
+  }
+}

@@ -1,0 +1,41 @@
+defaults:
+  - coupled_sequence
+  - _self_
+
+# Target-7 optimization pilots on the complete residual-weighted formulation.
+# Override alpha and method separately; no inward bound margin is used here.
+consistent_stabilization: true
+reference_stabilization: matched
+transport_form: advective
+slabs: 64
+horizon_s: 600.0
+target_startup_s: 60.0
+lower_K: 337.3
+temperature_margin_K: 0.0
+queries:
+  - {target: 7, upper_K: 357.3}
+alpha: 1.0e-14
+method: reference
+rank: 200
+recycle_window: 200
+device: hybrid
+hybrid_coarse_device: cuda
+hybrid_block_min_columns: 20
+hybrid_block_max_columns: 100
+flow_tolerance: 1.0e-12
+equation_acceptance_tolerance: 1.0e-12
+conservation_tolerance: 1.0e-6
+local_mass_diagnostics: true
+nonlinear_tolerance: 1.0e-8
+nonlinear_cap: 100
+qp_tolerance: 1.0e-10
+inner_tolerance: 1.0e-10
+inner_cap: 50000
+inner_refresh: 50000
+backtracking: quadratic
+secant_memory: 10
+stage:
+  positions: [0]
+evaluation_progress: true
+linear_progress: true
+threads: 8

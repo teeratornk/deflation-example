@@ -32,10 +32,11 @@ def test_invalid_time_grids_or_schemes_are_rejected(steps, slab, scheme):
         derivative_coefficients(steps, slab, scheme)
 
 
-def test_effective_history_preserves_both_storage_terms_and_original_problem():
+@pytest.mark.parametrize("consistent", [False, True])
+def test_effective_history_preserves_both_storage_terms_and_original_problem(consistent):
     from deflation_example.axisymmetric_flow import FlowResult
 
-    problem = small_coupled_problem([0.2, 0.3], uniform_capacity=True)
+    problem = small_coupled_problem([0.2, 0.3], uniform_capacity=True, consistent=consistent)
     state = problem.full_temperature(np.full(problem.spatial_size, 0.1))
     older = problem.full_temperature(np.full(problem.spatial_size, 0.04))
     flow = problem.initial_flow
@@ -57,8 +58,9 @@ def test_effective_history_preserves_both_storage_terms_and_original_problem():
     )
 
 
-def test_bdf2_replay_retains_backward_euler_when_every_source_interval_restarts():
-    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+@pytest.mark.parametrize("consistent", [False, True])
+def test_bdf2_replay_retains_backward_euler_when_every_source_interval_restarts(consistent):
+    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True, consistent=consistent)
     state = np.linspace(0.04, 0.1, problem.size)
     control = problem.evaluate(state).control
     replay = newton_trajectory(problem, control, time_scheme="bdf2", restart_interval=1)
@@ -67,11 +69,14 @@ def test_bdf2_replay_retains_backward_euler_when_every_source_interval_restarts(
     assert all(row["storage_derivative_coefficients_s_inverse"][2] == 0 for row in replay["steps"])
 
 
-def test_manufactured_thermal_trajectory_converges_at_second_order():
+@pytest.mark.parametrize("consistent", [False, True])
+def test_manufactured_thermal_trajectory_converges_at_second_order(consistent):
+    from scipy.sparse.linalg import splu
+
     errors = []
     for count in (8, 16, 32):
         problem = small_coupled_problem(
-            np.full(count, 0.4 / count), feedback=0, uniform_capacity=True
+            np.full(count, 0.4 / count), feedback=0, uniform_capacity=True, consistent=consistent
         )
         problem.initial[:] = 0
         problem.thermal_boundary[:] = 0
@@ -79,17 +84,18 @@ def test_manufactured_thermal_trajectory_converges_at_second_order():
         shape = np.linspace(0.04, 0.08, problem.spatial_size)
         full_shape = problem.full_temperature(shape)
         assembly = problem.assemble(problem.initial_flow.velocity)
-        stiffness = (assembly.stiffness @ full_shape)[problem.free] / assembly.mass[problem.free]
-        capacity = (
-            assembly.capacity[problem.free] / assembly.mass[problem.free] * problem.time_scale
-        )
-        background = assembly.load[problem.free] / assembly.mass[problem.free]
+        stiffness = (assembly.stiffness @ full_shape)[problem.free]
+        capacity_action = (assembly.storage @ full_shape)[problem.free] * problem.time_scale
+        background = assembly.load[problem.free]
         # Manufactured semi-discrete solution y(t) = sin(t) * shape. The source
         # uses its analytic derivative, independently of the time integrator.
-        control = (
+        load = (
             np.sin(times[:, None]) * stiffness
-            + np.cos(times[:, None]) * capacity * shape
+            + np.cos(times[:, None]) * capacity_action
             - background
+        )
+        control = (
+            splu(assembly.source_action[problem.free][:, problem.free].tocsc()).solve(load.T).T
         )
         replay = newton_trajectory(problem, control, time_scheme="bdf2", tolerance=1e-11)
         assert replay["status"] == "converged"
@@ -99,13 +105,16 @@ def test_manufactured_thermal_trajectory_converges_at_second_order():
     assert errors[1] / errors[2] > 3.5
 
 
-def test_saved_bdf2_histories_reproduce_both_equations_at_each_recorded_step():
+@pytest.mark.parametrize("consistent", [False, True])
+def test_saved_bdf2_histories_reproduce_both_equations_at_each_recorded_step(consistent):
     from deflation_example.axisymmetric_flow import FlowResult
     from deflation_example.coupled_time_integration import saved_history
     from deflation_example.coupled_newton_replay import criteria_met, step_equations
     from deflation_example.coupled_resolution import forward_model
 
-    problem = small_coupled_problem([0.1, 0.15, 0.08, 0.08], uniform_capacity=True)
+    problem = small_coupled_problem(
+        [0.1, 0.15, 0.08, 0.08], uniform_capacity=True, consistent=consistent
+    )
     controls = problem.evaluate(np.linspace(0.04, 0.1, problem.size)).control.reshape(4, -1)
     replay = newton_trajectory(
         problem, controls, time_scheme="bdf2", restart_interval=2, tolerance=1e-11

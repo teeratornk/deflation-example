@@ -133,3 +133,26 @@ def test_cli_preserves_all_samples_and_separates_projected_memory(
                 row["one_trajectory_factor_array_extrapolation_bytes"]
                 == row["slabs"] * row["exported_factor_array_bytes"]
             )
+
+
+@pytest.mark.gpu
+def test_gpu_block_plans_verify_both_transposes_and_repeated_actions():
+    pytest.importorskip("cupy")
+
+    matrix = sparse.diags(
+        [np.full(29, -0.3), np.linspace(2, 4, 30), np.full(29, -0.7)], [-1, 0, 1], format="csc"
+    )
+    result = factor_inventory(matrix, gpu_widths=[1, 2, 5])
+    assert result["factor_check_passed"]
+    for row, columns in zip(result["gpu_block_inventory"], (1, 2, 5), strict=True):
+        assert row["columns"] == columns and row["status"] == "complete"
+        assert row["all_actions_verified"]
+        assert len(row["actions"]) == 4
+        assert {(a["transpose"], a["repetition"]) for a in row["actions"]} == {
+            ("N", 0),
+            ("N", 1),
+            ("T", 0),
+            ("T", 1),
+        }
+        assert row["factor_and_permutation_bytes"] > 0
+        assert row["triangular_plan_bytes"] >= 4 * 2 * 30 * columns * 8

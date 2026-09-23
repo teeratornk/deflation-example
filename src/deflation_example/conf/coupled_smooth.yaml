@@ -1,0 +1,7 @@
+defaults:
+  - coupled_corrected
+  - _self_
+
+# Separate discretization: original physical inputs and accuracy requirements.
+streamline_rule: smooth_p8
+output: runs/coupled-smooth

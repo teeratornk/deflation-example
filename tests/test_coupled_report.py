@@ -85,6 +85,16 @@ def test_only_complete_matched_populations_produce_a_speedup():
     assert report["methods"][0]["verified_sequences"] == 2
 
 
+def test_report_enforces_the_declared_tighter_equation_acceptance():
+    data = record("reference", 0, 2)
+    assert validate_record(data)
+    data["configuration"]["equation_acceptance_tolerance"] = 1e-12
+    with pytest.raises(ValueError, match="accuracy checks"):
+        validate_record(data)
+    data["cases"][0]["equations"][0]["momentum_relative_residual"] = 1e-12
+    assert validate_record(data)
+
+
 def test_mismatched_sources_and_duplicate_repetitions_are_rejected():
     data = population()
     with pytest.raises(ValueError, match="Repetition"):

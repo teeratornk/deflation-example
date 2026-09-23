@@ -3,9 +3,31 @@
 import hashlib
 from types import SimpleNamespace
 import numpy as np
+import pytest
 
 from deflation_example import coupled_resolution as resolution
 from test_coupled_derivatives import small_coupled_problem
+
+
+@pytest.mark.parametrize("consistent", [False, True])
+@pytest.mark.parametrize("streamline_rule", ["hard_min", "smooth_p8"])
+def test_forward_builder_preserves_optimization_thermal_assembly(consistent, streamline_rule):
+    problem = small_coupled_problem(
+        [0.2, 0.35],
+        uniform_capacity=True,
+        inlet=0.2,
+        consistent=consistent,
+        streamline_rule=streamline_rule,
+    )
+    velocity = problem.initial_flow.velocity
+    expected = problem.assemble(velocity)
+    actual = resolution.forward_model(problem).thermal_builder(
+        problem.flow.thermal_velocity(velocity)
+    )
+    for key in ("stiffness", "storage", "source_action"):
+        left, right = getattr(actual, key), getattr(expected, key)
+        np.testing.assert_array_equal(left.toarray(), right.toarray())
+    np.testing.assert_array_equal(actual.load, expected.load)
 
 
 def test_forward_replay_recovers_the_temperature_eliminated_equations():

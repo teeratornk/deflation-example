@@ -73,6 +73,8 @@ def box_quadratic(
     tolerance=1e-9,
     max_steps=100,
     fixed_mask_corrections=4,
+    observer=None,
+    preconditioner_factory=None,
 ):
     """Solve min 0.5*x.T H x + gradient.T x under two-sided finite bounds.
 
@@ -105,6 +107,10 @@ def box_quadratic(
             "Finite compatible quadratic data, positive diagonal and strict bounds are required"
         )
     x = np.clip(np.zeros_like(g), lo, hi)
+    # The preconditioner is restricted to the active set and factorized one block
+    # per slab, which is neither free nor inside the solver's own timers. Cache it
+    # while the active set is unchanged and record what building it cost.
+    cached = {"key": None, "preconditioner": None, "seconds": 0.0, "builds": 0}
     history = []
     scale = max(1.0, np.linalg.norm(g, np.inf))
     status = "active_set_cap"
@@ -146,13 +152,32 @@ def box_quadratic(
                     return (H @ full)[inactive]
 
                 B = LinearOperator((len(inactive),) * 2, matvec=action, rmatvec=action, dtype=float)
+            # The diagonal is the active-set scale and the coarse space's Jacobi
+            # ingredient; an operator preconditioner, when configured, is a
+            # separate object and replaces only the inner solver's division.
             B.diagonal = lambda: d[inactive].copy()
+            if preconditioner_factory is not None:
+                key = inactive.tobytes()
+                if key != cached["key"]:
+                    tick = time.perf_counter()
+                    cached["preconditioner"] = preconditioner_factory(inactive)
+                    cached["seconds"] += time.perf_counter() - tick
+                    cached["builds"] += 1
+                    cached["key"] = key
+                B.preconditioner = cached["preconditioner"]
             rhs = -(g + H @ fixed)[inactive]
             linear_rhs = rhs - B @ x[inactive] if correction else rhs
             initial = np.zeros_like(linear_rhs) if correction else x[inactive]
+            if observer is not None:
+                observer.before_solve(step, inactive, linear_rhs, initial, correction)
             result, timing = solver.solve(B, linear_rhs, inactive, initial=initial)
+            if observer is not None:
+                observer.after_solve(result, timing)
             candidate = x[inactive] + result.x if correction else result.x
             original_residual = independent_residual(B, candidate, rhs)
+            if preconditioner_factory is not None:
+                row["preconditioner_builds"] = cached["builds"]
+                row["preconditioner_seconds"] = cached["seconds"]
             row.update(
                 linear_status=result.status,
                 linear_residual=original_residual,
@@ -220,20 +245,33 @@ def minimize_coupled(
     max_backtracks=24,
     backtracking="halving",
     secant_memory=0,
+    inner_preconditioner="jacobi",
+    frozen_sweeps=3,
     callback=None,
+    checkpoint=None,
+    resume=None,
+    observer=None,
 ):
     """Damped Gauss--Newton with feasible Armijo steps and exact nonlinear KKT.
 
     Failed flow evaluations cause backtracking and remain in the history.
     All methods share globalization, QP tolerances and the original-residual
     inner check supplied by StudySolver. No global optimality claim is implied.
+    ``checkpoint`` receives the complete optimizer state after every accepted
+    iterate; ``resume`` restarts from such a state, re-evaluating its flows once
+    from the saved velocities and pressures. Neither changes the iteration.
     """
     start = time.perf_counter()
+    if checkpoint is not None and not callable(checkpoint):
+        raise ValueError("Checkpoint hook must be callable")
     tolerance = positive_real(tolerance, "Nonlinear KKT tolerance")
     max_iterations = integer(max_iterations, "Nonlinear iteration cap", 1)
     max_regularizations = integer(max_regularizations, "Regularization attempts", 1)
     max_backtracks = integer(max_backtracks, "Backtracking cap", 1)
     secant_memory = integer(secant_memory, "Secant memory", 0)
+    if inner_preconditioner not in {"jacobi", "frozen"}:
+        raise ValueError("Choose the Jacobi diagonal or the velocity-frozen preconditioner")
+    frozen_sweeps = integer(frozen_sweeps, "Frozen preconditioner sweeps", 1)
     if backtracking not in {"halving", "quadratic"}:
         raise ValueError("Choose halving or safeguarded quadratic backtracking")
     if not np.isfinite(initial_damping) or initial_damping < 0:
@@ -242,16 +280,34 @@ def minimize_coupled(
     upper = np.broadcast_to(upper, (problem.size,)).astype(float, copy=True)
     if not np.isfinite([lower, upper]).all() or np.any(lower >= upper):
         raise ValueError("Temperature bounds must be finite and strictly ordered")
+    first_iteration = 0
+    history, status = [], "nonlinear_iteration_cap"
+    damping = float(initial_damping)
+    secants = []
+    if resume is not None:
+        initial, initial_evaluation = resume["state"], resume.get("initial_evaluation")
+        history = [dict(row) for row in resume["history"]]
+        damping = float(resume["damping"])
+        if not np.isfinite(damping) or damping < 0:
+            raise ValueError("A resumed damping must be finite and nonnegative")
+        secants = [
+            (np.asarray(s, dtype=float).copy(), np.asarray(g, dtype=float).copy())
+            for s, g in resume["secants"]
+        ]
+        if secant_memory:
+            secants = secants[-secant_memory:]
+        else:
+            secants = []
+        first_iteration = integer(resume["iteration"], "Resumed iteration", 0) + 1
+        if len(history) != first_iteration or first_iteration > max_iterations:
+            raise ValueError("A resumed history must end at the checkpointed iterate")
     y = np.zeros(problem.size) if initial is None else np.asarray(initial, dtype=float).copy()
     if y.shape != (problem.size,) or not np.isfinite(y).all():
         raise ValueError("Initial temperature must match the complete trajectory")
     y = np.clip(y, lower, upper)
     evaluation = problem.evaluate(y, initial=initial_evaluation)
     objective, gradient = problem.objective_gradient(evaluation, desired)
-    history, status = [], "nonlinear_iteration_cap"
-    damping = float(initial_damping)
-    secants = []
-    for iteration in range(max_iterations + 1):
+    for iteration in range(first_iteration, max_iterations + 1):
         # Normalize each weighted optimality equation by its positive tracking weight.
         scaled_gradient = gradient / problem.weights
         scale = max(
@@ -279,15 +335,38 @@ def minimize_coupled(
                 from .coupled_secant import SecantGaussNewton
 
                 H = SecantGaussNewton(H, secants)
+            diagonal = problem.preconditioning_diagonal(evaluation, damping)
+            if observer is not None:
+                observer.begin_quadratic(
+                    iteration,
+                    regularization,
+                    evaluation,
+                    desired,
+                    gradient,
+                    diagonal,
+                    damping,
+                    secants,
+                    lower,
+                    upper,
+                )
+            factory = None
+            if inner_preconditioner == "frozen":
+                from .coupled_frozen_preconditioner import frozen_preconditioner_factory
+
+                factory = frozen_preconditioner_factory(
+                    problem, evaluation, damping, sweeps=frozen_sweeps
+                )
             qp = box_quadratic(
                 H,
                 gradient,
-                problem.preconditioning_diagonal(evaluation, damping),
+                diagonal,
                 lower - evaluation.state,
                 upper - evaluation.state,
                 solver,
                 tolerance=qp_tolerance,
                 max_steps=qp_cap,
+                observer=observer,
+                preconditioner_factory=factory,
             )
             attempt = {
                 "damping": damping,
@@ -416,6 +495,21 @@ def minimize_coupled(
         if not moved:
             status = "globalization_failed"
             break
+        if checkpoint is not None:
+            # The accepted iterate, its converged flows and every quantity the
+            # next iteration reads; a restart from here repeats no accepted step.
+            checkpoint(
+                {
+                    "iteration": iteration,
+                    "state": evaluation.state,
+                    "flows": evaluation.flows,
+                    "history": list(history),
+                    "damping": damping,
+                    "secants": list(secants),
+                    "objective": objective,
+                    "optimizer_seconds": time.perf_counter() - start,
+                }
+            )
     # The returned residuals and gradient are always evaluated at the retained state.
     scaled_gradient = gradient / problem.weights
     scale = max(

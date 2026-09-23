@@ -1,0 +1,54 @@
+{
+  "schema": "coupled-completion-v2",
+  "formulation": "Residual-weighted axisymmetric thermal transport, including integrated P2 advection and cylindrical P1 diffusion",
+  "model": "Fixed-property transformer, laminar buoyancy, unchanged geometry and physical bounds",
+  "horizon_s": 600,
+  "target_startup_s": 60,
+  "targets": [7, 8, 15],
+  "physical_lower_K": 337.3,
+  "physical_upper_K": 357.3,
+  "diagnosis": {
+    "failed_time_s": 112.5,
+    "original": {"backtrack_cap": 21, "trust_region": null},
+    "deeper_search": {"backtrack_cap": 40, "trust_region": null},
+    "field_limited_search": {"backtrack_cap": 21, "trust_region": 0.05},
+    "pressure_policy": "Pressure increments do not enter the velocity step limit; original momentum and continuity equations determine line-search acceptance.",
+    "newton_cap": 100,
+    "comparison_windows_s": [[0, 9.375], [103.125, 112.5], [206.25, 215.625], [590.625, 600]],
+    "subdivisions": [1, 2, 4],
+    "window_initialization": "Identical verified initial fields for each subdivision in one window",
+    "selection": "Lowest total diagnostic cost among procedures meeting unchanged equation and balance criteria in the declared windows; failed attempts remain included. If no procedure qualifies, diagnose before extending the campaign."
+  },
+  "final_accuracy": {
+    "coupled_relative_equations": 1e-12,
+    "mass_and_energy_relative_balance": 1e-6,
+    "inner_original_residual": 1e-10,
+    "optimization_kkt": 1e-8
+  },
+  "resolution": {
+    "temporal_steps": [256, 512, 1024],
+    "maximum_temperature_difference_K": 0.05,
+    "relative_tracking_difference": 0.01,
+    "successive_comparisons_required": 2,
+    "spatial_test": "Nested mesh refinement with unchanged physical geometry, material labels, time history and exact P1 control transfer",
+    "stop_rule": "Two nonimproving refinements trigger diagnosis rather than relaxed tolerances or indefinite refinement."
+  },
+  "temperature_margin": {
+    "default_K": 0,
+    "rule": "max(0.01 K, 2 * (verified_temporal_difference_K + verified_spatial_difference_K))",
+    "maximum_K": 0.1,
+    "exceeds_cap": "Refine further; do not clip the computed margin.",
+    "scope": "Optimization bounds tighten inward; independent assessments use the unchanged physical bounds. The empirical margin is not a rigorous error certificate."
+  },
+  "optimization_order": "Reoptimize target 7 on the verified formulation and discretization, assess its frozen source on finer grids, then targets 8 and 15.",
+  "performance_after_accuracy_gates": {
+    "reference_ranks": [100, 200, 400],
+    "methods": ["jacobi", "reference", "recycling"],
+    "repetitions": 3,
+    "complete_sequences": 9,
+    "optimization_problems": 27,
+    "policy": "Freeze the rank policy after a declared pilot; matched starts, accuracy, hardware and physical bounds; rotate solver order; charge all work and report every outcome."
+  },
+  "restart": "Atomic fields and hash-bound records after every returned Newton and fallback attempt and every completed time step. Resumed runs remain separate from uninterrupted timings.",
+  "publication_gate": "Keep prescribed-flow results unchanged. Add a coupled stationary-point claim only after the forward-resolution, feasibility, optimization and matched complete-cost gates pass."
+}

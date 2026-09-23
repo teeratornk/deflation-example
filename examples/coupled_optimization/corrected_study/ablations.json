@@ -1,0 +1,20 @@
+{
+  "schema": "coupled-corrected-ablations-v1",
+  "numerical_source": "466d547a933214a5e15219b02b3707e7b7c99c3d",
+  "base_design": "protocol.json",
+  "cases": [
+    {"case": 0, "alpha": 1e-14, "method": "recycling", "rank": 200, "variant": "recycling", "overrides": {}},
+    {"case": 1, "alpha": 1e-14, "method": "reference", "rank": 200, "variant": "sequential", "overrides": {"reference_transfer": "sequential"}},
+    {"case": 2, "alpha": 1e-14, "method": "reference", "rank": 200, "variant": "tensor", "overrides": {"reference_construction": "tensor"}},
+    {"case": 3, "alpha": 1e-11, "method": "recycling", "rank": 200, "variant": "recycling", "overrides": {}},
+    {"case": 4, "alpha": 1e-11, "method": "reference", "rank": 200, "variant": "sequential", "overrides": {"reference_transfer": "sequential"}},
+    {"case": 5, "alpha": 1e-11, "method": "reference", "rank": 200, "variant": "tensor", "overrides": {"reference_construction": "tensor"}}
+  ],
+  "baseline_cases": "Four unchanged target-7 corrected pilots: Jacobi rank zero and full-reference rank 200 at each alpha, in protocol.json order.",
+  "fixed_settings": "Identical corrected thermal equations, baseline, 64 slabs, 600-second horizon, smooth 60-second startup, bounds, zero inward margin, initial guess, hybrid deployment, iteration budgets and independent final criteria.",
+  "recycling_policy": "Retain existing coarse vectors and new Krylov directions, select in Jacobi-scaled coordinates, and transfer between inactive systems. Requested rank and direction window are 200. Starts without history. Candidate processing, transfers and updates are timed. Equal retained-rank budgets are not equal peak-memory budgets.",
+  "sequential_policy": "The first inactive system receives the same constructed reference. Subsequent restrictions transfer only surviving entries, with zero values at newly released indices, no learned or replacement vectors. Effective rank and fallbacks remain recorded. The optimizer may follow a different path; this is not a replay of identical inactive systems.",
+  "tensor_policy": "Change only mode-dependent versus shared temporal factors. Total requested rank and spatial policy are fixed; selected candidate directions can differ.",
+  "replications": 1,
+  "scope": "Exploratory complete-optimization ablations, authorized alongside the original pilots. Not a final rank choice, repeated timing campaign, resolution certificate or manuscript result. Retain every outcome and all elapsed work. A paired ratio requires both complete solutions, matched hardware/timing and objective agreement within 1e-6 relative and temperature agreement within 0.001 K. The sign of the ratio is not an inclusion criterion."
+}

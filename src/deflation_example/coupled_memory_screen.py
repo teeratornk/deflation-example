@@ -46,7 +46,75 @@ def dense_storage(spatial_size, slabs, rank):
     }
 
 
-def factor_inventory(matrix, checkpoint_comparison=False):
+def gpu_factor_inventory(matrix, factor, widths):
+    """Measure one factor's device plans; verify every solve on the CPU matrix."""
+    import cupy as cp
+    from .coupled_triangular import PersistentSuperLU
+
+    rows = []
+    for columns in widths:
+        columns = integer(columns, "GPU block width", 1)
+        resident = None
+        rhs_device = answer_device = None
+        row = {"columns": columns, "actions": []}
+        try:
+            resident = PersistentSuperLU(factor)
+            rhs = np.random.default_rng(815 + columns).normal(size=(matrix.shape[0], columns))
+            rhs_device = cp.asarray(rhs)
+            for transpose in ("N", "T"):
+                for repetition in range(2):
+                    tick = time.perf_counter()
+                    answer_device = resident.solve(rhs_device, trans=transpose)
+                    cp.cuda.get_current_stream().synchronize()
+                    seconds = time.perf_counter() - tick
+                    answer = cp.asnumpy(answer_device)
+                    A = matrix if transpose == "N" else matrix.T
+                    residual = float(np.linalg.norm(A @ answer - rhs) / np.linalg.norm(rhs))
+                    row["actions"].append(
+                        {
+                            "transpose": transpose,
+                            "repetition": repetition,
+                            "seconds": seconds,
+                            "fresh_relative_residual": residual,
+                            "verified": bool(np.isfinite(residual) and residual <= 1e-8),
+                        }
+                    )
+            matrix_bytes = sum(
+                a.nbytes for A in (resident.L, resident.U) for a in (A.data, A.indices, A.indptr)
+            )
+            permutation_bytes = sum(
+                a.nbytes
+                for a in (
+                    resident.perm_r,
+                    resident.perm_c,
+                    resident.factor._perm_r_rev,
+                    resident.factor._perm_c_rev,
+                )
+            )
+            row.update(
+                status="complete",
+                factor_and_permutation_bytes=int(matrix_bytes + permutation_bytes),
+                triangular_plan_bytes=int(resident.storage_bytes()),
+                all_actions_verified=all(a["verified"] for a in row["actions"]),
+            )
+        except (MemoryError, RuntimeError) as error:
+            row.update(
+                status="memory_limited" if isinstance(error, MemoryError) else "device_error",
+                error_type=type(error).__name__,
+                all_actions_verified=False,
+            )
+        finally:
+            if resident is not None:
+                resident.close()
+            resident = rhs_device = answer_device = None
+            gc.collect()
+            cp.cuda.get_current_stream().synchronize()
+            cp.get_default_memory_pool().free_all_blocks()
+        rows.append(row)
+    return rows
+
+
+def factor_inventory(matrix, checkpoint_comparison=False, gpu_widths=()):
     """Expose sparse-LU array sizes and independently check one deterministic solve.
 
     SciPy's exported L/U arrays exclude SuperLU's opaque internal workspace.
@@ -75,6 +143,8 @@ def factor_inventory(matrix, checkpoint_comparison=False):
         "fresh_relative_residual": float(residual),
         "factor_check_passed": bool(np.isfinite(residual) and residual <= 1e-8),
     }
+    if gpu_widths:
+        result["gpu_block_inventory"] = gpu_factor_inventory(matrix, factor, gpu_widths)
     if checkpoint_comparison:
         tick = time.perf_counter()
         checkpoint = RecomputedLU(matrix)
@@ -132,13 +202,21 @@ def main():
     parser.add_argument("--threads", type=int, default=8)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--checkpoint-comparison", action="store_true")
+    parser.add_argument(
+        "--gpu-widths",
+        type=int,
+        nargs="+",
+        default=[],
+        help="Optional single-factor GPU block-plan screen; requires an allocated GPU.",
+    )
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
     samples = [integer(n, "Sample step", 0) for n in args.sample_steps]
     slabs = [integer(n, "Time slabs", 1) for n in args.slabs]
     ranks = [integer(n, "Rank", 0) for n in args.ranks]
-    if any(len(set(values)) != len(values) for values in (samples, slabs, ranks)):
+    widths = [integer(n, "GPU block width", 1) for n in args.gpu_widths]
+    if any(len(set(values)) != len(values) for values in (samples, slabs, ranks, widths)):
         raise ValueError("Declare distinct sample steps, time grids and ranks")
     args.output.mkdir(parents=True, exist_ok=False)
     rows, failure = [], None
@@ -150,11 +228,30 @@ def main():
         "declared_ranks": ranks,
         "threads": integer(args.threads, "Threads", 1),
         "checkpoint_comparison": args.checkpoint_comparison,
+        "gpu_block_widths": widths,
         "scope": "Saved velocity fields at candidate time steps; no new flow trajectory or optimization. Factor-array extrapolations are estimates, not memory guarantees. Named arrays overlap sampled process memory and must not be added to it.",
     }
     write_report(args.output / "record.json", {**metadata, "status": "running", "rows": rows})
     with threadpool_limits(integer(args.threads, "Threads", 1)):
         sampler = ProcessMemory("cpu", 0.01)
+        if widths:
+            import cupy as cp
+            import pynvml
+
+            cp.zeros(1)
+            pynvml.nvmlInit()
+            try:
+                handle = pynvml.nvmlDeviceGetHandleByPciBusId(cp.cuda.Device().pci_bus_id)
+                sampler.device_uuid = pynvml.nvmlDeviceGetUUID(handle)
+            finally:
+                pynvml.nvmlShutdown()
+            metadata["gpu_total_memory_bytes"] = int(cp.cuda.runtime.memGetInfo()[1])
+            metadata["gpu"] = {
+                "model": cp.cuda.runtime.getDeviceProperties(0)["name"].decode(),
+                "cupy": cp.__version__,
+                "cuda_runtime": cp.cuda.runtime.runtimeGetVersion(),
+                "cuda_driver": cp.cuda.runtime.driverGetVersion(),
+            }
         try:
             sampler.start()
             record, cfg, _, digest = load_saved_solution(
@@ -204,11 +301,49 @@ def main():
                         ) + problem.flow.convection_derivative(velocity)
                         matrix = J[problem.flow_free][:, problem.flow_free].tocsc()
                         values = (
-                            factor_inventory(matrix, checkpoint_comparison=True)
-                            if args.checkpoint_comparison
-                            else factor_inventory(matrix)
+                            factor_inventory(matrix, args.checkpoint_comparison, widths)
+                            if widths
+                            else (
+                                factor_inventory(matrix, checkpoint_comparison=True)
+                                if args.checkpoint_comparison
+                                else factor_inventory(matrix)
+                            )
                         )
                         row.update(status="complete", **values)
+                        source_inventory = None
+                        if widths and problem.consistent_stabilization:
+                            assembly = problem.assemble(velocity)
+                            source_matrix = assembly.source_action[problem.free][
+                                :, problem.free
+                            ].tocsc()
+                            source_inventory = factor_inventory(source_matrix, gpu_widths=widths)
+                            row["thermal_source_inventory"] = source_inventory
+                            del assembly, source_matrix
+                        for block in row.get("gpu_block_inventory", []):
+                            if block["status"] == "complete":
+                                block["one_trajectory_named_gpu_storage_extrapolation_bytes"] = (
+                                    n
+                                    * (
+                                        block["factor_and_permutation_bytes"]
+                                        + block["triangular_plan_bytes"]
+                                    )
+                                )
+                        if source_inventory is not None:
+                            for block in row["gpu_block_inventory"]:
+                                source_block = next(
+                                    b
+                                    for b in source_inventory["gpu_block_inventory"]
+                                    if b["columns"] == block["columns"]
+                                )
+                                if block["status"] == source_block["status"] == "complete":
+                                    block[
+                                        "one_trajectory_named_combined_gpu_storage_extrapolation_bytes"
+                                    ] = block[
+                                        "one_trajectory_named_gpu_storage_extrapolation_bytes"
+                                    ] + n * (
+                                        source_block["factor_and_permutation_bytes"]
+                                        + source_block["triangular_plan_bytes"]
+                                    )
                         row["one_trajectory_factor_array_extrapolation_bytes"] = (
                             n * values["exported_factor_array_bytes"]
                         )
@@ -251,6 +386,17 @@ def main():
             and len(rows) == len(samples) * len(slabs)
             and all(
                 row.get("factor_check_passed", False)
+                and all(b["all_actions_verified"] for b in row.get("gpu_block_inventory", []))
+                and (
+                    "thermal_source_inventory" not in row
+                    or (
+                        row["thermal_source_inventory"]["factor_check_passed"]
+                        and all(
+                            b["all_actions_verified"]
+                            for b in row["thermal_source_inventory"]["gpu_block_inventory"]
+                        )
+                    )
+                )
                 and (
                     not args.checkpoint_comparison
                     or row["checkpoint_comparison"]["all_actions_verified"]

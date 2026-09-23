@@ -134,10 +134,44 @@ class ThermalAssembly:
     transport: sparse.csr_matrix
     stabilization: sparse.csr_matrix
     load: np.ndarray
+    # The other two pieces of a residual-weighted stabilisation. They are empty
+    # unless it is asked for, so the declared symmetric term stands alone by
+    # default and every earlier record reproduces exactly.
+    stabilized_storage: sparse.csr_matrix = None
+    stabilized_source: sparse.csr_matrix = None
+    # Per cell, the factor the row limit applied to the streamline parameter. One
+    # wherever the limit was inactive, which is almost everywhere. Empty unless the
+    # consistent weighting was asked for, so nothing else carries it.
+    streamline_limit: np.ndarray = None
 
     @property
     def stiffness(self):
         return self.diffusion + self.transport + self.stabilization
+
+    @property
+    def storage(self):
+        """Capacity acting on the time derivative, lumped plus any streamline weight.
+
+        Compressed rows in both cases, so a caller may restrict it to the free nodes
+        without knowing which model it was handed. A diagonal times a vector is the
+        same number either way.
+        """
+        lumped = sparse.diags(self.capacity)
+        if self.stabilized_storage is None:
+            return lumped.tocsr()
+        return (lumped + self.stabilized_storage).tocsr()
+
+    @property
+    def source_action(self):
+        """How a nodal source enters the equation, lumped plus any streamline weight."""
+        lumped = sparse.diags(self.mass)
+        if self.stabilized_source is None:
+            return lumped.tocsr()
+        return (lumped + self.stabilized_source).tocsr()
+
+    @property
+    def consistent(self):
+        return self.stabilized_storage is not None and self.stabilized_source is not None
 
 
 def simplex_geometry(mesh):
@@ -165,19 +199,33 @@ def assemble_thermal(
     streamline=False,
     *,
     transport_form="advective",
+    consistent=False,
+    streamline_length="edge",
+    bound_streamline=None,
+    streamline_rule="hard_min",
 ):
     """Assemble diffusion, nonconservative transport, and optional streamline diffusion.
 
     Conductivity is a symmetric positive-definite tensor per cell. Capacity and
     velocity are frozen per cell. Streamline diffusion adds a declared symmetric
-    artificial-diffusion term to the discrete state equation; no SUPG right-hand
-    side is implied. The exact transpose of the resulting equation is used.
+    artificial-diffusion term to the discrete state equation. On its own that term
+    is not weighted against the rest of the residual, so it does not vanish for the
+    exact solution and leaves an error proportional to the element size. Asking for
+    ``consistent`` weights storage, source, and the cell-interior strong thermal
+    residual with the same cell-constant streamline test function. Quadratic
+    velocities are integrated in the residual. In axisymmetric coordinates the
+    strong diffusion includes (K grad T)_r/r, even for P1 temperature elements.
+    The exact transpose of the resulting discrete equation is used.
     For a continuous quadratic 2D velocity, ``skew`` adds half the cellwise
     divergence times temperature. Its quadratic form is the boundary heat flux
     plus any interelement capacity-flux jumps. Axisymmetric divergence includes
     v_r/r. The original advective form remains the default.
     """
     nc, d = len(mesh.cells), mesh.dimension
+    if streamline_rule not in {"hard_min", "smooth_p8"}:
+        raise ValueError("Choose hard_min or smooth_p8 streamline coefficients")
+    if streamline_rule == "smooth_p8" and (not streamline or streamline_length != "edge"):
+        raise ValueError("Smooth coefficients require streamline stabilization with edge length")
     k = real_array(conductivity, "Conductivity")
     c = real_array(capacity, "Capacity")
     v = np.zeros((nc, d)) if velocity is None else real_array(velocity, "Velocity")
@@ -194,6 +242,19 @@ def assemble_thermal(
     quadratic_flow = d == 2 and v.shape == (nc, 6, 2)
     if transport_form not in {"advective", "skew"}:
         raise ValueError("Choose advective or skew thermal transport")
+    if consistent and not streamline:
+        raise ValueError("A consistent stabilisation needs the streamline term it weights")
+    if consistent and transport_form != "advective":
+        raise ValueError("Residual-weighted stabilization currently requires advective transport")
+    # The row bound belongs to the consistent weighting, so it follows that choice
+    # unless asked for on its own. Asking for it without the weighting gives the
+    # corrected model's stiffness with lumped storage and source, which is what a
+    # coarse space built by a Kronecker-sum construction can represent.
+    bound_streamline = consistent if bound_streamline is None else bool(bound_streamline)
+    if bound_streamline and not streamline:
+        raise ValueError("A streamline bound needs the streamline term it bounds")
+    if streamline_length not in {"edge", "flow"}:
+        raise ValueError("Choose the longest edge or the length along the flow")
     if transport_form == "skew" and not quadratic_flow:
         raise ValueError("Skew thermal transport requires a quadratic 2D velocity")
     if (v.shape != (nc, d) and not quadratic_flow) or not np.isfinite(v).all():
@@ -248,16 +309,89 @@ def assemble_thermal(
         transport = lump[:, :, None] * transport_gradient[:, None, :]
     transport_gradient = c[:, None] * np.einsum("ed,eid->ei", v, grad)
     stabilization = np.zeros_like(diffusion)
+    stabilized_storage = stabilized_source = None
+    stabilized_load = streamline_limit = None
     if streamline:
         verts = mesh.nodes[mesh.cells]
         h = np.max(np.linalg.norm(verts[:, :, None] - verts[:, None, :], axis=3), axis=(1, 2))
+        if streamline_length == "flow":
+            # The length along the flow rather than the longest edge. It bounds the
+            # streamline weight everywhere, but it only ever lowers the parameter on a
+            # mesh like the transformer's, and lowering it removes stabilisation the
+            # advection-dominated problem needs. Measured there: never above the longest
+            # edge, median ratio 0.95. The consistent weighting gets its bound from the
+            # row limit below instead, which is inactive wherever it is not needed, so
+            # this stays available and stays out of the default.
+            directional = np.abs(np.einsum("ed,eid->ei", v, grad)).sum(axis=1)
+            h = 2 * np.linalg.norm(v, axis=1) / np.maximum(directional, np.finfo(float).tiny)
         speed = c * np.linalg.norm(v, axis=1)
         tau = np.minimum(
             h / (2 * np.maximum(speed, np.finfo(float).tiny)), h**2 / (12 * eigenvalues[:, 0])
         )
+        unbounded_tau = tau
+        if bound_streamline:
+            # A cell must not take more out of a node's row than that node's own share
+            # of the cell mass, or the assembled storage and source action lose their
+            # positive row sums and the step operator they sit inside turns nearly
+            # singular. On the transformer mesh the parameter taken from the longest
+            # edge reverses the sign of thirty-five rows of ten thousand eight hundred
+            # and thirty, which is enough: the forward Newton's best step then reduces
+            # the residual by a few parts in ten million and the solve crawls.
+            #
+            # The limit scales the parameter itself, so all three pieces of the term
+            # keep one value; scaling the assembled terms instead cost a factor of two
+            # in the convergence rate.
+            #
+            # On a simplex the three shape-function gradients sum to zero, so the
+            # largest of the three directional derivatives is exactly half their total
+            # and the limit binds at a nearly constant factor: measured on the
+            # transformer mesh under the flow-aligned length it binds in 99.4% of fluid
+            # cells with a factor between 0.664 and 0.667, which is two thirds. Where it
+            # binds the parameter is the nodal share over the streamline derivative and
+            # no longer depends on the element length at all, so the length only decides
+            # the handful of cells where the limit is slack.
+            # Written with the Euclidean norm of the cell's streamline derivatives
+            # rather than their largest entry: both bound the same thing, because the
+            # largest entry never exceeds the norm, but the largest entry is a maximum
+            # over three nodes and on a structured mesh with a nearly axial flow two of
+            # them tie in whole rows of cells at once, which would leave the model
+            # without a derivative there.
+            share = (lump / measure[:, None]).min(axis=1)
+            reach = np.linalg.norm(np.einsum("eid,ed->ei", grad, v), axis=1)
+            bound = np.full_like(tau, np.inf)
+            np.divide(share, c * reach, out=bound, where=reach > 0)
+            streamline_limit = np.minimum(bound / np.maximum(tau, np.finfo(float).tiny), 1.0)
+            tau = np.minimum(tau, bound)
+        if streamline_rule == "smooth_p8":
+            from .streamline import smooth_parameter
+
+            tau, _ = smooth_parameter(grad, lump, c, eigenvalues[:, 0], v, verts, bound_streamline)
+            if bound_streamline:
+                # Relative to the unbounded hard coefficient; includes smoothing.
+                streamline_limit = tau / unbounded_tau
         stabilization = (measure * tau)[:, None, None] * (
             transport_gradient[:, :, None] * transport_gradient[:, None, :]
         )
+        if consistent:
+            weighted = tau[:, None] * transport_gradient
+            # The test weight uses the centroid velocity. The residual uses the
+            # same P2 velocity as the Galerkin transport, integrated over the cell.
+            # Replacing that velocity by its centroid value changes the equation.
+            convection = measure[:, None] * transport_gradient
+            if quadratic_flow:
+                convection = c[:, None] * np.einsum("ed,ejd->ej", moments.sum(axis=1), grad)
+            if mesh.axisymmetric:
+                # The cylindrical 1/r cancels the 2*pi*r volume weight. The
+                # remaining integral is exact for cell-constant K and P1 T.
+                area = np.linalg.det(verts[:, 1:] - verts[:, :1]) / 2
+                radial_flux = np.einsum("ed,ejd->ej", k[:, 0, :], grad)
+                convection -= (2 * np.pi * area)[:, None] * radial_flux
+            stabilization = weighted[:, :, None] * convection[:, None, :]
+            stabilized_storage = c[:, None, None] * weighted[:, :, None] * lump[:, None, :]
+            stabilized_source = weighted[:, :, None] * lump[:, None, :]
+            # The background source is cell constant, so its streamline weight is the
+            # same integral with the cell measure rather than the local mass.
+            stabilized_load = (measure * q)[:, None] * weighted
     size = len(mesh.nodes)
     rows = np.repeat(mesh.cells, d + 1, axis=1).ravel()
     cols = np.tile(mesh.cells, (1, d + 1)).ravel()
@@ -275,7 +409,10 @@ def assemble_thermal(
         matrix(diffusion),
         matrix(transport),
         matrix(stabilization),
-        vector(q[:, None] * lump),
+        vector(q[:, None] * lump) + (0.0 if stabilized_load is None else vector(stabilized_load)),
+        None if stabilized_storage is None else matrix(stabilized_storage),
+        None if stabilized_source is None else matrix(stabilized_source),
+        streamline_limit,
     )
 
 

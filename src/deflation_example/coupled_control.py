@@ -6,18 +6,23 @@ equations. A differentiable, locally unique flow branch is required. Frozen
 Jacobian factors define the exact discrete tangent and adjoint at that point.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import time
 
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import splu
 
-from .coupled_derivatives import ControlJacobian, buoyancy_jacobian, thermal_velocity_jacobian
+from .coupled_derivatives import (
+    ControlJacobian,
+    buoyancy_jacobian,
+    consistent_velocity_jacobian,
+    thermal_velocity_jacobian,
+)
 from .coupled_flow_solve import solve_momentum
 from .coupled_factor_storage import RecomputedLU
 from .mesh_control import WeightedReducedOperator
-from .meshes import assemble_thermal
+from .meshes import assemble_thermal, simplex_geometry
 from .solvers import relative_norm
 from .validation import integer, positive_real
 
@@ -69,6 +74,10 @@ class CoupledControlProblem:
         flow_cap=100,
         flow_continuation=False,
         momentum_factor_policy="retained",
+        transport_form="advective",
+        consistent_stabilization=False,
+        reference_stabilization="shipped",
+        streamline_rule="hard_min",
     ):
         self.flow, self.mesh = flow, flow.mesh
         self.free = self.mesh.free.copy()
@@ -132,9 +141,49 @@ class CoupledControlProblem:
         if momentum_factor_policy not in {"retained", "recompute"}:
             raise ValueError("Choose retained or recompute momentum-factor storage")
         self.momentum_factor_policy = momentum_factor_policy
+        if transport_form not in {"advective", "skew"}:
+            raise ValueError("Choose advective or skew thermal transport")
+        self.transport_form = transport_form
+        if not isinstance(consistent_stabilization, bool):
+            raise ValueError("Consistent stabilisation is a Boolean choice")
+        self.consistent_stabilization = consistent_stabilization
+        if reference_stabilization not in {"shipped", "matched"}:
+            raise ValueError("Choose shipped or matched reference stabilisation")
+        self.reference_stabilization = reference_stabilization
+        if streamline_rule not in {"hard_min", "smooth_p8"}:
+            raise ValueError("Choose hard_min or smooth_p8 streamline coefficients")
+        self.streamline_rule = streamline_rule
         self.evaluation_callback = None
         self.evaluation_count = 0
         self.assembly = self.assemble(initial_flow.velocity)
+        # The coarse space is built from the lumped assembly even when the model is
+        # weighted, which is a declared approximation rather than an oversight: it is
+        # a preconditioner ingredient, every solve is still accepted on the true
+        # original residual, and the construction eliminates the control by dividing
+        # by the lumped mass and forms its transient operator as a Kronecker sum,
+        # neither of which a weighted storage is.
+        #
+        # Which lumped assembly is a separate question, and it matters more. Asking
+        # for the lumped assembly also reverts the streamline parameter to its
+        # unbounded value, and on the corrected model that carries about three times
+        # the artificial diffusion of the operator actually being solved, so the
+        # coarse space is built from the slow modes of a much more diffusive operator.
+        # "matched" keeps the bound, so the stiffness is the corrected model's own and
+        # only the storage and the source are lumped. "shipped" is what every record
+        # up to the corrected-operator screen used, and stays the default so those
+        # records reproduce.
+        if not self.consistent_stabilization:
+            self.reference_assembly = self.assembly
+        elif reference_stabilization == "matched":
+            self.reference_assembly = replace(
+                self.assembly, stabilized_storage=None, stabilized_source=None
+            )
+        else:
+            self.reference_assembly = self.assemble(
+                initial_flow.velocity,
+                consistent=False,
+                bound_streamline=False,
+            )
         mass = self.assembly.mass[self.free]
         self.weights = mass / mass.mean()
         self.objective_scale = float(mass.mean())
@@ -152,7 +201,14 @@ class CoupledControlProblem:
             (flow.mass, flow.mass, sparse.csr_matrix((flow.np, flow.np))), format="csr"
         )[self.flow_free][:, self.flow_free]
 
-    def assemble(self, velocity):
+    def assemble(self, velocity, consistent=None, bound_streamline=None):
+        """The thermal assembly at one velocity.
+
+        ``consistent`` overrides the problem's own setting, which the reference
+        construction uses to ask for the lumped assembly deliberately, and
+        ``bound_streamline`` lets it keep the corrected model's bounded streamline
+        parameter while doing so.
+        """
         return assemble_thermal(
             self.mesh,
             self.conductivity,
@@ -160,6 +216,10 @@ class CoupledControlProblem:
             self.velocity_scale * self.flow.thermal_velocity(velocity),
             self.source,
             streamline=True,
+            transport_form=self.transport_form,
+            consistent=self.consistent_stabilization if consistent is None else consistent,
+            bound_streamline=bound_streamline,
+            streamline_rule=self.streamline_rule,
         )
 
     def full_temperature(self, state):
@@ -187,6 +247,7 @@ class CoupledControlProblem:
         zero_trajectory = not np.any(state) and not np.any(self.thermal_boundary)
         previous_flow, previous_temperature = self.initial_flow, self.initial
         factors, history, velocity_actions, diagonals, lower = [], [], [], [], []
+        source_factors = []
         controls, flows, metrics = [], [], []
         for n, yn in enumerate(Y):
             full = self.full_temperature(yn)
@@ -227,14 +288,37 @@ class CoupledControlProblem:
             assembly = self.assemble(result.velocity)
             mass = assembly.mass[self.free]
             inverse_mass = sparse.diags(1 / mass)
-            A = (inverse_mass @ assembly.stiffness[self.free][:, self.free]).tocsr()
-            control = (assembly.stiffness @ full - assembly.load)[self.free] / mass
+            # A consistent stabilisation weights the source by the streamline test
+            # function, so the control is no longer recovered by dividing by the
+            # lumped mass. The action is factored once per slab and applied where
+            # the momentum factors already are, rather than inverted into a matrix
+            # that would be dense.
+            action = None
+            if assembly.consistent:
+                action = splu(assembly.source_action[self.free][:, self.free].tocsc())
+                source_factors.append(action)
+            raw = assembly.stiffness[self.free][:, self.free].tocsr()
+            residual = (assembly.stiffness @ full - assembly.load)[self.free]
+            storage = None
             if dt is not None:
-                C = assembly.capacity[self.free] / mass / self.steps[n]
-                control += C * (yn - previous_temperature)
-                A += sparse.diags(C)
-                if n:
-                    lower.append(-sparse.diags(C))
+                if assembly.consistent:
+                    storage = (assembly.storage[self.free][:, self.free] / self.steps[n]).tocsr()
+                else:
+                    storage = sparse.diags(assembly.capacity[self.free] / self.steps[n])
+                residual = residual + storage @ (yn - previous_temperature)
+                raw = raw + storage
+            if action is None:
+                A = (inverse_mass @ raw).tocsr()
+                control = residual / mass
+                if dt is not None and n:
+                    lower.append(-sparse.diags(assembly.capacity[self.free] / mass / self.steps[n]))
+            else:
+                # The raw blocks are kept unnormalised; the factor is applied by the
+                # Jacobian, which is exact because J = S^-1 R gives J^T = R^T S^-T.
+                A = raw
+                control = action.solve(residual)
+                if dt is not None and n:
+                    lower.append(-storage)
             derivative = thermal_velocity_jacobian(
                 self.flow,
                 result.velocity,
@@ -242,14 +326,57 @@ class CoupledControlProblem:
                 self.capacity,
                 self.conductivity,
                 self.velocity_scale,
+                limit_rows=assembly.consistent,
+                residual_weighted=assembly.consistent,
+                streamline_rule=self.streamline_rule,
             )
+            if action is not None:
+                # The consistent weighting puts the same streamline factor on the
+                # storage, the source and the control's own action, so all three
+                # move with the velocity. Their shared scalar per fluid cell is
+                # assembled here, where the state, the control and the source are
+                # to hand, and differentiated together.
+                grad, lump = simplex_geometry(self.mesh)
+                fluid = self.flow.fluid_cells
+                cells = self.mesh.cells[fluid]
+                local_mass = lump[fluid]
+                recovered = np.zeros(len(self.mesh.nodes))
+                recovered[self.free] = control
+                scalar = -np.einsum("ei,ei->e", local_mass, recovered[cells])
+                scalar = scalar - local_mass.sum(axis=1) * np.asarray(self.source)[fluid]
+                if dt is not None:
+                    change = np.zeros(len(self.mesh.nodes))
+                    change[self.free] = yn - previous_temperature
+                    scalar = (
+                        scalar
+                        + np.asarray(self.capacity)[fluid]
+                        * np.einsum("ei,ei->e", local_mass, change[cells])
+                        / self.steps[n]
+                    )
+                derivative = derivative + consistent_velocity_jacobian(
+                    self.flow,
+                    result.velocity,
+                    scalar,
+                    self.capacity,
+                    self.conductivity,
+                    self.velocity_scale,
+                    streamline_rule=self.streamline_rule,
+                )
+            block = derivative[self.free][:, self.flow_free]
             velocity_actions.append(
-                (inverse_mass @ derivative[self.free][:, self.flow_free]).tocsr()
+                block.tocsr() if action is not None else (inverse_mass @ block).tocsr()
             )
-            if zero_trajectory:
-                # Every thermal velocity sensitivity is exactly zero. No
-                # momentum derivative factor is needed for this evaluation.
-                # All original momentum equations are still solved and checked.
+            if zero_trajectory and not velocity_actions[-1].nnz:
+                # This slab's thermal velocity sensitivity is exactly zero, so no
+                # momentum derivative factor is needed for it. All original momentum
+                # equations are still solved and checked.
+                #
+                # The test is the sensitivity itself rather than a zero trajectory,
+                # which only implies it for the lumped model. A consistent weighting
+                # makes the background source's own streamline weight move with the
+                # velocity, so its sensitivity is non-zero even from a zero control,
+                # and taking the shortcut there left a factor of None for the
+                # transpose to call solve on.
                 factors.append(None)
             else:
                 J = self.flow.operator(
@@ -286,16 +413,36 @@ class CoupledControlProblem:
             blocks[n][n] = A
             if n:
                 blocks[n][n - 1] = lower[n - 1]
+        if any(factor is None for factor in factors) and any(A.nnz for A in velocity_actions):
+            raise ValueError(
+                "A slab without a momentum factor needs a zero velocity sensitivity in every "
+                "slab, because the tangent's traversal is all or nothing"
+            )
         thermal = sparse.bmat(blocks, format="csr")
+        # The preconditioner's diagonal reads this operator, and only that; the
+        # coarse space is built separately from the lumped reference assembly. When
+        # the stabilisation is consistent the blocks above are unnormalised, so give
+        # them the lumped normalisation here, which approximates the factored source
+        # action by its diagonal. Both are preconditioner ingredients and every solve
+        # is still accepted on the true original residual.
+        frozen = thermal
+        if source_factors:
+            lumped = sparse.diags(np.tile(1.0 / self.assembly.mass[self.free], self.slabs))
+            frozen = (lumped @ thermal).tocsr()
         jacobian = ControlJacobian(
-            thermal, velocity_actions, self.load_derivative, factors, history
+            thermal,
+            velocity_actions,
+            self.load_derivative,
+            factors,
+            history,
+            source_factors=tuple(source_factors) or None,
         )
         return CoupledEvaluation(
             state,
             np.concatenate(controls),
             tuple(flows),
             jacobian,
-            thermal,
+            frozen,
             tuple(metrics),
             time.perf_counter() - start,
         )
@@ -337,13 +484,27 @@ class CoupledControlProblem:
     def verify_adjoint(self, evaluation, desired):
         """Reassemble momentum transpose equations at the retained trajectory.
 
-        The source-constraint multiplier is alpha*W*u. The momentum multiplier
-        has the opposite sign to the auxiliary adjoint used here. Each residual
-        uses a freshly assembled momentum Jacobian, including temporal mass.
+        For a consistent source action S, the source-constraint multiplier solves
+        S.T*lambda = alpha*W*u. Both thermal and momentum transpose terms use
+        lambda. The source action is independently assembled and factored here;
+        the optimizer's source factors are not reused by this verification.
         """
         J = evaluation.jacobian
         multiplier = self.alpha * self.weights * evaluation.control
-        blocks = multiplier.reshape(self.slabs, self.spatial_size)
+        blocks = multiplier.reshape(self.slabs, self.spatial_size).copy()
+        source_residuals = np.zeros(self.slabs)
+        if J.source_factors is not None:
+            for n, flow_result in enumerate(evaluation.flows):
+                assembly = self.assemble(flow_result.velocity)
+                source = assembly.source_action[self.free][:, self.free].tocsc()
+                rhs = blocks[n].copy()
+                blocks[n] = splu(source).solve(rhs, trans="T")
+                residual = source.T @ blocks[n] - rhs
+                norm = np.linalg.norm(rhs)
+                source_residuals[n] = (
+                    np.linalg.norm(residual) / norm if norm else np.linalg.norm(residual)
+                )
+        multiplier = blocks.ravel()
         gradient = self.weights * (evaluation.state - desired) + J.thermal.T @ multiplier
         gradient = gradient.reshape(self.slabs, self.spatial_size)
         following = np.zeros(len(self.flow_free))
@@ -363,11 +524,24 @@ class CoupledControlProblem:
             norm = np.linalg.norm(rhs)
             relative = np.linalg.norm(residual) / norm if norm else np.linalg.norm(residual)
             gradient[n] += self.load_derivative.T @ adjoint
-            rows.append({"slab": n, "momentum_adjoint_relative_residual": float(relative)})
+            rows.append(
+                {
+                    "slab": n,
+                    "momentum_adjoint_relative_residual": float(relative),
+                    "source_adjoint_relative_residual": float(source_residuals[n]),
+                }
+            )
             following = adjoint
         reference = self.objective_gradient(evaluation, desired)[1]
         difference = np.linalg.norm(gradient.ravel() - reference)
+        scaled = reference / self.weights
+        scale = max(
+            1.0,
+            np.max(np.abs(evaluation.state - desired)),
+            np.max(np.abs(scaled - (evaluation.state - desired))),
+        )
         return {
+            "procedure": "independent-source-momentum-adjoint-v2",
             "steps": rows[::-1],
             "maximum_momentum_adjoint_relative_residual": max(
                 r["momentum_adjoint_relative_residual"] for r in rows
@@ -375,9 +549,13 @@ class CoupledControlProblem:
             "gradient_relative_difference": float(
                 difference / max(np.linalg.norm(reference), np.finfo(float).tiny)
             ),
+            "maximum_source_adjoint_relative_residual": float(source_residuals.max()),
+            "gradient_weight_normalized_difference": float(
+                np.max(np.abs((gradient.ravel() - reference) / self.weights)) / scale
+            ),
         }
 
-    def verify(self, evaluation):
+    def verify(self, evaluation, *, local_mass=False):
         """Rebuild momentum and thermal equations at the same retained fields.
 
         The energy check uses independently integrated boundary advection and
@@ -403,12 +581,16 @@ class CoupledControlProblem:
             u[self.free] = un
             dt = self.physical_steps[n] if len(self.physical_steps) else None
             assembly = self.assemble(flow_result.velocity)
+            # Both forms come from the assembly, so this checks the equation that was
+            # solved. A lumped assembly returns the diagonals and the arithmetic is
+            # what it always was; a consistent one returns the streamline-weighted
+            # operators, and checking against the lumped ones would certify nothing.
             storage = (
                 np.zeros_like(y)
                 if dt is None
-                else assembly.capacity * (y - previous_y) / self.steps[n]
+                else assembly.storage @ (y - previous_y) / self.steps[n]
             )
-            rhs = assembly.load + assembly.mass * u
+            rhs = assembly.load + assembly.source_action @ u
             reaction = assembly.stiffness @ y + storage - rhs
             acceleration = self.acceleration + self.flow.buoyancy(
                 self.temperature_offset + self.temperature_scale * y,
@@ -432,7 +614,7 @@ class CoupledControlProblem:
                     * fluid_capacity[0]
                     * self.flow.boundary_flux(flow_result.velocity, scalar=y).sum()
                 ),
-                "control_input": float(assembly.mass @ u),
+                "control_input": float((assembly.source_action @ u).sum()),
                 "background_input": float(assembly.load.sum()),
                 "dirichlet_supply": float(reaction[self.mesh.dirichlet].sum()),
             }
@@ -463,5 +645,9 @@ class CoupledControlProblem:
                     },
                 }
             )
+            if local_mass:
+                from .flow_conservation import mass_diagnostics
+
+                rows[-1]["mass_diagnostics"] = mass_diagnostics(self.flow, flow_result.velocity)
             previous_y, previous_v = y, flow_result.velocity
         return rows

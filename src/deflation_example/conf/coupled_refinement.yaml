@@ -1,0 +1,35 @@
+defaults:
+  - coupled_sequence
+  - _self_
+
+# Same physical problem as the smooth 64-slab study. Required input directories
+# are supplied on the command line. Run only after the declared resolution gate.
+output: runs/coupled-refinement
+slabs: 256
+queries:
+  - {target: 7, upper_K: 357.3}
+stage:
+  positions: [0]
+  restore: null
+  resume: null
+temperature_margin_K: 0.0
+flow_tolerance: 1.0e-12
+equation_acceptance_tolerance: 1.0e-12
+conservation_tolerance: 1.0e-6
+local_mass_diagnostics: true
+consistent_stabilization: true
+reference_stabilization: matched
+streamline_rule: smooth_p8
+backtracking: quadratic
+secant_memory: 10
+evaluation_progress: true
+linear_progress: true
+inner_refresh: 50000
+threads: 8
+device: hybrid
+method: reference
+rank: 20
+recycle_window: 20
+hybrid_block_min_columns: 20
+hybrid_block_max_columns: 5
+hybrid_coarse_device: cuda

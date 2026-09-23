@@ -85,8 +85,11 @@ def check_saved_trajectory(problem, state, control, velocity, pressure, replay=N
         }
         if replay is not None:
             replay_previous = problem.initial if n == 0 else replay[n - 1]
-            capacity = assembly.capacity[I] / problem.steps[n]
-            propagated = spsolve(B, rhs[I] - boundary + capacity * (replay_previous - previous[I]))
+            # The storage comes from the assembly, so this propagates the step the
+            # model actually takes. A lumped assembly returns the capacity diagonal
+            # and the arithmetic is what it always was.
+            storage = (assembly.storage[I][:, I] / problem.steps[n]).tocsr()
+            propagated = spsolve(B, rhs[I] - boundary + storage @ (replay_previous - previous[I]))
             row.update(
                 replayed_previous_frozen_velocity_error_K=float(
                     np.max(np.abs(propagated - state[n])) * problem.temperature_scale

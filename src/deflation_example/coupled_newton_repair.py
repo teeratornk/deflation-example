@@ -75,7 +75,7 @@ def compare_step(
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", type=Path, required=True)
-    parser.add_argument("--fine-baseline", type=Path, required=True)
+    parser.add_argument("--fine-baseline", type=Path, help="Omit for same-mesh temporal replay")
     parser.add_argument("--optimization", type=Path, required=True)
     parser.add_argument("--replay", type=Path, required=True)
     parser.add_argument(
@@ -83,6 +83,9 @@ def main():
     )
     parser.add_argument("--target-position", type=int)
     parser.add_argument("--cap", type=int, default=100)
+    parser.add_argument(
+        "--protocol", choices=("legacy", "refinement_v7", "continuation_v7"), default="legacy"
+    )
     parser.add_argument("--threads", type=int, default=8)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -94,26 +97,36 @@ def main():
             args.optimization, args.method, args.target_position
         )
         replay = json.loads((args.replay / "record.json").read_text())
+        if replay["configuration"] != config:
+            raise ValueError("Replay must retain the saved optimization configuration")
         if replay["status"] in {"converged", "running"}:
             raise ValueError("Select a completed, unsuccessful forward replay")
         subdivision = integer(replay.get("subdivision", 1), "Time subdivision", 1)
         comparison = {**config, "slabs": config["slabs"] * subdivision}
         coarse, baseline = load_problem({**comparison, "baseline_directory": str(args.baseline)})
-        fine, fine_baseline = load_problem(
-            {**comparison, "baseline_directory": str(args.fine_baseline)}
+        fine, fine_baseline = (
+            (coarse, baseline)
+            if args.fine_baseline is None
+            else load_problem({**comparison, "baseline_directory": str(args.fine_baseline)})
         )
         require_matching_baseline(saved, baseline)
         if (
             replay["optimization_field_sha256"] != digest
             or replay["baseline_sha256"] != baseline["baseline_sha256"]
-            or replay["fine_baseline_sha256"] != fine_baseline["baseline_sha256"]
+            or replay.get("fine_baseline_sha256", replay["baseline_sha256"])
+            != fine_baseline["baseline_sha256"]
         ):
             raise ValueError("Replay, saved control and baselines must match")
-        controls, _ = transfer_source(
-            coarse,
-            fine,
-            np.repeat(fields["control"].reshape(config["slabs"], -1), subdivision, axis=0),
-        )
+        controls = np.repeat(fields["control"].reshape(config["slabs"], -1), subdivision, axis=0)
+        if args.fine_baseline is not None:
+            controls, _ = transfer_source(coarse, fine, controls)
+        formulation = replay.get("forward_formulation", {})
+        if (
+            formulation.get("consistent_stabilization", fine.consistent_stabilization)
+            != fine.consistent_stabilization
+            or formulation.get("streamline_rule", fine.streamline_rule) != fine.streamline_rule
+        ):
+            raise ValueError("Repair must preserve the actual replay formulation")
         with np.load(args.replay / "states.npz", allow_pickle=False) as arrays:
             states, velocities, pressures, times = (
                 arrays[key] for key in ("state", "velocity", "pressure", "times_s")
@@ -151,10 +164,98 @@ def main():
             "slab_zero_based": n,
             "spatial_state_degrees_of_freedom": fine.spatial_size,
             "time_scheme": scheme,
+            "protocol": args.protocol,
+            "streamline_rule": fine.streamline_rule,
+            "consistent_stabilization": fine.consistent_stabilization,
             "storage_derivative_coefficients_s_inverse": coefficients.tolist(),
             "scope": "Matched local Newton restarts from the saved unsuccessful candidate. The previous state and signed source are fixed; complete trajectory accuracy remains a separate check.",
         }
         write_report(args.output / "record.json", {**metadata, "status": "running"})
+
+        if args.protocol in {"refinement_v7", "continuation_v7"}:
+            from .coupled_repair_protocol import derivative_check, compare_repairs, paired_selection
+            from .coupled_forward_verify import verify_fields
+
+            audit = verify_fields(
+                fine,
+                controls,
+                {"state": states, "velocity": velocities, "pressure": pressures, "times_s": times},
+                replay["steps"],
+                time_scheme=scheme,
+                subdivision=subdivision,
+            )
+            metadata["input_equation_audit"] = audit
+            if not all(row["verified"] for row in audit["steps"][:-1]):
+                write_report(
+                    args.output / "record.json",
+                    {**metadata, "status": "previous_history_check_failed"},
+                )
+                return
+            metadata["scope"] = (
+                "Matched fixed-source repairs of one failed step, from the saved candidate and preceding physical state. Both starts use the same independently verified temporal history. Complete trajectory accuracy remains a separate check."
+            )
+
+            metadata["derivative_check"] = derivative_check(
+                effective, source, previous, previous_flow, state, flow, n
+            )
+            if not metadata["derivative_check"]["passed"]:
+                write_report(
+                    args.output / "record.json", {**metadata, "status": "derivative_check_failed"}
+                )
+                return
+            rows, solutions = [], {}
+            initializations = (
+                ("saved", state, flow),
+                (
+                    "previous",
+                    fine.full_temperature(fine.initial)
+                    if n == 0
+                    else fine.full_temperature(states[n - 1]),
+                    fine.initial_flow
+                    if n == 0
+                    else FlowResult(velocities[n - 1], pressures[n - 1], "previous", []),
+                ),
+            )
+            for name, initial_state, initial_flow in initializations:
+
+                def progress(current, arrays):
+                    write_fields(args.output / "states.npz", **{**solutions, **arrays})
+                    write_report(
+                        args.output / "record.json",
+                        {**metadata, "status": "running", "rows": rows + current},
+                    )
+
+                current, arrays = compare_repairs(
+                    effective,
+                    source,
+                    previous,
+                    previous_flow,
+                    initial_state,
+                    initial_flow,
+                    n,
+                    initialization=name,
+                    cap=cap,
+                    callback=progress,
+                    continuation=args.protocol == "continuation_v7",
+                )
+                rows.extend(current)
+                solutions.update(arrays)
+            write_fields(args.output / "states.npz", **solutions)
+            write_report(
+                args.output / "record.json",
+                {
+                    **metadata,
+                    "status": "complete",
+                    "rows": rows,
+                    "selection": paired_selection(
+                        rows,
+                        solutions,
+                        fine.temperature_scale,
+                        continuation=args.protocol == "continuation_v7",
+                    ),
+                },
+            )
+            return
 
         def completed_policy(rows, solutions):
             write_fields(args.output / "states.npz", **solutions)

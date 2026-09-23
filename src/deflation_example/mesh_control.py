@@ -170,6 +170,12 @@ def build_mesh_control(
     mass = assembly.mass[I]
     if np.any(mass <= 0):
         raise ValueError("Lumped mass must be positive")
+    if assembly.consistent:
+        # This path eliminates the control by dividing by the lumped mass and builds
+        # the transient operator as a Kronecker sum with a scalar capacity per node.
+        # A streamline-weighted storage and source are neither, so refuse rather than
+        # return a number for a different problem.
+        raise ValueError("This path requires a lumped thermal assembly")
     boundary = np.broadcast_to(real_array(boundary_value, "Dirichlet temperature"), (len(J),))
     if not np.isfinite(boundary).all():
         raise ValueError("Dirichlet temperature must be finite")

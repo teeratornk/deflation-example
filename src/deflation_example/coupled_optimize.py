@@ -17,9 +17,11 @@ from threadpoolctl import threadpool_limits
 from .assess_transformer import transformer_boundaries
 from .axisymmetric_flow import AxisymmetricFlow, FlowResult
 from .coupled_control import CoupledControlProblem, FlowEvaluationError
+from .coupled_bounds import temperature_bounds
 from .coupled_optimizer import NUMERICAL_POLICY, minimize_coupled
 from .coupled_pilot import transformer_inputs
 from .coupled_reference import configured_reference
+from .coupled_saved import load_saved_solution, require_matching_baseline
 from .coupled_targets import desired_temperature
 from .oil_properties import momentum_reference
 from .reporting import environment, write_fields, write_report
@@ -66,6 +68,9 @@ def load_problem(config):
     if config["transient"]:
         count = integer(config["slabs"], "Number of time slabs", 1)
         steps = np.full(count, positive_real(config["horizon_s"], "Physical horizon") / count)
+    feedback = float(config.get("feedback_multiplier", 1.0))
+    if not np.isfinite(feedback) or not 0 <= feedback <= 1:
+        raise ValueError("Diagnostic feedback multiplier must lie in [0, 1]")
     problem = CoupledControlProblem(
         flow,
         k,
@@ -75,7 +80,7 @@ def load_problem(config):
         values,
         baseline,
         alpha=config["alpha"],
-        expansion=properties["expansion_coefficient_K_inverse"],
+        expansion=properties["expansion_coefficient_K_inverse"] * feedback,
         temperature_scale=p["temperature_scale_K"],
         temperature_offset=p["inlet_temperature_K"],
         buoyancy_reference=p["inlet_temperature_K"],
@@ -86,6 +91,10 @@ def load_problem(config):
         flow_cap=config["flow_cap"],
         flow_continuation=config["flow_continuation"],
         momentum_factor_policy=policy,
+        transport_form=config.get("transport_form", "advective"),
+        consistent_stabilization=config.get("consistent_stabilization", False),
+        reference_stabilization=config.get("reference_stabilization", "shipped"),
+        streamline_rule=config.get("streamline_rule", "hard_min"),
     )
     return problem, record
 
@@ -136,8 +145,10 @@ def derivative_report(problem, desired):
     }
 
 
-def equations_verified(rows):
+def equations_verified(rows, *, equation_tolerance=1e-8, conservation_tolerance=1e-6):
     """Common independent equation and conservation criteria for every mode."""
+    equation_tolerance = positive_real(equation_tolerance, "Equation acceptance tolerance")
+    conservation_tolerance = positive_real(conservation_tolerance, "Conservation tolerance")
     return bool(rows) and all(
         np.isfinite(
             [
@@ -148,16 +159,48 @@ def equations_verified(rows):
                 r["energy"]["relative_defect"],
             ]
         ).all()
+        and min(
+            r["momentum_relative_residual"],
+            r["continuity_relative_residual"],
+            r["thermal_relative_residual"],
+            r["mass_relative_imbalance"],
+            r["energy"]["relative_defect"],
+        )
+        >= 0
         and max(
             r["momentum_relative_residual"],
             r["continuity_relative_residual"],
             r["thermal_relative_residual"],
         )
-        <= 1e-8
-        and r["mass_relative_imbalance"] <= 1e-6
-        and r["energy"]["relative_defect"] <= 1e-6
+        <= equation_tolerance
+        and r["mass_relative_imbalance"] <= conservation_tolerance
+        and r["energy"]["relative_defect"] <= conservation_tolerance
         for r in rows
     )
+
+
+def equation_acceptance(rows, config):
+    """Use the declared final criteria; retain legacy defaults for saved inputs."""
+    return equations_verified(
+        rows,
+        equation_tolerance=config.get("equation_acceptance_tolerance", 1e-8),
+        conservation_tolerance=config.get("conservation_tolerance", 1e-6),
+    )
+
+
+def adjoint_acceptance(report):
+    """Require source, momentum and outer-normalized gradient checks at 1e-8.
+
+    This gate applies to newly evaluated states; it does not relabel archived
+    records containing the earlier momentum-only verification.
+    """
+    names = (
+        "maximum_momentum_adjoint_relative_residual",
+        "maximum_source_adjoint_relative_residual",
+        "gradient_weight_normalized_difference",
+    )
+    values = np.asarray([report.get(name, np.nan) for name in names], dtype=float)
+    return bool(np.isfinite(values).all() and np.all(values >= 0) and np.all(values <= 1e-8))
 
 
 def observe_linear_solves(solver, destination):
@@ -189,6 +232,74 @@ def observe_linear_solves(solver, destination):
     solver.solve = observed
 
 
+def prolonged_initial_state(cfg, problem, baseline_record):
+    """A saved optimum on a coarser time grid, repeated per original slab.
+
+    The saved trajectory is piecewise constant in time on its own slabs; each
+    slab value is repeated over the finer slabs it covers. Flows are recomputed
+    from the isothermal baseline, so this is only an initial iterate. The saved
+    problem must be the same declared target, bounds, horizon and startup.
+    """
+    repeat = integer(cfg.get("initial_control_repeat", 1), "Temporal repetition", 1)
+    position = cfg.get("initial_control_position")
+    record, saved_cfg, arrays, digest = load_saved_solution(
+        cfg["initial_control_directory"], cfg["initial_control_method"], position
+    )
+    require_matching_baseline(record, baseline_record)
+    saved_slabs = integer(saved_cfg.get("slabs", 1), "Saved slabs", 1)
+    if saved_cfg.get("transient") != cfg.get("transient"):
+        raise ValueError("A saved initial control must share the transient setting")
+    if saved_slabs * repeat != integer(cfg["slabs"], "Slabs", 1):
+        raise ValueError("The temporal repetition must map the saved slabs onto the declared slabs")
+    for key in ("query", "upper_K", "lower_K", "horizon_s", "target_count"):
+        if key in saved_cfg and saved_cfg[key] != cfg[key]:
+            raise ValueError(f"A saved initial control must share the declared {key}")
+    if saved_cfg.get("target_startup_s", 0.0) != cfg.get("target_startup_s", 0.0):
+        raise ValueError("A saved initial control must share the declared target startup")
+    state = np.asarray(arrays["state"], dtype=float).reshape(saved_slabs, -1)
+    prolonged = np.repeat(state, repeat, axis=0).ravel()
+    if prolonged.shape != (problem.size,):
+        raise ValueError("The prolonged initial control does not match the problem size")
+    return prolonged, {
+        "directory": str(cfg["initial_control_directory"]),
+        "method": cfg["initial_control_method"],
+        "position": position,
+        "field_sha256": digest,
+        "saved_slabs": saved_slabs,
+        "temporal_repetition": repeat,
+        "scope": "Initial iterate only; flows are recomputed from the isothermal baseline and every optimality check applies to the new optimum.",
+    }
+
+
+def preconditioner_description(cfg):
+    """What the inner solver actually divides by, for the run's own record."""
+    if cfg.get("inner_preconditioner", "jacobi") == "frozen":
+        sweeps = cfg.get("frozen_sweeps", 3)
+        return (
+            f"{sweeps} block-Jacobi sweeps over the slab-diagonal blocks of the "
+            "frozen-velocity thermal normal operator"
+        )
+    return "positive diagonal of the frozen-velocity thermal normal operator"
+
+
+def solver_options(cfg, solver_class):
+    """Runner-level inner-solver settings that every method shares.
+
+    The residual-refresh interval applies to all methods. Hybrid-only settings
+    reach only the hybrid backend, so CPU and CUDA-resident solvers are unchanged.
+    """
+    options = {"refresh": integer(cfg.get("inner_refresh", 1000), "Residual refresh interval", 1)}
+    if solver_class.__name__ == "HybridCoupledSolver":
+        options["block_min_columns"] = integer(
+            cfg.get("hybrid_block_min_columns", 20), "CUDA block threshold", 2
+        )
+        options["block_max_columns"] = integer(
+            cfg.get("hybrid_block_max_columns", 100), "CUDA block chunk width", 1
+        )
+        options["coarse_device"] = cfg.get("hybrid_coarse_device", "cpu")
+    return options
+
+
 def run(config):
     cfg = OmegaConf.to_container(config, resolve=True)
     if not cfg["baseline_directory"]:
@@ -197,6 +308,10 @@ def run(config):
         raise ValueError("Choose derivatives or optimize")
     if cfg["device"] not in {"cpu", "cuda", "hybrid"}:
         raise ValueError("Choose cpu, cuda or hybrid")
+    if cfg.get("inner_preconditioner", "jacobi") not in {"jacobi", "frozen"}:
+        raise ValueError("Choose the Jacobi diagonal or the velocity-frozen preconditioner")
+    if cfg.get("inner_preconditioner", "jacobi") == "frozen" and cfg["device"] == "cuda":
+        raise ValueError("The frozen preconditioner runs on the host kernel, so cpu or hybrid")
     output = Path(cfg["output"])
     output.mkdir(parents=True, exist_ok=False)
     with threadpool_limits(integer(cfg["threads"], "Threads", 1)):
@@ -224,7 +339,7 @@ def run(config):
             "state_dofs": problem.size,
             "thermal_offset_K": problem.temperature_offset,
             "thermal_scale_K": problem.temperature_scale,
-            "preconditioner": "positive diagonal of the frozen-velocity thermal normal operator",
+            "preconditioner": preconditioner_description(cfg),
         }
         write_report(output / "record.json", {**metadata, "status": "running"})
         try:
@@ -234,7 +349,7 @@ def run(config):
                     report["relative_dot_product_error"] <= 1e-9
                     and min(report["taylor_orders"]) > 1.9
                     and np.isfinite(report["taylor_orders"]).all()
-                    and equations_verified(report["equations"])
+                    and equation_acceptance(report["equations"], cfg)
                 )
                 write_report(
                     output / "record.json",
@@ -246,8 +361,20 @@ def run(config):
                     },
                 )
                 return
-            lower = (cfg["lower_K"] - problem.temperature_offset) / problem.temperature_scale
-            upper = (cfg["upper_K"] - problem.temperature_offset) / problem.temperature_scale
+            bounds = temperature_bounds(cfg)
+            metadata["temperature_bounds"] = bounds
+            lower = (
+                bounds["optimization_lower_K"] - problem.temperature_offset
+            ) / problem.temperature_scale
+            upper = (
+                bounds["optimization_upper_K"] - problem.temperature_offset
+            ) / problem.temperature_scale
+            initial_state = None
+            if cfg.get("initial_control_directory"):
+                initial_state, metadata["initial_control"] = prolonged_initial_state(
+                    cfg, problem, baseline_record
+                )
+                write_report(output / "record.json", {**metadata, "status": "running"})
             results = []
             for method in cfg["methods"]:
                 tick = time.perf_counter()
@@ -273,6 +400,7 @@ def run(config):
                     maxiter=cfg["inner_cap"],
                     cg_factor=0.1,
                     residual_policy="refine",
+                    **solver_options(cfg, solver_class),
                 )
                 if cfg["linear_progress"]:
                     observe_linear_solves(solver, output / (method + "-linear-progress.json"))
@@ -283,23 +411,25 @@ def run(config):
                         lower,
                         upper,
                         solver,
+                        initial=initial_state,
                         tolerance=cfg["nonlinear_tolerance"],
                         max_iterations=cfg["nonlinear_cap"],
                         backtracking=cfg["backtracking"],
                         secant_memory=cfg["secant_memory"],
+                        inner_preconditioner=cfg.get("inner_preconditioner", "jacobi"),
+                        frozen_sweeps=cfg.get("frozen_sweeps", 3),
                         qp_tolerance=cfg["qp_tolerance"],
                         qp_cap=cfg["qp_cap"],
                         callback=lambda row, ev: write_report(
                             output / (method + "-progress.json"), row
                         ),
                     )
-                    checks = problem.verify(result.evaluation)
-                    adjoint = problem.verify_adjoint(result.evaluation, desired)
-                    equations_pass = equations_verified(checks)
-                    adjoint_pass = (
-                        np.isfinite(adjoint["maximum_momentum_adjoint_relative_residual"])
-                        and adjoint["maximum_momentum_adjoint_relative_residual"] <= 1e-8
+                    checks = problem.verify(
+                        result.evaluation, local_mass=cfg.get("local_mass_diagnostics", False)
                     )
+                    adjoint = problem.verify_adjoint(result.evaluation, desired)
+                    equations_pass = equation_acceptance(checks, cfg)
+                    adjoint_pass = adjoint_acceptance(adjoint)
                     row = {
                         "method": method,
                         "optimizer_status": result.status,

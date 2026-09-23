@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "study": "coupled-full-validation-v1",
+  "stage": "formulation_verification",
+  "geometry": "transformer",
+  "physical_horizon_seconds": 600,
+  "startup_seconds": 60,
+  "target_indices": [7, 8, 15],
+  "physical_bound_policy": "unchanged from the selected baseline",
+  "source_policy": "fixed saved source, piecewise constant on optimization time slabs",
+  "accuracy": {
+    "coupled_original_equations": 1e-12,
+    "mass_relative_imbalance": 1e-6,
+    "energy_relative_defect": 1e-6,
+    "inner_original_relative_residual": 1e-10,
+    "optimization_kkt": 1e-8
+  },
+  "resolution": {
+    "maximum_temperature_difference_K": 0.05,
+    "maximum_relative_tracking_change": 0.01,
+    "successive_passing_comparisons_required": 2,
+    "domain": "all constrained spatial nodes and all assessment time levels over 0 to 600 seconds",
+    "spatial_and_temporal_checks": "separate",
+    "source_transfer": "preserve the frozen spatial field and slabwise source history",
+    "nonimproving_comparisons_before_diagnosis": 2,
+    "early_time_only_acceptance": false,
+    "sampled_eigenvalue_products_are_resolution_certificates": false,
+    "bound_policy": "report positive excess with estimated uncertainty; require uncertainty below the resolution gate"
+  },
+  "forward_policy": {
+    "primary": "fixed-scaled Newton",
+    "newton_iteration_cap": 100,
+    "fallback": "complete-field Anderson from retained Newton fields",
+    "anderson_depth": 5,
+    "anderson_relaxation": 0.5,
+    "anderson_iteration_cap": 300,
+    "momentum_iteration_cap": 100,
+    "retain_all_attempts_and_costs": true
+  },
+  "rank_selection": {
+    "reference_ranks": [100, 200, 400],
+    "rank_zero_control": "Jacobi-CG",
+    "recycling": "retain existing coarse vectors and new directions; Jacobi-scaled selection",
+    "selection_quantity": "lowest complete verified time subject to memory and accuracy criteria",
+    "freeze_before_final_comparisons": true
+  },
+  "final_comparisons": {
+    "methods": ["jacobi", "reference", "recycling"],
+    "repetitions": 3,
+    "targets_per_sequence": 3,
+    "total_sequences": 9,
+    "total_optimizations": 27,
+    "rotate_method_order": true,
+    "exclusive_resources": true,
+    "matched_initial_history": true,
+    "timing": "construction, all nonlinear and inner solves, transfers, verification, cleanup",
+    "preparation": "report separately and in preparation-inclusive totals",
+    "include_failures": true,
+    "resumed_sequences_are_separate": true
+  },
+  "publication_gate": "verified model and derivatives, resolved fixed-control assessment, complete matched comparisons, clean-checkout reproduction",
+  "optimization_interpretation": "verified discrete stationary point; no global optimality claim"
+}

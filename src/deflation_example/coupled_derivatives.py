@@ -28,13 +28,86 @@ def buoyancy_jacobian(flow, expansion, temperature_scale, gravity=(0.0, -9.81)):
     )
 
 
-def thermal_velocity_jacobian(flow, velocity, state, capacity, conductivity, velocity_scale):
+def streamline_parameter(grad, lump, c, kmin, v, vertices, limit_rows, rule="hard_min"):
+    """The streamline parameter and its velocity derivative, per fluid cell.
+
+    The parameter is the declared one, the smaller of the advective and diffusive
+    limits on the longest edge. At a switch between those branches the derivative is
+    undefined and such a point is rejected, which is the guard the symmetric term has
+    always carried.
+
+    The consistent weighting additionally bounds the parameter so that no cell takes
+    more out of a node's row than that node's own share of the cell mass. Where that
+    bound binds, the parameter is the smallest nodal share over the Euclidean norm of
+    the cell's streamline derivatives, which no longer depends on the element length;
+    its derivative follows from the same expression. A point where the bound is
+    exactly at its switch is rejected for the same reason a branch switch is.
+    """
+    if rule == "smooth_p8":
+        from .streamline import smooth_parameter
+
+        return smooth_parameter(grad, lump, c, kmin, v, vertices, limit_rows)
+    if rule != "hard_min":
+        raise ValueError("Choose hard_min or smooth_p8 streamline coefficients")
+    norm = np.linalg.norm(v, axis=1)
+    h = np.max(np.linalg.norm(vertices[:, :, None] - vertices[:, None, :], axis=3), axis=(1, 2))
+    diffusion_tau = h**2 / (12 * kmin)
+    advection_tau = np.full_like(norm, np.inf)
+    np.divide(h, 2 * c * norm, out=advection_tau, where=norm > 0)
+    if np.any(np.isclose(advection_tau, diffusion_tau, rtol=1e-12, atol=0)):
+        raise StabilizationBranchError(
+            "Streamline stabilization is at a nondifferentiable branch switch"
+        )
+    tau = np.minimum(advection_tau, diffusion_tau)
+    dtau = np.zeros_like(v)
+    advective = advection_tau < diffusion_tau
+    dtau[advective] = -tau[advective, None] * v[advective] / norm[advective, None] ** 2
+    if not limit_rows:
+        return tau, dtau
+    # The bound is written with the Euclidean norm of the cell's streamline
+    # derivatives rather than their largest entry. Both give a valid bound, because
+    # the largest entry never exceeds the norm, but the largest entry is a maximum
+    # over three nodes and on a structured mesh with a nearly axial flow two of them
+    # tie in whole rows of cells at once, which leaves the model itself without a
+    # derivative there. The norm has one, everywhere except at rest, and costs at
+    # most a factor of the square root of three in how far the bound reaches.
+    share = (lump / lump.sum(axis=1)[:, None]).min(axis=1)
+    u = np.einsum("eid,ed->ei", grad, v)
+    reach = np.linalg.norm(u, axis=1)
+    bound = np.full_like(tau, np.inf)
+    np.divide(share, c * reach, out=bound, where=reach > 0)
+    if np.any(np.isclose(bound, tau, rtol=1e-12, atol=0)):
+        raise StabilizationBranchError("The streamline row limit is at its own switch")
+    limited = bound < tau
+    moving = reach > 0
+    dbound = np.zeros_like(v)
+    if np.any(moving):
+        gradient = np.einsum("ei,eid->ed", u[moving], grad[moving]) / reach[moving, None]
+        dbound[moving] = -bound[moving, None] * gradient / reach[moving, None]
+    return np.where(limited, bound, tau), np.where(limited[:, None], dbound, dtau)
+
+
+def thermal_velocity_jacobian(
+    flow,
+    velocity,
+    state,
+    capacity,
+    conductivity,
+    velocity_scale,
+    limit_rows=False,
+    residual_weighted=False,
+    streamline_rule="hard_min",
+):
     """Derivative of K(v)y, including the active streamline-diffusion branch.
 
     K is exactly the P2-velocity thermal operator in assemble_thermal. At a
     switch between its two stabilization branches the derivative is undefined;
     such a point is explicitly rejected. At zero velocity the diffusion-limited
     branch is smooth and has zero stabilization derivative.
+
+    ``limit_rows`` follows the assembly's consistent weighting, which bounds the
+    streamline parameter by the nodal share of the cell mass. The symmetric term
+    carries the same bounded parameter, so this derivative has to know about it.
     """
     mesh = flow.mesh
     state = np.asarray(state, dtype=float)
@@ -64,19 +137,7 @@ def thermal_velocity_jacobian(flow, velocity, state, capacity, conductivity, vel
     transport = c[:, None, None, None] * moments[:, :, :, None] * gradient_y[:, None, None, :]
     center_shape = np.array([-1, -1, -1, 4, 4, 4]) / 9
     v = velocity_scale * np.einsum("a,ead->ed", center_shape, velocity[flow.p2])
-    norm = np.linalg.norm(v, axis=1)
-    h = np.max(np.linalg.norm(vertices[:, :, None] - vertices[:, None, :], axis=3), axis=(1, 2))
-    diffusion_tau = h**2 / (12 * kmin)
-    advection_tau = np.full_like(norm, np.inf)
-    np.divide(h, 2 * c * norm, out=advection_tau, where=norm > 0)
-    if np.any(np.isclose(advection_tau, diffusion_tau, rtol=1e-12, atol=0)):
-        raise StabilizationBranchError(
-            "Streamline stabilization is at a nondifferentiable branch switch"
-        )
-    tau = np.minimum(advection_tau, diffusion_tau)
-    dtau = np.zeros_like(v)
-    advective = advection_tau < diffusion_tau
-    dtau[advective] = -tau[advective, None] * v[advective] / norm[advective, None] ** 2
+    tau, dtau = streamline_parameter(grad, lump, c, kmin, v, vertices, limit_rows, streamline_rule)
     g = c[:, None] * np.einsum("eid,ed->ei", grad, v)
     s = c * np.einsum("ed,ed->e", gradient_y, v)
     derivative = lump.sum(axis=1)[:, None, None] * (
@@ -87,6 +148,27 @@ def thermal_velocity_jacobian(flow, velocity, state, capacity, conductivity, vel
     local = velocity_scale * (
         transport + derivative[:, :, None, :] * center_shape[None, None, :, None]
     )
+    if residual_weighted:
+        # Differentiate w_i * integral(c*v.grad(T) - div(K grad(T))).
+        # Both the streamline test weight and the integrated P2 velocity vary.
+        integrated_shape = np.einsum("eq,qa->ea", measure, shape)
+        integrated_velocity = velocity_scale * np.einsum(
+            "ea,ead->ed", integrated_shape, velocity[flow.p2]
+        )
+        scalar = c * np.einsum("ed,ed->e", integrated_velocity, gradient_y)
+        if mesh.axisymmetric:
+            k = np.asarray(conductivity)[flow.fluid_cells]
+            scalar -= 2 * np.pi * area * np.einsum("ed,ed->e", k[:, 0, :], gradient_y)
+        dw = tau[:, None, None] * c[:, None, None] * grad + dtau[:, None, :] * g[:, :, None]
+        weighted = tau[:, None] * g
+        local = velocity_scale * (
+            transport
+            + (dw * scalar[:, None, None])[:, :, None, :] * center_shape[None, None, :, None]
+            + weighted[:, :, None, None]
+            * c[:, None, None, None]
+            * integrated_shape[:, None, :, None]
+            * gradient_y[:, None, None, :]
+        )
     blocks = [
         flow._matrix(local[:, :, :, d], cells, flow.p2, (len(mesh.nodes), flow.nv))
         for d in range(2)
@@ -102,7 +184,13 @@ class ControlJacobian(LinearOperator):
     backwards, including the final block. All LU factors are fixed at creation.
     """
 
-    def __init__(self, thermal, velocity_actions, buoyancy, factors, history):
+    def __init__(self, thermal, velocity_actions, buoyancy, factors, history, source_factors=None):
+        # With a consistent stabilisation the source is weighted by the streamline
+        # test function, so the control is recovered through a factored action
+        # rather than a division by the lumped mass. The thermal and velocity blocks
+        # are then unnormalised and the action is applied here, which is exact
+        # because J = S^-1 R gives J^T = R^T S^-T.
+        self.source_factors = None if source_factors is None else tuple(source_factors)
         self.thermal = sparse.csr_matrix(thermal)
         self.velocity_actions = tuple(sparse.csr_matrix(A, copy=True) for A in velocity_actions)
         for action in self.velocity_actions:
@@ -116,6 +204,8 @@ class ControlJacobian(LinearOperator):
             raise ValueError("Control derivative dimensions do not match the trajectory")
         if len(self.velocity_actions) != self.slabs or len(self.history) != self.slabs:
             raise ValueError("Each time slab needs thermal, momentum and history blocks")
+        if self.source_factors is not None and len(self.source_factors) != self.slabs:
+            raise ValueError("Each time slab needs its own source action factor")
         super().__init__(dtype=np.dtype(float), shape=self.thermal.shape)
 
     def _matvec(self, direction):
@@ -126,14 +216,31 @@ class ControlJacobian(LinearOperator):
         if not columns:
             return np.empty_like(directions)
         if self.thermal_only:
-            return self.thermal @ directions
+            return self._normalize((self.thermal @ directions).copy())
         dy = np.asarray(directions).reshape(self.slabs, self.spatial_size, columns)
         result = (self.thermal @ directions).reshape(dy.shape)
         previous = np.zeros((self.buoyancy.shape[0], columns))
         for n, factor in enumerate(self.factors):
             previous = factor.solve(self.buoyancy @ dy[n] + self.history[n] @ previous)
             result[n] += self.velocity_actions[n] @ previous
-        return result.reshape(self.shape[0], columns)
+        return self._normalize(result.reshape(self.shape[0], columns))
+
+    def _normalize(self, values):
+        """Apply the source action inverse slab by slab, if there is one."""
+        if self.source_factors is None:
+            return values
+        blocks = values.reshape(self.slabs, self.spatial_size, -1)
+        for n, factor in enumerate(self.source_factors):
+            blocks[n] = factor.solve(blocks[n])
+        return blocks.reshape(values.shape)
+
+    def _normalize_transpose(self, values):
+        if self.source_factors is None:
+            return values
+        blocks = np.array(values, dtype=float).reshape(self.slabs, self.spatial_size, -1)
+        for n, factor in enumerate(self.source_factors):
+            blocks[n] = factor.solve(blocks[n], trans="T")
+        return blocks.reshape(np.shape(values))
 
     def _rmatvec(self, vector):
         return self._rmatmat(np.asarray(vector).reshape(-1, 1)).ravel()
@@ -142,6 +249,7 @@ class ControlJacobian(LinearOperator):
         columns = vectors.shape[1]
         if not columns:
             return np.empty_like(vectors)
+        vectors = self._normalize_transpose(vectors)
         if self.thermal_only:
             return self.thermal.T @ vectors
         z = np.asarray(vectors).reshape(self.slabs, self.spatial_size, columns)
@@ -223,3 +331,47 @@ class GaussNewtonOperator(LinearOperator):
         operator.coupled_parent = self
         operator.inactive_indices = indices.copy()
         return operator
+
+
+def consistent_velocity_jacobian(
+    flow, velocity, weights, capacity, conductivity, velocity_scale, streamline_rule="hard_min"
+):
+    """Velocity derivative of the three residual pieces a consistent weighting adds.
+
+    Each of them has the same shape: the streamline weight on the test function,
+    ``w_i = tau * c * (v . grad N_i)``, multiplied by one scalar per cell. So they
+    share one derivative and differ only in that scalar, which the caller supplies
+    already combined. The scalar is held fixed here because it is built from the
+    state, the control and the source, not from the velocity.
+
+    The branch guard lives in the symmetric term's derivative, which the caller
+    evaluates first, so a branch switch is rejected before this is reached.
+    """
+    mesh = flow.mesh
+    weights = np.asarray(weights, dtype=float)
+    flow.sampled_velocity(velocity)
+    grad, lump = simplex_geometry(mesh)
+    cells = mesh.cells[flow.fluid_cells]
+    grad, lump = grad[flow.fluid_cells], lump[flow.fluid_cells]
+    if weights.shape != (len(cells),) or not np.isfinite(weights).all():
+        raise ValueError("The consistent derivative needs one finite scalar per fluid cell")
+    c = np.asarray(capacity)[flow.fluid_cells]
+    kmin = np.linalg.eigvalsh(np.asarray(conductivity)[flow.fluid_cells])[:, 0]
+    vertices = mesh.nodes[cells]
+    center_shape = np.array([-1, -1, -1, 4, 4, 4]) / 9
+    v = velocity_scale * np.einsum("a,ead->ed", center_shape, velocity[flow.p2])
+    # The consistent weighting always carries the row limit, so this always asks for
+    # it. The symmetric term's derivative, which the caller evaluates first, asks for
+    # the same and raises at either switch before this is reached.
+    tau, dtau = streamline_parameter(grad, lump, c, kmin, v, vertices, True, streamline_rule)
+    g = c[:, None] * np.einsum("eid,ed->ei", grad, v)
+    # The derivative of the streamline weight that every one of the three shares.
+    dw = tau[:, None, None] * c[:, None, None] * grad + dtau[:, None, :] * g[:, :, None]
+    local = velocity_scale * (
+        (dw * weights[:, None, None])[:, :, None, :] * center_shape[None, None, :, None]
+    )
+    blocks = [
+        flow._matrix(local[:, :, :, d], cells, flow.p2, (len(mesh.nodes), flow.nv))
+        for d in range(2)
+    ]
+    return sparse.hstack(blocks + [sparse.csr_matrix((len(mesh.nodes), flow.np))], format="csr")

@@ -132,6 +132,11 @@ class CudaCoupledSolver(StudySolver):
         parent = getattr(B, "coupled_parent", None)
         if parent is None or not np.array_equal(indices, B.inactive_indices):
             raise ValueError("A matching restricted coupled Gauss--Newton operator is required")
+        if getattr(B, "preconditioner", None) is not None:
+            raise ValueError(
+                "An operator preconditioner is supported by the host kernel only; "
+                "this solver keeps its own recurrence on the device"
+            )
         b, guess, diagonal = validate_linear_inputs(
             B, b, None, B.diagonal(), initial, target, cap, self.refresh, 1e10
         )

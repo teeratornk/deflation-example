@@ -21,14 +21,24 @@ query: 7
 target_count: 16
 lower_K: 337.3
 upper_K: 357.3
+temperature_margin_K: 0.0 # Inward optimization margin; physical assessment bounds stay unchanged.
 methods: [jacobi, reference, recycling]
 device: cpu
 rank: 20
 recycle_window: 20
 flow_tolerance: 1.0e-9
+equation_acceptance_tolerance: 1.0e-8
+conservation_tolerance: 1.0e-6
+local_mass_diagnostics: false
 flow_cap: 100
 flow_continuation: false
 momentum_factor_policy: retained
+transport_form: advective
+consistent_stabilization: false
+reference_stabilization: shipped
+inner_preconditioner: jacobi
+frozen_sweeps: 3
+streamline_rule: hard_min
 nonlinear_tolerance: 1.0e-8
 nonlinear_cap: 100
 backtracking: halving
@@ -39,6 +49,14 @@ qp_tolerance: 1.0e-10
 qp_cap: 100
 inner_tolerance: 1.0e-10
 inner_cap: 50000
+inner_refresh: 1000
+hybrid_block_min_columns: 20
+hybrid_block_max_columns: 100
+hybrid_coarse_device: cpu
+initial_control_directory: null
+initial_control_method: reference
+initial_control_position: null
+initial_control_repeat: 1
 threads: 4
 hydra:
   run:

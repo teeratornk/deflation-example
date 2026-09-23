@@ -114,10 +114,21 @@ def main():
     )
     parser.add_argument("--backtrack-cap", type=int, default=21)
     parser.add_argument(
+        "--trust-region",
+        type=float,
+        help="Start each Newton line search at the edge of a region this wide in "
+        "nondimensional temperature; omit for the unrestricted search",
+    )
+    parser.add_argument(
         "--time-scheme", choices=("backward_euler", "bdf2"), default="backward_euler"
     )
     parser.add_argument("--subdivision", type=int, default=1)
     parser.add_argument("--coarse-replay", type=Path)
+    parser.add_argument(
+        "--consistent-stabilization",
+        action="store_true",
+        help="Weight the storage and the source by the streamline test function",
+    )
     add_forward_options(parser)
     args = parser.parse_args()
     if args.procedure != "monolithic_newton" and (
@@ -142,11 +153,12 @@ def main():
             raise ValueError("Spatial trajectory replay requires a transient optimization")
         original_slabs = integer(cfg["slabs"], "Original time slabs", 1)
         comparison_cfg = {**cfg, "slabs": original_slabs * subdivision}
+        stabilisation = {"consistent_stabilization": args.consistent_stabilization}
         coarse, baseline = load_problem(
-            {**comparison_cfg, "baseline_directory": str(args.baseline)}
+            {**comparison_cfg, "baseline_directory": str(args.baseline), **stabilisation}
         )
         fine, fine_baseline = load_problem(
-            {**comparison_cfg, "baseline_directory": str(args.fine_baseline)}
+            {**comparison_cfg, "baseline_directory": str(args.fine_baseline), **stabilisation}
         )
         require_matching_baseline(record, baseline)
         for key in (
@@ -195,6 +207,7 @@ def main():
             "coarse_state_dofs": coarse.size,
             "fine_state_dofs": fine.size,
             "subdivision": subdivision,
+            "consistent_stabilization": args.consistent_stabilization,
             "coarse_replay": comparison,
             "forward_solver": forward_protocol(fine, options),
             "control_transfer": "Nested P1 interpolation with zero source at prescribed-temperature nodes; each saved source is copied unchanged into its temporal subintervals.",
@@ -207,6 +220,7 @@ def main():
                 "newton_cap": integer(args.newton_cap, "Newton iteration cap", 0),
                 "line_search": args.line_search,
                 "backtrack_cap": integer(args.backtrack_cap, "Backtracking trial cap", 1),
+                "trust_region": args.trust_region,
                 "linear_internal_target": 1e-10,
                 "linear_acceptance_target": 1e-8,
                 "linear_correction_cap": 2,
@@ -230,6 +244,7 @@ def main():
                 callback=callback,
                 line_search=args.line_search,
                 backtrack_cap=args.backtrack_cap,
+                trust_region=args.trust_region,
                 time_scheme=args.time_scheme,
                 restart_interval=subdivision,
             )

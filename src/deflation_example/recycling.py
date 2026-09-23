@@ -85,6 +85,61 @@ def jacobi_ritz(A, diagonal, candidates, rank, tolerance=1e-12):
     }
 
 
+def metric_ritz(A, metric, candidates, rank, tolerance=1e-12):
+    """Select low Ritz vectors of A in a general symmetric positive-definite metric.
+
+    ``jacobi_ritz`` scales candidates by the square root of the Jacobi diagonal, which
+    is an elementwise operation and so is available only for a diagonal metric. An
+    operator preconditioner exposes no elementwise square root, so the same selection
+    is posed here through the Gram matrix ``C' M C`` instead: its eigendecomposition
+    supplies an M-orthonormal basis with the same numerical-rank truncation, and the
+    Rayleigh quotient of A in that basis is reduced exactly as before.
+
+    With a diagonal metric this returns the same subspace as ``jacobi_ritz``; that path
+    keeps its cheaper scaling and is not routed through here.
+    """
+    A, metric = matrix(A), matrix(metric)
+    candidates = real_array(candidates, "Candidates")
+    rank = integer(rank, "Retained rank")
+    tolerance = positive_real(tolerance, "Numerical rank tolerance")
+    n = A.shape[0]
+    if (
+        candidates.ndim != 2
+        or A.shape != (n, n)
+        or metric.shape != (n, n)
+        or candidates.shape[0] != n
+        or not np.isfinite(candidates).all()
+    ):
+        raise ValueError("Ritz selection needs finite compatible candidates and metric")
+    if not rank or 0 in candidates.shape:
+        return np.empty((n, 0)), {"candidate_rank": 0, "selected_rank": 0}
+    quadratic = np.einsum("ij,ij->j", candidates, metric @ candidates)
+    # A zero column carries no direction and is dropped, as the Jacobi path drops it.
+    # A nonzero column with a nonpositive quadratic form means the metric is not
+    # positive definite where it is about to be used, which is an error, not a drop.
+    nonzero = linalg.norm(candidates, axis=0) > 0
+    if np.any(quadratic[nonzero] <= 0):
+        raise ValueError("The metric must be positive definite on the candidates")
+    if not nonzero.any():
+        return np.empty((n, 0)), {"candidate_rank": 0, "selected_rank": 0}
+    scaled = candidates[:, nonzero] / np.sqrt(quadratic[nonzero])
+    gram = scaled.T @ (metric @ scaled)
+    gram = (gram + gram.T) / 2
+    values, vectors = linalg.eigh(gram)
+    keep = values > tolerance * values[-1]
+    basis = scaled @ (vectors[:, keep] / np.sqrt(values[keep]))
+    projected = basis.T @ (A @ basis)
+    ritz, directions = linalg.eigh((projected + projected.T) / 2)
+    retained = min(rank, len(ritz))
+    return basis @ directions[:, :retained], {
+        "candidate_rank": int(keep.sum()),
+        "selected_rank": retained,
+        "candidate_sigma_min": float(np.sqrt(values[keep][0])),
+        "ritz_min": float(ritz[0]),
+        "ritz_max": float(ritz[retained - 1]),
+    }
+
+
 def gpu_jacobi_ritz(A, diagonal, candidates, rank, torch, tolerance=1e-12):
     """GPU counterpart; inputs and returned physical vectors stay on the device."""
     if not rank or 0 in candidates.shape:
@@ -194,7 +249,28 @@ class RecycleSpace:
         blocks = ([] if deployed is None else [deployed]) + list(self.directions)
         if self.device == "cpu":
             candidates = np.column_stack(blocks) if blocks else np.empty((len(self.current), 0))
-            selected, spectral = jacobi_ritz(A, diagonal, candidates, self.rank, self.tolerance)
+            inverse = getattr(A, "preconditioner", None)
+            if inverse is not None and self.rank and candidates.shape[1]:
+                from .coupled_preconditioned_reference import preconditioned_reference
+                from .study_solvers import ArrayReference
+
+                reference = preconditioned_reference(
+                    ArrayReference(candidates, {}),
+                    A,
+                    inverse,
+                    self.rank,
+                    tolerance=self.tolerance,
+                    enrich=False,
+                )
+                selected = reference.basis
+                spectral = {
+                    "selected_rank": reference.rank,
+                    "candidate_rank": reference.description["independent_candidates"],
+                    "ritz_values": reference.description["ritz_values"],
+                }
+                metrics["policy"] = "existing-coarse-plus-new-directions-preconditioned-ritz-v1"
+            else:
+                selected, spectral = jacobi_ritz(A, diagonal, candidates, self.rank, self.tolerance)
             selection_seconds = time.perf_counter() - start
             download_seconds = 0.0
             candidate_bytes = candidates.nbytes

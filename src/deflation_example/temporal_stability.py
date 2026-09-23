@@ -17,6 +17,10 @@ def amplification_mode(assembly, dt, time_scale_s=1.0):
     dt = positive_real(dt, "Time step")
     seconds = positive_real(time_scale_s, "Time scale")
     indices = assembly.mesh.free
+    if assembly.consistent:
+        # The pencil below is built from a scalar capacity per node. A streamline
+        # weighted storage is a matrix, and its modes are not these.
+        raise ValueError("This diagnostic requires a lumped thermal assembly")
     capacity = assembly.capacity[indices]
     K = assembly.stiffness[indices][:, indices].tocsc()
     if not len(indices) or np.any(capacity <= 0) or not np.isfinite(capacity).all():

@@ -8,8 +8,8 @@ from deflation_example.coupled_resolution import forward_model
 from test_coupled_derivatives import small_coupled_problem
 
 
-def data():
-    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+def data(**options):
+    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True, **options)
     state = np.linspace(0.04, 0.1, problem.size)
     evaluation = problem.evaluate(state)
     source = np.zeros(len(problem.mesh.nodes))
@@ -18,8 +18,14 @@ def data():
 
 
 @pytest.mark.parametrize("line_search", ["equation_max", "fixed_scaled"])
-def test_forward_newton_recovers_complete_known_trajectory_from_fixed_sources(line_search):
-    problem, expected, evaluation, _ = data()
+@pytest.mark.parametrize("consistent", [False, True])
+@pytest.mark.parametrize("streamline_rule", ["hard_min", "smooth_p8"])
+def test_forward_newton_recovers_complete_known_trajectory_from_fixed_sources(
+    line_search, consistent, streamline_rule
+):
+    problem, expected, evaluation, _ = data(
+        consistent=consistent, streamline_rule=streamline_rule, inlet=0.2
+    )
     state = problem.full_temperature(problem.initial)
     flow = problem.initial_flow
     for n in range(problem.slabs):
@@ -42,6 +48,26 @@ def test_forward_newton_recovers_complete_known_trajectory_from_fixed_sources(li
         np.testing.assert_array_equal(source, original)
         assert len(result.history) <= 10
         state, flow = result.state, result.flow
+
+
+@pytest.mark.parametrize("consistent", [False, True])
+@pytest.mark.parametrize("override", [None, False, True])
+def test_replay_preserves_saved_formulation_unless_explicitly_changed(consistent, override):
+    from deflation_example.coupled_newton_replay import replay_configuration
+
+    saved = {"slabs": 4, "consistent_stabilization": consistent, "streamline_rule": "smooth_p8"}
+    copied = saved.copy()
+    cfg = replay_configuration(saved, "baseline", 2, override)
+    assert saved == copied
+    assert cfg["slabs"] == 8
+    assert cfg["streamline_rule"] == "smooth_p8"
+    assert cfg["consistent_stabilization"] is (consistent if override is None else override)
+
+
+def test_replay_legacy_configuration_preserves_lumped_default():
+    from deflation_example.coupled_newton_replay import replay_configuration
+
+    assert replay_configuration({"slabs": 1}, "baseline", 1)["consistent_stabilization"] is False
 
 
 def test_fixed_scaled_merit_uses_the_original_equations_for_final_acceptance():

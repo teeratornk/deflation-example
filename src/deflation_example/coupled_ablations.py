@@ -11,7 +11,7 @@ from hydra import compose, initialize_config_dir
 import numpy as np
 from omegaconf import OmegaConf
 
-from .coupled_optimize import derivative_report, equations_verified, load_problem
+from .coupled_optimize import derivative_report, equation_acceptance, load_problem
 from .coupled_report import validate_record
 from .coupled_saved import file_digest
 from .coupled_sequence import run as run_sequence
@@ -88,7 +88,7 @@ def derivative_identity(config):
     # The target changes the linear tracking term, not the state/source Jacobian.
     # Bounds, reference construction and linear-solver choices likewise leave it
     # unchanged. Each temporal grid, physical model and momentum target is checked.
-    return {
+    identity = {
         key: config[key]
         for key in (
             "transient",
@@ -100,6 +100,13 @@ def derivative_identity(config):
             "flow_continuation",
         )
     }
+    identity.update(
+        consistent_stabilization=config.get("consistent_stabilization", False),
+        transport_form=config.get("transport_form", "advective"),
+    )
+    if "feedback_multiplier" in config:
+        identity["feedback_multiplier"] = config["feedback_multiplier"]
+    return identity
 
 
 def check_gate(gate, config, baseline_digest):
@@ -116,7 +123,7 @@ def check_gate(gate, config, baseline_digest):
         or min(report["taylor_orders"]) <= 1.9
         or not np.isfinite(report["relative_dot_product_error"])
         or report["relative_dot_product_error"] > 1e-9
-        or not equations_verified(report["equations"])
+        or not equation_acceptance(report["equations"], config)
     ):
         raise ValueError("Derivative gate disagrees with its numerical checks")
 

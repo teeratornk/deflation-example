@@ -1,6 +1,7 @@
 """Verify the coupled current/history Jacobian and the amplification pencil."""
 
 import numpy as np
+import pytest
 from scipy import sparse
 
 from deflation_example.coupled_step_spectrum import step_linearization, amplification_spectrum
@@ -8,8 +9,36 @@ from deflation_example.coupled_resolution import forward_model
 from test_coupled_derivatives import small_coupled_problem
 
 
-def test_current_and_previous_derivatives_against_complete_equations():
-    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+@pytest.mark.parametrize(
+    "consistent,inlet",
+    [(False, 0.02), (True, 0.02), (True, 0.3)],
+    ids=["lumped", "consistent-slack-bound", "consistent-binding-bound"],
+)
+@pytest.mark.parametrize("streamline_rule", ["hard_min", "smooth_p8"])
+def test_current_and_previous_derivatives_against_complete_equations(
+    consistent, inlet, streamline_rule
+):
+    """The step Jacobian is the derivative of the step the runner actually solves.
+
+    With a consistent stabilisation the storage, the source and the control's action
+    are all weighted by the streamline test function, so all three move with the
+    velocity and all three belong in this derivative. The control and the previous
+    state are handed over as complete nodal fields, the way the runner holds them.
+    """
+    problem = small_coupled_problem(
+        [0.2, 0.35], uniform_capacity=True, inlet=inlet, streamline_rule=streamline_rule
+    )
+    if consistent:
+        problem.consistent_stabilization = True
+        problem.assembly = problem.assemble(problem.initial_flow.velocity)
+    built = problem.assemble(problem.initial_flow.velocity)
+    assert built.consistent is consistent
+    if consistent and streamline_rule == "hard_min":
+        # The bound on the streamline parameter is part of the model, so it is part of
+        # this derivative. At the faster inlet it binds in every fluid cell, which is
+        # the regime the transformer mesh is in; at the default it is slack.
+        binding = (built.streamline_limit[problem.flow.fluid_cells] < 1.0).mean()
+        assert binding == (1.0 if inlet > 0.02 else 0.0)
     Y = np.linspace(0.04, 0.08, problem.size)
     evaluation = problem.evaluate(Y)
     model = forward_model(problem)
@@ -20,7 +49,14 @@ def test_current_and_previous_derivatives_against_complete_equations():
     previous = problem.full_temperature(Y.reshape(2, -1)[n - 1])
     control = np.zeros_like(state)
     control[problem.free] = evaluation.control.reshape(2, -1)[n]
-    H, C, _, _ = step_linearization(problem, state[problem.free], flow.velocity, n)
+    H, C, _, _ = step_linearization(
+        problem, state[problem.free], flow.velocity, n, control=control, previous=previous
+    )
+    if consistent:
+        lumped = small_coupled_problem([0.2, 0.35], uniform_capacity=True, inlet=inlet)
+        L = step_linearization(lumped, state[lumped.free], flow.velocity, n)[0]
+        share = abs(H - L).max() / abs(L).max()
+        assert share > 1e-3, f"the weighting moves the step by only {share}, so this proves nothing"
     rng = np.random.default_rng(842)
     direction = rng.normal(size=H.shape[0])
     nv = len(problem.flow_free)
@@ -60,3 +96,89 @@ def test_diagonal_pencil_reports_amplification_and_residual():
         sorted(row["amplification_modulus"] for row in report["modes"]), [0.5, 1]
     )
     assert max(row["pencil_relative_residual"] for row in report["modes"]) < 1e-8
+
+
+@pytest.mark.parametrize("slab", [0, 1])
+def test_saved_spectrum_supplies_control_and_initial_or_previous_temperature(slab):
+    from deflation_example.coupled_step_spectrum import saved_step_linearization
+
+    problem = small_coupled_problem(
+        [0.2, 0.35],
+        uniform_capacity=True,
+        consistent=True,
+        streamline_rule="smooth_p8",
+        inlet=0.3,
+    )
+    state = np.linspace(0.04, 0.1, problem.size)
+    evaluation = problem.evaluate(state)
+    fields = {"state": state, "control": evaluation.control}
+    velocities = np.stack([f.velocity for f in evaluation.flows])
+    actual = saved_step_linearization(problem, fields, velocities, slab)
+    previous = problem.initial if slab == 0 else state.reshape(2, -1)[slab - 1]
+    expected = step_linearization(
+        problem,
+        state.reshape(2, -1)[slab],
+        velocities[slab],
+        slab,
+        control=evaluation.control.reshape(2, -1)[slab],
+        previous=previous,
+    )
+    for a, b in zip(actual, expected, strict=True):
+        np.testing.assert_array_equal(a.toarray(), b.toarray())
+    incomplete = step_linearization(problem, state.reshape(2, -1)[slab], velocities[slab], slab)
+    assert abs(actual[0] - incomplete[0]).max() > 1e-6
+
+
+def test_the_trust_region_scales_a_runaway_step_and_leaves_a_small_one_alone():
+    """A near-singular step Jacobian returns an exact direction that is enormous.
+
+    Halving from one then spends every trial outside the region where the linear
+    model means anything, which is exactly how the corrected model stagnated: the
+    residual grew quadratically through twenty-one halvings and the direction was
+    never tested. The region is declared, not inferred, and it must cost nothing
+    when the step is already inside it.
+    """
+    from deflation_example.coupled_newton_replay import trust_scale
+
+    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+    flow = problem.initial_flow
+    nv = len(problem.flow_free)
+    speed = max(float(np.max(np.abs(flow.velocity))), np.finfo(float).tiny)
+
+    small = np.zeros(nv + problem.spatial_size)
+    small[nv:] = 0.01
+    small[:nv] = 0.01 * speed
+    assert trust_scale(problem, flow, small, 0.05) == 1.0
+
+    runaway = np.zeros_like(small)
+    runaway[nv:] = 5.0
+    assert trust_scale(problem, flow, runaway, 0.05) == pytest.approx(0.01)
+
+    fast = np.zeros_like(small)
+    fast[:nv] = 5.0 * speed
+    assert trust_scale(problem, flow, fast, 0.05) == pytest.approx(0.01)
+
+    with pytest.raises(ValueError):
+        trust_scale(problem, flow, small, 0.0)
+
+
+def test_the_unrestricted_search_is_what_it_always_was():
+    """Without the option every line search still starts at a full Newton step."""
+    import inspect
+
+    from deflation_example.coupled_newton_replay import newton_step, newton_trajectory
+
+    for function in (newton_step, newton_trajectory):
+        assert inspect.signature(function).parameters["trust_region"].default is None
+
+
+def test_pressure_is_not_used_as_a_velocity_scale():
+    from deflation_example.coupled_newton_replay import trust_scale
+
+    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+    count = len(problem.flow_free)
+    update = np.zeros(count + problem.spatial_size)
+    update[:count][problem.flow_free >= 2 * problem.flow.nv] = 1e6
+    assert trust_scale(problem, problem.initial_flow, update, 0.05) == 1
+    update[count:] = 1.0
+    assert trust_scale(problem, problem.initial_flow, update, 0.05) == pytest.approx(0.05)
