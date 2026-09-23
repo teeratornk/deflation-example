@@ -41,22 +41,27 @@ def inner_evidence(record):
                     if rank > requested:
                         raise ValueError("Deployed rank exceeds the requested rank")
                     ranks[str(rank)] += 1
-                    statuses[status] += 1
                     reason = step.get("fallback")
                     if reason is not None:
                         fallbacks[str(reason)] += 1
                     case_iterations += count
-                    used_space |= rank > 0 and count > 0
+                    used_space |= rank > 0 and count > 0 and step.get("candidate_retained", False)
                     if status == "converged":
                         residual = step.get("linear_residual")
-                        if (
-                            residual is None
-                            or not np.isfinite(residual)
-                            or residual < 0
-                            or residual > tolerance
-                        ):
+                        if residual is None or not np.isfinite(residual) or residual < 0:
                             raise ValueError("Converged inner solve fails original-residual check")
-                        maximum_residual = max(maximum_residual or 0.0, residual)
+                        if residual > tolerance:
+                            if (
+                                step.get("candidate_retained", False)
+                                or attempt.get("qp_status") != "linear_original_residual_failed"
+                            ):
+                                raise ValueError(
+                                    "Converged inner solve fails original-residual check"
+                                )
+                            status = "original_residual_failed"
+                        else:
+                            maximum_residual = max(maximum_residual or 0.0, residual)
+                    statuses[status] += 1
         if case_iterations != case.get("inner_iterations"):
             raise ValueError("Inner iteration total differs from the recorded solve histories")
         iterations += case_iterations

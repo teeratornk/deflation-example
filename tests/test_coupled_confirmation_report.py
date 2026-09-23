@@ -50,6 +50,7 @@ def population():
                                         "deployed_rank": arm["rank"],
                                         "linear_residual": 1e-11,
                                         "fallback": None,
+                                        "candidate_retained": True,
                                     }
                                 ]
                             }
@@ -148,7 +149,7 @@ def test_inner_failures_remain_visible_when_outer_solver_recovers():
     settings, records, fields = population()
     case = records[-1]["cases"][0]
     step = deepcopy(case["history"][0]["attempts"][0]["qp_history"][0])
-    step.update(linear_status="iteration_cap", linear_residual=0.01)
+    step.update(linear_status="iteration_cap", linear_residual=0.01, candidate_retained=False)
     case["history"][0]["attempts"].insert(0, {"qp_history": [step]})
     case["inner_iterations"] += 2
     result = summarize(records, settings, fields)
@@ -156,3 +157,25 @@ def test_inner_failures_remain_visible_when_outer_solver_recovers():
     assert evidence["termination_counts"] == {"converged": 3, "iteration_cap": 1}
     assert evidence["recorded_inner_iterations"] == 8
     assert result["publication_gate_passed"]
+
+
+def test_failed_original_verification_is_retained_as_a_rejected_attempt():
+    settings, records, fields = population()
+    case = records[-1]["cases"][0]
+    step = deepcopy(case["history"][0]["attempts"][0]["qp_history"][0])
+    step.update(linear_residual=0.01, candidate_retained=False)
+    case["history"][0]["attempts"].insert(
+        0, {"qp_status": "linear_original_residual_failed", "qp_history": [step]}
+    )
+    case["inner_iterations"] += 2
+    result = summarize(records, settings, fields)
+    evidence = result["methods"][-1]["outcomes"][-1]["inner_evidence"]
+    assert evidence["termination_counts"] == {"converged": 3, "original_residual_failed": 1}
+    assert result["publication_gate_passed"]
+
+
+def test_only_rejected_coarse_work_does_not_establish_reference_use():
+    settings, records, fields = population()
+    for case in records[-1]["cases"]:
+        case["history"][0]["attempts"][0]["qp_history"][0]["candidate_retained"] = False
+    assert not summarize(records, settings, fields)["publication_gate_passed"]
