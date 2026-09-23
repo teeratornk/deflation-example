@@ -129,3 +129,29 @@ def test_rank_zero_jacobi_replay_has_no_preconditioner_setup():
 def test_new_replay_refuses_even_sweeps():
     with pytest.raises(ValueError, match="odd sweeps"):
         ReplayPreconditioner(None, None, 0.0, "frozen", 2)
+
+
+def test_cleanup_releases_factors_despite_a_surviving_operator(monkeypatch):
+    import weakref
+
+    from deflation_example import coupled_frozen_preconditioner as frozen
+
+    class Inverse:
+        def __call__(self, residual):
+            return residual.copy()
+
+    monkeypatch.setattr(frozen, "frozen_preconditioner_factory", lambda *a: lambda i: Inverse())
+    preconditioner = ReplayPreconditioner(None, None, 0.0, "frozen", 3)
+    B = aslinearoperator(np.eye(3))
+    preconditioner.attach(B, np.arange(3))
+    factors = weakref.ref(preconditioner.preconditioner)
+    assert factors() is not None
+    assert B.preconditioner is preconditioner
+    preconditioner.close()
+    assert factors() is None
+    assert preconditioner.factory is None
+    preconditioner.close()  # Cleanup is safe after a partially completed repetition.
+    with pytest.raises(RuntimeError, match="closed"):
+        preconditioner.attach(B, np.arange(3))
+    with pytest.raises(RuntimeError, match="live"):
+        B.preconditioner(np.ones(3))

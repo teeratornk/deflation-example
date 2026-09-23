@@ -38,6 +38,7 @@ class ReplayPreconditioner:
         if sweeps not in {1, 3, 5}:
             raise ValueError("The new comparison uses one, three or five odd sweeps")
         self.factory = None
+        self.closed = False
         if policy == "frozen":
             from .coupled_frozen_preconditioner import frozen_preconditioner_factory
 
@@ -49,6 +50,8 @@ class ReplayPreconditioner:
         self.applications = 0
 
     def attach(self, operator, indices):
+        if self.closed:
+            raise RuntimeError("A closed replay preconditioner cannot be reused")
         if self.factory is None:
             return
         if self.indices is None or not np.array_equal(self.indices, indices):
@@ -60,11 +63,18 @@ class ReplayPreconditioner:
         operator.preconditioner = self
 
     def __call__(self, residual):
+        if self.closed or self.preconditioner is None:
+            raise RuntimeError("Attach a live replay preconditioner before applying it")
         tick = time.perf_counter()
         result = self.preconditioner(residual)
         self.application_seconds += time.perf_counter() - tick
         self.applications += 1
         return result
+
+    def close(self):
+        """Release factors even when the last operator still refers to this wrapper."""
+        self.preconditioner = self.factory = self.indices = None
+        self.closed = True
 
     def report(self):
         return {
@@ -403,7 +413,7 @@ def replay(args):
     }
     write_report(args.output / "record.json", record)
     sampler.start()
-    solver = None
+    solver = preconditioner = None
     try:
         for repetition in range(integer(args.repetitions, "Repetitions", 1)):
             resource_tick = time.perf_counter()
@@ -472,6 +482,7 @@ def replay(args):
             barrier()
             tick = time.perf_counter()
             solver.close()
+            preconditioner.close()
             preconditioner = None
             barrier()
             record.setdefault("cleanup_seconds", []).append(time.perf_counter() - tick)
@@ -484,6 +495,8 @@ def replay(args):
     finally:
         if solver is not None:
             solver.close()
+        if preconditioner is not None:
+            preconditioner.close()
         record["memory"] = sampler.finish()
         record["all_systems_verified"] = bool(record["rows"]) and all(
             r["verified"] for r in record["rows"]
