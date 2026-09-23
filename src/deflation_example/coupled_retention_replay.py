@@ -311,7 +311,22 @@ def construct_bank(args):
         write_report(args.output / "record.json", record)
 
 
+def checked_replay_rank(policy, requested):
+    allowed = {
+        "jacobi": {0},
+        "thermal": {20, 50, 100, 200},
+        "nominal_coupled": {20, 50, 100, 200},
+        "preconditioned_coupled": {20, 50, 100, 200},
+        "krylov_coupled": {1, 2, 4, 8},
+    }
+    requested = integer(requested, "Rank", 0)
+    if policy not in allowed or requested not in allowed[policy]:
+        raise ValueError("Use a predeclared rank for the selected replay policy")
+    return requested
+
+
 def replay(args):
+    requested = checked_replay_rank(args.policy, args.rank)
     manifest = read_manifest(args.trace)
     bank = json.loads((args.bank / "record.json").read_text())
     if (
@@ -341,7 +356,6 @@ def replay(args):
             )
             if difference > 1e-9:
                 raise ValueError("Reconstructed " + name + " differs from the recorded system")
-    requested = integer(args.rank, "Rank", 0)
     reference = None
     construction = 0.0
     if args.policy == "thermal":
@@ -363,8 +377,10 @@ def replay(args):
             },
         )
         construction = bank["selection"]["construction_seconds"]
-    elif args.policy == "preconditioned_coupled":
-        stored = bank["preconditioned_selection"]
+    elif args.policy in {"preconditioned_coupled", "krylov_coupled"}:
+        stored = bank[
+            "krylov_selection" if args.policy == "krylov_coupled" else "preconditioned_selection"
+        ]
         full = load_reference(args.bank, stored)
         reference = ArrayReference(
             full.basis[:, :requested].copy(),
@@ -379,8 +395,6 @@ def replay(args):
         del full
     elif requested:
         raise ValueError("Jacobi uses rank zero")
-    if args.policy != "jacobi" and requested not in {20, 50, 100, 200}:
-        raise ValueError("Use a predeclared reference rank")
     args.output.mkdir(parents=True, exist_ok=False)
     preparation_tick = time.perf_counter()
     sampler, barrier, solver_class, device = prepare_device(args.device, 0.01)
@@ -518,7 +532,13 @@ def main():
     parser.add_argument("--rank", type=int, default=0)
     parser.add_argument(
         "--policy",
-        choices=("jacobi", "thermal", "nominal_coupled", "preconditioned_coupled"),
+        choices=(
+            "jacobi",
+            "thermal",
+            "nominal_coupled",
+            "preconditioned_coupled",
+            "krylov_coupled",
+        ),
         default="jacobi",
     )
     parser.add_argument("--feedback", type=float, choices=(0.0, 0.5, 1.0))

@@ -7,6 +7,7 @@ from scipy.sparse.linalg import aslinearoperator
 from deflation_example.coupled_derivatives import GaussNewtonOperator
 from deflation_example.coupled_retention_replay import (
     ReplayPreconditioner,
+    checked_replay_rank,
     error_diagnostic,
     load_reference,
     rebuild,
@@ -15,6 +16,23 @@ from deflation_example.coupled_retention_replay import (
 from deflation_example.study_solvers import ArrayReference
 from deflation_example.spacetime_reference import SpaceTimeReference
 from test_coupled_derivatives import small_coupled_problem
+
+
+@pytest.mark.parametrize(
+    "policy,ranks",
+    [("jacobi", [0]), ("thermal", [20, 50, 100, 200]), ("krylov_coupled", [1, 2, 4, 8])],
+)
+def test_replay_rank_contract_preserves_each_declared_policy(policy, ranks):
+    for rank in ranks:
+        assert checked_replay_rank(policy, rank) == rank
+
+
+@pytest.mark.parametrize(
+    "policy,rank", [("jacobi", 1), ("thermal", 8), ("krylov_coupled", 20), ("unknown", 0)]
+)
+def test_replay_refuses_unlisted_rank_choices(policy, rank):
+    with pytest.raises(ValueError, match="predeclared"):
+        checked_replay_rank(policy, rank)
 
 
 def test_energy_removal_uses_actual_initial_guess_and_has_correct_spectrum():
