@@ -148,3 +148,26 @@ uv run --no-sync pytest tests/test_coupled_completion_audit.py \
 GPU block tests use the `coupled-gpu` extra on an allocated GPU. Test records and
 numerical records identify their exact source separately; older measurements are
 not relabeled as results of this implementation.
+
+## Independent spectral diagnostic
+
+The thermal-candidate Ritz construction samples its candidate span. A separate
+full-domain Krylov diagnostic checks directions outside that span. It starts
+from a fixed random vector, scaled by the nominal diagonal, without consulting
+target loads or inactive sets. Forty-eight applications of the stationary
+inverse-preconditioned operator build an energy-orthogonal space. The diagnostic
+reports projected Ritz values, independently evaluated energy-norm residuals,
+construction cost and sampled memory. These values do not certify the extremal
+eigenvalues of the complete operator.
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_krylov_reference \
+  --baseline BASELINE --trace CAPTURE/linear-systems --steps 48 --rank 8 \
+  --seed 20260923 --output KRYLOV_DIAGNOSTIC
+uv run --no-sync pytest tests/test_coupled_krylov_reference.py
+```
+
+This construction runs on CPUs because its operator applications have one
+column. It does not alter the frozen replay campaign or establish an
+optimization-time benefit. The saved basis permits separately declared
+low-rank comparisons if its spectral residuals justify further investigation.
