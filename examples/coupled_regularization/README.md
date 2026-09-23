@@ -38,6 +38,21 @@ Repeat for every value in `protocol.json`; retain every output directory.
 Each alpha worker has a 12-hour scheduler limit. Interrupted workers retain their
 last written record. No incomplete comparison yields a completed-solve speedup.
 
+Verify the four output directories and generate the cost figure with:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_regularization_report \
+  --runs regularization-1e-14 regularization-1e-13 regularization-1e-12 regularization-1e-11 \
+  --output regularization-summary --plot
+uv run --no-sync pytest tests/test_coupled_regularization_report.py
+```
+
+The summary checks every target and repetition, independently evaluated residuals
+and quadratic KKT components, checksummed increment fields, objective agreement,
+source and runtime consistency, and construction accounting. It keeps incomplete
+and unsuccessful attempts visible and selects at most one complete-optimization
+candidate. It never converts an incomplete or capped control into a speedup.
+
 ## Interpretation and continuation
 
 These are constrained quadratic subproblems, not complete nonlinear optimization
