@@ -6,6 +6,11 @@ velocity-frozen preconditioner. The transformer geometry, physical coefficients,
 requirements remain unchanged. These are development comparisons. No coupled
 reference-reuse speedup is established by the new implementation alone.
 
+The [fixed-setting measurement archive](coupled_completion/README.md) supplies
+all replay outcomes and a self-contained command to regenerate their summaries
+and figures. It distinguishes measurement reproduction from rerunning the PDE
+solves described below.
+
 ## Evidence and termination
 
 The existing retention campaign names directories after the dispatcher stage.
