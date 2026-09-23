@@ -169,5 +169,20 @@ uv run --no-sync pytest tests/test_coupled_krylov_reference.py
 
 This construction runs on CPUs because its operator applications have one
 column. It does not alter the frozen replay campaign or establish an
-optimization-time benefit. The saved basis permits separately declared
-low-rank comparisons if its spectral residuals justify further investigation.
+optimization-time benefit. A separate diagnostic compares prefixes of ranks
+1, 2, 4 and 8 against the rank-zero frozen preconditioner, on the first three
+recorded quadratics with three repetitions each. All five policies use CPU
+operator applications in this low-rank comparison:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_retention_replay replay \
+  --baseline BASELINE --trace CAPTURE/linear-systems --bank KRYLOV_DIAGNOSTIC \
+  --quadratic 0 --policy krylov_coupled --rank 2 --device cpu --width 20 \
+  --preconditioner frozen --sweeps 3 --repetitions 3 --output KRYLOV_REPLAY
+```
+
+Repeat for quadratics 0--2 and each declared rank; use `--policy jacobi --rank 0`
+for the matched control. Preserve the entire construction cost once per replay
+sum and distinguish those sums from complete optimization. The sampled Ritz
+values and their residuals help interpret these comparisons; measured solver
+work determines whether the selected directions repay their use.
