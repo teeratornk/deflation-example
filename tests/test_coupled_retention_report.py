@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import pytest
 
-from deflation_example.coupled_retention_report import summarize
+from deflation_example.coupled_retention_report import plot, replay_label, summarize
 
 
 def records():
@@ -126,3 +126,16 @@ def test_cost_model_excludes_incomplete_comparisons():
     manifest, rows = records()
     rows[0]["rows"].pop()
     assert summarize(manifest, rows)["amortization"]["rows"] == []
+
+
+def test_plot_labels_name_the_actual_preconditioner(tmp_path):
+    assert (
+        replay_label({"policy": "jacobi", "rank": 0, "preconditioner": "frozen"})
+        == "CG\nFrozen preconditioner\nr=0"
+    )
+    assert replay_label({"policy": "jacobi", "rank": 0}) == "CG\nJacobi preconditioner\nr=0"
+    manifest, rows = records()
+    rows[1].update(policy="krylov_coupled", rank=8, preconditioner="frozen")
+    summary = summarize(manifest, rows)
+    plot(summary, tmp_path)
+    assert (tmp_path / "replay_cost.png").stat().st_size > 1000

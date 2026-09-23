@@ -187,6 +187,20 @@ def summarize(manifest, reports, partition="selection", repetitions=3):
     }
 
 
+def replay_label(row):
+    """Display the preconditioner actually applied by the rank-zero host kernel."""
+    preconditioner = "Frozen" if row.get("preconditioner", "jacobi") == "frozen" else "Jacobi"
+    if row["policy"] == "jacobi":
+        return f"CG\n{preconditioner} preconditioner\nr=0"
+    names = {
+        "thermal": "Thermal reference",
+        "nominal_coupled": "Jacobi Ritz",
+        "preconditioned_coupled": "Energy Ritz",
+        "krylov_coupled": "Coupled Krylov",
+    }
+    return f"{names[row['policy']]}\nr={row['rank']}\n{preconditioner} preconditioner"
+
+
 def plot(summary, directory):
     import matplotlib
 
@@ -196,22 +210,20 @@ def plot(summary, directory):
     rows = [r for r in summary["rows"] if r["eligible"]]
     if not rows:
         return
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4), constrained_layout=True)
-    labels = [
-        f"{r['policy']} / {r.get('preconditioner', 'jacobi')}\nr={r['rank']}, block={r['width']}"
-        for r in rows
-    ]
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8), constrained_layout=True)
+    labels = [replay_label(row) for row in rows]
     for i, row in enumerate(rows):
         values = np.array(row["replay_totals_seconds"])
         median = np.median(values)
         axes[0].errorbar(
             i, median, yerr=[[median - values.min()], [values.max() - median]], fmt="o", capsize=3
         )
+        axes[0].scatter(i + np.linspace(-0.05, 0.05, len(values)), values, s=12, color="black")
     axes[0].set_ylabel("Setup-inclusive replay sum (s)")
     axes[1].bar(np.arange(len(rows)), [np.median(r["total_iterations"]) for r in rows])
     axes[1].set_ylabel("Total inner iterations")
     for ax in axes:
-        ax.set_xticks(np.arange(len(rows)), labels, rotation=45, ha="right", fontsize=8)
+        ax.set_xticks(np.arange(len(rows)), labels, rotation=25, ha="right", fontsize=8)
         ax.grid(axis="y", alpha=0.2)
     fig.savefig(directory / "replay_cost.pdf")
     fig.savefig(directory / "replay_cost.png", dpi=180)
