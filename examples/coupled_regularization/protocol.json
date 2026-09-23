@@ -1,0 +1,42 @@
+{
+  "schema": "coupled-regularization-protocol-v1",
+  "alphas": [1e-14, 1e-13, 1e-12, 1e-11],
+  "targets": [7, 15, 14],
+  "ranks": [0, 4, 8, 16],
+  "repetitions": 3,
+  "device": "cpu",
+  "threads": 8,
+  "slabs": 64,
+  "horizon_s": 600.0,
+  "target_startup_s": 60.0,
+  "lower_K": 337.3,
+  "upper_K": 357.3,
+  "reference": {
+    "steps": 48,
+    "rank": 16,
+    "seed": 20260923,
+    "ordering": "alternating_low_high",
+    "policy": "Construct on the common initial full-domain trajectory separately for each alpha; retain this space unchanged across all target quadratics. Use nested rank prefixes without replacement directions."
+  },
+  "preconditioner": "velocity-frozen block Jacobi, three fixed odd sweeps",
+  "inner_tolerance": 1e-10,
+  "inner_cap": 50000,
+  "internal_cg_factor": 0.1,
+  "residual_policy": "refine",
+  "qp_tolerance": 1e-10,
+  "qp_cap": 100,
+  "nonlinear_tolerance": 1e-8,
+  "equation_acceptance_tolerance": 1e-12,
+  "conservation_tolerance": 1e-6,
+  "initial_quadratic_scope": "Independently timed sequences of three constrained Gauss-Newton subproblems at one common initial temperature trajectory. Recompute every alpha-dependent operator, gradient, diagonal and active set. No imported secants, gradients, restricted right-hand sides or active masks. These subproblems are not complete nonlinear optimizations.",
+  "timing": "Online intervals include all three quadratic solves, PDAS updates, basis restriction, preconditioner/coarse setup, iterations, independent residual and quadratic KKT verification, resources and cleanup. Common physical reconstruction is separate. Charge the measured full reference construction once to each reference sequence for the setup-inclusive model. Serialization follows the online timer.",
+  "screen_gate": {
+    "minimum_online_saving_fraction": 0.05,
+    "maximum_break_even_three_quadratic_sequences": 9,
+    "maximum_state_difference": 1e-6,
+    "maximum_relative_quadratic_objective_difference": 1e-6,
+    "rule": "Require all declared repetitions, original residuals and quadratic KKT checks, solution agreement, actual nonzero reference deployment, and at least 5 percent lower median online time than the matched rank-zero control. Require construction to amortize within nine repetitions of this same three-quadratic mix under a constant-cost model. This conditional count is not an optimization-query count."
+  },
+  "next_stage": "Select at most one alpha/rank from verified screening results, using the largest predicted saving over nine three-quadratic sequences; break ties by smaller rank and smaller alpha. Evaluate complete three-target optimization with plain Jacobi CG, velocity-frozen CG, matched-rank recycling, and fixed reference. Use three development repetitions, then five fresh timing repetitions only if complete time improves. Preserve all failures and do not interpret a capped baseline as a speedup.",
+  "limits": "Four alpha workers, each with a 12-hour scheduler limit. No automatic extension of the alpha range, ranks, physical model, targets, bounds or accuracy. Retain interrupted and incomplete records."
+}
