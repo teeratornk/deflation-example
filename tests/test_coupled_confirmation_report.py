@@ -38,6 +38,24 @@ def population():
             for i, case in enumerate(row["cases"]):
                 case.update(position=i, target=settings["targets"][i], objective=1e-5)
                 case["equations"][0]["momentum_relative_residual"] = 1e-13
+                case["inner_iterations"] = 2
+                case["history"] = [
+                    {
+                        "attempts": [
+                            {
+                                "qp_history": [
+                                    {
+                                        "linear_status": "converged",
+                                        "linear_iterations": 2,
+                                        "deployed_rank": arm["rank"],
+                                        "linear_residual": 1e-11,
+                                        "fallback": None,
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
             row["configuration"]["queries"] = [
                 {"target": t, "upper_K": 357.3} for t in settings["targets"]
             ]
@@ -92,3 +110,49 @@ def test_development_outcomes_are_not_confirmation():
     settings, records, fields = population()
     settings["phase"] = "development"
     assert not summarize(records, settings, fields)["publication_gate_passed"]
+
+
+@pytest.mark.parametrize("defect", ["rank_zero", "missing_history"])
+def test_missing_reference_work_withholds_reference_claim(defect):
+    settings, records, fields = population()
+    for case in records[-1]["cases"]:
+        if defect == "missing_history":
+            del case["history"]
+        else:
+            step = case["history"][0]["attempts"][0]["qp_history"][0]
+            step.update(deployed_rank=0, fallback="coarse_condition_limit")
+    result = summarize(records, settings, fields)
+    assert result["all_sequences_verified"]
+    assert not result["publication_gate_passed"]
+    if defect == "rank_zero":
+        evidence = result["methods"][-1]["outcomes"][-1]["inner_evidence"]
+        assert evidence["fallback_counts"] == {"coarse_condition_limit": 3}
+        assert evidence["deployed_rank_counts"] == {"0": 3}
+
+
+@pytest.mark.parametrize("defect", ["rank", "residual", "iterations"])
+def test_inconsistent_inner_evidence_is_rejected(defect):
+    settings, records, fields = population()
+    step = records[-1]["cases"][0]["history"][0]["attempts"][0]["qp_history"][0]
+    if defect == "rank":
+        step["deployed_rank"] = 21
+    elif defect == "residual":
+        step["linear_residual"] = 1e-8
+    else:
+        step["linear_iterations"] = 3
+    with pytest.raises(ValueError):
+        summarize(records, settings, fields)
+
+
+def test_inner_failures_remain_visible_when_outer_solver_recovers():
+    settings, records, fields = population()
+    case = records[-1]["cases"][0]
+    step = deepcopy(case["history"][0]["attempts"][0]["qp_history"][0])
+    step.update(linear_status="iteration_cap", linear_residual=0.01)
+    case["history"][0]["attempts"].insert(0, {"qp_history": [step]})
+    case["inner_iterations"] += 2
+    result = summarize(records, settings, fields)
+    evidence = result["methods"][-1]["outcomes"][-1]["inner_evidence"]
+    assert evidence["termination_counts"] == {"converged": 3, "iteration_cap": 1}
+    assert evidence["recorded_inner_iterations"] == 8
+    assert result["publication_gate_passed"]

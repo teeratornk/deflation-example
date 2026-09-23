@@ -109,6 +109,11 @@ The reporter requires all four arms, three distinct targets and five fresh
 repetitions for confirmation. It checks complete timing sums, unchanged final
 tolerances, source/deployment matching and agreement of saved states and
 objectives. Missing, failed or unverified comparisons cannot produce a speedup.
+It also audits inner iteration totals, independently evaluated residuals,
+deployed ranks and fallback counts. A reference-space publication claim requires
+complete inner histories and actual use of a nonzero space in every reference
+sequence. A final verified solution can follow rejected inner attempts; the
+summary retains those attempts and their costs.
 
 Generate the performance figure from the same settings and records:
 

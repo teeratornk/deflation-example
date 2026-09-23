@@ -1,6 +1,7 @@
 """Accuracy- and coverage-gated four-way complete optimization comparisons."""
 
 import argparse
+from collections import Counter
 import json
 from pathlib import Path
 
@@ -13,6 +14,62 @@ from .validation import integer
 
 ARM_KEYS = {"method", "rank", "recycle_window", "inner_preconditioner", "reference_selection"}
 ARMS = {"jacobi", "recycling", "frozen", "reference"}
+
+
+def inner_evidence(record):
+    """Audit actual inner work without confusing requested and deployed ranks."""
+    ranks, statuses, fallbacks = Counter(), Counter(), Counter()
+    iterations = 0
+    used_space = False
+    complete = True
+    maximum_residual = None
+    requested = integer(record["configuration"]["rank"], "Requested rank", 0)
+    tolerance = record["configuration"]["inner_tolerance"]
+    for case in record["cases"]:
+        if "history" not in case:
+            complete = False
+            continue
+        case_iterations = 0
+        for outer in case["history"]:
+            for attempt in outer["attempts"]:
+                for step in attempt["qp_history"]:
+                    if "linear_status" not in step:
+                        continue
+                    status = step["linear_status"]
+                    count = integer(step["linear_iterations"], "Inner iterations", 0)
+                    rank = integer(step["deployed_rank"], "Deployed rank", 0)
+                    if rank > requested:
+                        raise ValueError("Deployed rank exceeds the requested rank")
+                    ranks[str(rank)] += 1
+                    statuses[status] += 1
+                    reason = step.get("fallback")
+                    if reason is not None:
+                        fallbacks[str(reason)] += 1
+                    case_iterations += count
+                    used_space |= rank > 0 and count > 0
+                    if status == "converged":
+                        residual = step.get("linear_residual")
+                        if (
+                            residual is None
+                            or not np.isfinite(residual)
+                            or residual < 0
+                            or residual > tolerance
+                        ):
+                            raise ValueError("Converged inner solve fails original-residual check")
+                        maximum_residual = max(maximum_residual or 0.0, residual)
+        if case_iterations != case.get("inner_iterations"):
+            raise ValueError("Inner iteration total differs from the recorded solve histories")
+        iterations += case_iterations
+    return {
+        "complete_histories": complete,
+        "recorded_inner_iterations": iterations,
+        "deployed_rank_counts": dict(sorted(ranks.items(), key=lambda item: int(item[0]))),
+        "termination_counts": dict(sorted(statuses.items())),
+        "fallback_counts": dict(sorted(fallbacks.items())),
+        "maximum_converged_original_residual": maximum_residual,
+        "nonzero_coarse_space_used": used_space,
+        "scope": "All recorded inner attempts, including rejected outer attempts; final ranks describe returned solver states.",
+    }
 
 
 def summarize(records, settings, fields=None):
@@ -102,6 +159,7 @@ def summarize(records, settings, fields=None):
                 "inner_iterations": sum(c.get("inner_iterations", 0) for c in record["cases"]),
                 "outer_iterations": sum(c.get("nonlinear_iterations", 0) for c in record["cases"]),
                 "sampled_gpu_peak_bytes": record["memory"].get("peak_gpu_process_bytes"),
+                "inner_evidence": inner_evidence(record),
             }
         )
     rows = []
@@ -118,6 +176,12 @@ def summarize(records, settings, fields=None):
             }
         )
     complete = all(r["eligible"] for r in rows)
+    histories_complete = complete and all(
+        item["inner_evidence"]["complete_histories"] for row in rows for item in row["outcomes"]
+    )
+    reference_used = bool(groups["reference"]) and all(
+        item["inner_evidence"]["nonzero_coarse_space_used"] for item in groups["reference"]
+    )
     agreement = None
     if complete and fields is not None:
         if len(fields) != len(records):
@@ -156,12 +220,16 @@ def summarize(records, settings, fields=None):
         "schema": "coupled-confirmation-summary-v1",
         "methods": rows,
         "all_sequences_verified": complete,
+        "inner_histories_complete": histories_complete,
+        "reference_used_in_every_reference_sequence": reference_used,
         "solution_agreement": agreement,
         "fastest_tested_alternative_over_reference": ratio,
         "ten_percent_time_saving": ratio is not None and ratio >= 1 / 0.9,
         "observed_timing_ranges_separated": ranges_separated,
         "phase": phase,
         "publication_gate_passed": phase == "confirmation"
+        and histories_complete
+        and reference_used
         and ratio is not None
         and ratio >= 1 / 0.9
         and ranges_separated,
