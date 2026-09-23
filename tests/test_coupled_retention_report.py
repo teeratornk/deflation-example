@@ -4,7 +4,12 @@ from copy import deepcopy
 
 import pytest
 
-from deflation_example.coupled_retention_report import plot, replay_label, summarize
+from deflation_example.coupled_retention_report import (
+    plot,
+    replay_label,
+    summarize,
+    summarize_by_deployment,
+)
 
 
 def records():
@@ -74,6 +79,52 @@ def test_different_bank_rejected():
     rows[1]["bank_sha256"] = "other"
     with pytest.raises(ValueError, match="same trace"):
         summarize(manifest, rows)
+
+
+@pytest.mark.parametrize("field", ["cuda_driver", "gpu", "operator_policy"])
+def test_different_deployments_remain_separate(field):
+    manifest, rows = records()
+    rows[0]["device"] = {field: "a"}
+    rows[1]["device"] = {field: "b"}
+    with pytest.raises(ValueError, match="matching implementations"):
+        summarize(manifest, rows)
+    grouped = summarize_by_deployment(manifest, rows)
+    assert len(grouped["groups"]) == 2
+    assert sorted(i for g in grouped["groups"] for i in g["record_indices"]) == [0, 1]
+    assert all(not g["summary"]["reference_beats_jacobi"] for g in grouped["groups"])
+    assert "best_reference" not in grouped
+
+
+def test_grouping_does_not_fill_missing_repetitions_from_another_deployment():
+    manifest, rows = records()
+    alternate = deepcopy(rows[1])
+    alternate["device"] = {"cuda_driver": "different"}
+    alternate["rows"] = [rows[1]["rows"].pop()]
+    grouped = summarize_by_deployment(manifest, [*rows, alternate])
+    assert len(grouped["groups"]) == 2
+    for group in grouped["groups"]:
+        assert not group["summary"]["reference_beats_jacobi"]
+        for row in group["summary"]["rows"]:
+            if row["policy"] == "thermal":
+                assert not row["eligible"]
+                assert row["missing"]
+
+
+def test_deployment_grouping_keeps_matched_controls_and_all_records():
+    manifest, rows = records()
+    unmatched = deepcopy(rows[0])
+    unmatched["device"] = {"cuda_driver": "different"}
+    grouped = summarize_by_deployment(manifest, [*rows, unmatched])
+    assert sum(len(g["record_indices"]) for g in grouped["groups"]) == 3
+    assert sum(g["summary"]["reference_beats_jacobi"] for g in grouped["groups"]) == 1
+    assert "reference_beats_jacobi" not in grouped
+
+
+def test_deployment_grouping_still_rejects_different_banks():
+    manifest, rows = records()
+    rows[1]["bank_sha256"] = "different"
+    with pytest.raises(ValueError, match="same trace"):
+        summarize_by_deployment(manifest, rows)
 
 
 def test_preconditioners_are_distinct_and_reference_competes_with_fastest_control():

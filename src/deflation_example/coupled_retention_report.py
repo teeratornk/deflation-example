@@ -11,6 +11,18 @@ from .coupled_trace import read_manifest
 from .reporting import file_sha256, write_report
 
 
+def deployment_key(report):
+    """Keep driver, operator policy, hardware and implementation matching strict."""
+    return json.dumps(
+        {
+            "device": report.get("device", {}),
+            "cpu": report.get("environment", {}).get("cpu_model"),
+            "source": report.get("environment", {}).get("source_sha256"),
+        },
+        sort_keys=True,
+    )
+
+
 def amortization(rows, systems):
     """Constant-cost replay model, separate from complete optimization evidence."""
     controls = [row for row in rows if row["eligible"] and row["policy"] == "jacobi"]
@@ -64,17 +76,7 @@ def summarize(manifest, reports, partition="selection", repetitions=3):
     hashes = {(r["trace_sha256"], r["bank_sha256"]) for r in reports}
     if len(hashes) != 1:
         raise ValueError("Every comparison must share the same trace and reference bank")
-    deployments = {
-        json.dumps(
-            {
-                "device": r.get("device", {}),
-                "cpu": r.get("environment", {}).get("cpu_model"),
-                "source": r.get("environment", {}).get("source_sha256"),
-            },
-            sort_keys=True,
-        )
-        for r in reports
-    }
+    deployments = {deployment_key(r) for r in reports}
     if len(deployments) != 1:
         raise ValueError("Compare matching implementations and hardware deployments")
     for report in reports:
@@ -184,6 +186,28 @@ def summarize(manifest, reports, partition="selection", repetitions=3):
         "baseline_scope": "Fastest verified rank-zero configuration, including frozen preconditioning when present.",
         "amortization": amortization(rows, len(expected) // repetitions),
         "scope": "Sums of matched replay timings by repetition with construction charged once; not independently timed complete optimization.",
+    }
+
+
+def summarize_by_deployment(manifest, reports, partition="selection", repetitions=3):
+    """Archive incompatible deployments separately, without pooling their costs."""
+    if len({(r["trace_sha256"], r["bank_sha256"]) for r in reports}) != 1:
+        raise ValueError("Every comparison must share the same trace and reference bank")
+    groups = {}
+    for report in reports:
+        groups.setdefault(deployment_key(report), []).append(report)
+    return {
+        "schema": "coupled-retention-deployment-summaries-v1",
+        "partition": partition,
+        "groups": [
+            {
+                "deployment": json.loads(key),
+                "record_indices": [i for i, r in enumerate(reports) if deployment_key(r) == key],
+                "summary": summarize(manifest, members, partition, repetitions),
+            }
+            for key, members in sorted(groups.items())
+        ],
+        "scope": "Separate deployment summaries retain every record. Each group requires the entire declared partition and all repetitions for each policy. Missing cases remain ineligible; there is no pooled timing comparison or complete-optimization inference.",
     }
 
 
@@ -362,17 +386,21 @@ def main():
     parser.add_argument("--partition", choices=("selection", "held_out"), default="selection")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--plot", action="store_true")
-    parser.add_argument("--feedback", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--feedback", action="store_true")
+    mode.add_argument(
+        "--by-deployment", action="store_true", help="Archive each matched deployment separately"
+    )
     args = parser.parse_args()
     reports = [json.loads(path.read_text()) for path in args.records]
     digest = file_sha256(args.trace / "manifest.json")
     if any(r["trace_sha256"] != digest for r in reports):
         raise ValueError("Replay records refer to a different trace")
-    summary = (
-        summarize_feedback(reports)
-        if args.feedback
-        else summarize(read_manifest(args.trace), reports, args.partition)
-    )
+    if args.feedback:
+        summary = summarize_feedback(reports)
+    else:
+        summarize_replays = summarize_by_deployment if args.by_deployment else summarize
+        summary = summarize_replays(read_manifest(args.trace), reports, args.partition)
     summary["records"] = [
         {"file": path.parent.name + "/" + path.name, "sha256": file_sha256(path)}
         for path in args.records
@@ -380,7 +408,13 @@ def main():
     args.output.mkdir(parents=True, exist_ok=False)
     write_report(args.output / "summary.json", summary)
     if args.plot:
-        (plot_feedback if args.feedback else plot)(summary, args.output)
+        if args.by_deployment:
+            for index, group in enumerate(summary["groups"]):
+                directory = args.output / f"deployment-{index + 1:02d}"
+                directory.mkdir()
+                plot(group["summary"], directory)
+        else:
+            (plot_feedback if args.feedback else plot)(summary, args.output)
 
 
 if __name__ == "__main__":

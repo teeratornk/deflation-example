@@ -186,3 +186,24 @@ for the matched control. Preserve the entire construction cost once per replay
 sum and distinguish those sums from complete optimization. The sampled Ritz
 values and their residuals help interpret these comparisons; measured solver
 work determines whether the selected directions repay their use.
+
+## Deployment consistency
+
+The replay summary checks the source files, processor, GPU, CUDA libraries,
+driver and operator policy before comparing costs. A deployment mismatch stops
+the automatic campaign. It does not change a verified solve into a numerical
+failure. Preserve all records and inspect the mismatch before restarting any
+stage. The following reporting command keeps deployments separate:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_retention_report \
+  --trace CAPTURE/linear-systems --records REPLAY_A/record.json REPLAY_B/record.json \
+  --partition selection --by-deployment --plot --output DEPLOYMENT_SUMMARIES
+```
+
+Supply every replay record in the declared comparison. Each deployment must
+contain all systems and repetitions for a method to contribute a timing result.
+Incomplete methods remain in the summary with their missing cases. The output
+retains input hashes and group membership; it provides no pooled speedup or
+automatic promotion to complete optimization. A fresh matched deployment is
+required if the missing comparison is needed for a claim.
