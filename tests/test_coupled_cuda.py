@@ -3,9 +3,12 @@
 import numpy as np
 import pytest
 
+
 from deflation_example.coupled_cuda import CudaControlJacobian, CudaGaussNewton
 from deflation_example.coupled_derivatives import GaussNewtonOperator
 from test_coupled_derivatives import small_coupled_problem
+
+pytestmark = pytest.mark.cupy
 
 
 @pytest.mark.gpu

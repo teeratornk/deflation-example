@@ -4,6 +4,7 @@ import numpy as np
 from omegaconf import OmegaConf
 import pytest
 
+
 from deflation_example import coupled_sequence as sequence
 from deflation_example.coupled_reference import configured_reference
 from deflation_example.coupled_trajectory_initial import (
@@ -14,6 +15,8 @@ from deflation_example.reporting import write_fields, write_report
 from test_coupled_derivatives import small_coupled_problem
 from test_coupled_sequence import configuration
 from test_coupled_optimizer import solver
+
+pytestmark = pytest.mark.cupy
 
 
 @pytest.fixture

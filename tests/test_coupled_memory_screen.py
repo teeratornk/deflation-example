@@ -2,9 +2,12 @@
 
 import numpy as np
 import pytest
+
 from scipy import sparse
 
 from deflation_example.coupled_memory_screen import dense_storage, factor_inventory
+
+pytestmark = pytest.mark.cupy
 
 
 def test_rank_zero_screen_has_no_reference_arrays():

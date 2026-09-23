@@ -7,6 +7,7 @@ import numpy as np
 from omegaconf import OmegaConf
 import pytest
 
+
 from deflation_example import coupled_sequence as sequence
 from deflation_example.coupled_initial_state import snapshot_initial_guess
 from deflation_example.coupled_reference import configured_reference
@@ -16,6 +17,8 @@ from test_coupled_derivatives import small_coupled_problem
 from test_coupled_optimizer import solver
 from test_coupled_review import source_files
 from test_coupled_sequence import configuration
+
+pytestmark = pytest.mark.cupy
 
 
 @pytest.fixture

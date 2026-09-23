@@ -3,11 +3,14 @@
 import numpy as np
 import pytest
 
+
 from deflation_example.coupled_derivatives import GaussNewtonOperator
 from deflation_example.coupled_hybrid_solver import HybridCoupledSolver
 from deflation_example.solvers import independent_residual
 from deflation_example.study_solvers import ArrayReference
 from test_coupled_derivatives import small_coupled_problem
+
+pytestmark = pytest.mark.cupy
 
 
 def system():

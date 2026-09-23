@@ -40,7 +40,7 @@ include = ["src", "tests", "tools", "examples", "docs", "README.md", "LICENSE", 
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["gpu: requires a CUDA device and the optional PyTorch dependency"]
+markers = ["gpu: requires a usable CUDA device and the test's optional backend", "cupy: GPU tests in this module require the coupled-gpu extra"]
 
 [tool.ruff]
 line-length = 100

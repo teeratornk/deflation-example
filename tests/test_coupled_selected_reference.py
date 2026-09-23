@@ -2,11 +2,14 @@
 
 import numpy as np
 import pytest
+
 from scipy import linalg
 from scipy.sparse.linalg import aslinearoperator
 
 from deflation_example.coupled_selected_reference import selected_reference
 from deflation_example.study_solvers import ArrayReference
+
+pytestmark = pytest.mark.cupy
 
 
 def test_full_candidates_recover_scaled_eigenvectors_and_transfer():

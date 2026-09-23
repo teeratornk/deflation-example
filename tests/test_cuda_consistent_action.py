@@ -12,9 +12,12 @@ These tests would have failed on that. They need a device and skip without one.
 import numpy as np
 import pytest
 
+
 from deflation_example.coupled_cuda import CudaControlJacobian, CudaGaussNewton
 from deflation_example.coupled_derivatives import GaussNewtonOperator
 from test_coupled_derivatives import small_coupled_problem
+
+pytestmark = pytest.mark.cupy
 
 
 def consistent_problem(steps):
