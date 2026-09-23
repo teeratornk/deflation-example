@@ -2,12 +2,51 @@
 
 import argparse
 import json
+import math
 from pathlib import Path
 
 import numpy as np
 
 from .coupled_trace import read_manifest
 from .reporting import file_sha256, write_report
+
+
+def amortization(rows, systems):
+    """Constant-cost replay model, separate from complete optimization evidence."""
+    controls = [row for row in rows if row["eligible"] and row["policy"] == "jacobi"]
+    baseline = min(controls, key=lambda row: row["median_replay_total_seconds"], default=None)
+    result = []
+    if baseline is not None:
+        baseline_online = (
+            baseline["median_replay_total_seconds"] - baseline["construction_seconds_once"]
+        )
+        for row in rows:
+            if not row["eligible"] or row["policy"] == "jacobi":
+                continue
+            online = row["median_replay_total_seconds"] - row["construction_seconds_once"]
+            saving = baseline_online - online
+            additional = row["construction_seconds_once"] - baseline["construction_seconds_once"]
+            blocks = max(1, math.ceil(additional / saving)) if saving > 0 else None
+            result.append(
+                {
+                    "policy": row["policy"],
+                    "rank": row["rank"],
+                    "preconditioner": row["preconditioner"],
+                    "online_replay_median_seconds": online,
+                    "online_saving_per_replay_block_seconds": saving,
+                    "additional_construction_seconds": additional,
+                    "constant_cost_break_even_replay_blocks": blocks,
+                    "constant_cost_break_even_inner_solves": None
+                    if blocks is None
+                    else blocks * systems,
+                }
+            )
+    return {
+        "systems_per_replay_block": systems,
+        "baseline_preconditioner": None if baseline is None else baseline["preconditioner"],
+        "rows": result,
+        "scope": "A conditional model repeating this same recorded system mix at its measured median costs. Blocks count linear-system replays, not optimization queries. Nonpositive online savings provide no amortization in this model. No complete-sequence speedup is inferred.",
+    }
 
 
 def summarize(manifest, reports, partition="selection", repetitions=3):
@@ -143,6 +182,7 @@ def summarize(manifest, reports, partition="selection", repetitions=3):
         and baseline is not None
         and best["median_replay_total_seconds"] < baseline,
         "baseline_scope": "Fastest verified rank-zero configuration, including frozen preconditioning when present.",
+        "amortization": amortization(rows, len(expected) // repetitions),
         "scope": "Sums of matched replay timings by repetition with construction charged once; not independently timed complete optimization.",
     }
 

@@ -99,3 +99,30 @@ def test_selection_records_do_not_supply_held_out_coverage():
     summary = summarize(manifest, rows, "held_out")
     assert summary["rows"] == []
     assert not summary["reference_beats_jacobi"]
+
+
+def test_cost_model_keeps_construction_and_online_work_separate():
+    manifest, rows = records()
+    rows[1]["construction_seconds_once"] = 12
+    summary = summarize(manifest, rows)
+    model = summary["amortization"]["rows"][0]
+    assert not summary["reference_beats_jacobi"]
+    assert model["online_saving_per_replay_block_seconds"] == 5
+    assert model["constant_cost_break_even_replay_blocks"] == 3
+    assert model["constant_cost_break_even_inner_solves"] == 3
+
+
+@pytest.mark.parametrize("seconds", [10, 12])
+def test_cost_model_has_no_break_even_without_online_savings(seconds):
+    manifest, rows = records()
+    for row in rows[1]["rows"]:
+        row["solve_seconds"] = seconds
+    model = summarize(manifest, rows)["amortization"]["rows"][0]
+    assert model["constant_cost_break_even_replay_blocks"] is None
+    assert model["online_saving_per_replay_block_seconds"] == 10 - seconds
+
+
+def test_cost_model_excludes_incomplete_comparisons():
+    manifest, rows = records()
+    rows[0]["rows"].pop()
+    assert summarize(manifest, rows)["amortization"]["rows"] == []
