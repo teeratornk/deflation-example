@@ -234,21 +234,24 @@ def plot(summary, directory):
     rows = [r for r in summary["rows"] if r["eligible"]]
     if not rows:
         return
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8), constrained_layout=True)
+    fig, axes = plt.subplots(
+        1, 2, figsize=(11, max(3.4, 0.7 * len(rows) + 1)), sharey=True, constrained_layout=True
+    )
     labels = [replay_label(row) for row in rows]
     for i, row in enumerate(rows):
         values = np.array(row["replay_totals_seconds"])
         median = np.median(values)
         axes[0].errorbar(
-            i, median, yerr=[[median - values.min()], [values.max() - median]], fmt="o", capsize=3
+            median, i, xerr=[[median - values.min()], [values.max() - median]], fmt="o", capsize=3
         )
-        axes[0].scatter(i + np.linspace(-0.05, 0.05, len(values)), values, s=12, color="black")
-    axes[0].set_ylabel("Setup-inclusive replay sum (s)")
-    axes[1].bar(np.arange(len(rows)), [np.median(r["total_iterations"]) for r in rows])
-    axes[1].set_ylabel("Total inner iterations")
+        axes[0].scatter(values, i + np.linspace(-0.05, 0.05, len(values)), s=12, color="black")
+    axes[0].set_xlabel("Setup-inclusive replay sum (s)")
+    axes[1].barh(np.arange(len(rows)), [np.median(r["total_iterations"]) for r in rows])
+    axes[1].set_xlabel("Total inner iterations")
+    axes[0].set_yticks(np.arange(len(rows)), labels, fontsize=8)
+    axes[0].invert_yaxis()
     for ax in axes:
-        ax.set_xticks(np.arange(len(rows)), labels, rotation=25, ha="right", fontsize=8)
-        ax.grid(axis="y", alpha=0.2)
+        ax.grid(axis="x", alpha=0.2)
     fig.savefig(directory / "replay_cost.pdf")
     fig.savefig(directory / "replay_cost.png", dpi=180)
     plt.close(fig)
