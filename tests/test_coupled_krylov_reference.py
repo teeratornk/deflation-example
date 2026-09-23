@@ -44,6 +44,7 @@ def test_invalid_actions_are_rejected(defect):
     K = np.eye(6)
     if defect == "asymmetric":
         K[0, 1] = 1
+
     def inverse(x):
         if defect == "shape":
             return x[:-1]
@@ -52,5 +53,6 @@ def test_invalid_actions_are_rejected(defect):
         if defect == "nonfinite":
             return x * np.nan
         return K @ x
+
     with pytest.raises(ValueError):
         krylov_reference(H, inverse, np.ones(6), 3, steps=6)
