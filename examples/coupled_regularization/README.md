@@ -71,3 +71,28 @@ selection rule frozen in `protocol.json`. That comparison retains Jacobi CG,
 velocity-frozen CG, matched-rank recycling and fixed-reference deflation. Complete
 optimization must establish its own nonlinear KKT accuracy and timing benefit.
 Screening improvements alone supply no complete-optimization speedup claim.
+
+## Explicit continuation after a time limit
+
+The separately documented `continuation.json` applies after authorization to
+finish missing repetitions. Keep the original records unchanged and confirm that
+their scheduler jobs have stopped. Run each missing three-target repetition in a
+fresh eight-thread CPU allocation with a twelve-hour limit:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_regularization_resume \
+  --original regularization-1e-11 --baseline BASELINE --trace CAPTURE/linear-systems \
+  --rank 16 --repetition 0 --output continuation-r16-repeat0
+```
+
+The driver rejects replacement of a recorded result, source changes, altered
+physical inputs, mismatched numerical runtimes and reference checksum changes.
+Every original numerical module remains byte-identical. The original reference
+construction cost stays in the cost model; restart preparation is also measured
+and reported separately. Fresh-process repetitions remain explicitly identified.
+
+Pass every continuation directory to the summary command using
+`--continuations DIR1 DIR2 ...`. The summary combines records in memory without
+rewriting the original attempts. It checks each repetition against its matching
+rank-zero result, rejects duplicate replacements and retains unsuccessful
+outcomes. A completed numerical population does not erase its earlier timeouts.

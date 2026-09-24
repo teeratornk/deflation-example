@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from .coupled_regularization import ALPHAS, RANKS, TARGETS, configuration
+from .coupled_regularization_resume import read_population
 from .reporting import file_sha256, write_report
 
 
@@ -72,10 +73,11 @@ def load_increments(directory, descriptor, dofs):
     return values
 
 
-def summarize_alpha(directory):
+def summarize_alpha(directory, continuations=()):
     directory = Path(directory)
     path = directory / "record.json"
-    record = json.loads(path.read_text())
+    original_status = json.loads(path.read_text())["status"]
+    record, origins, continuation_evidence = read_population(directory, continuations)
     if record.get("schema") != "coupled-regularization-screen-v1":
         raise ValueError("Unexpected regularization screen schema")
     cfg = configuration({"configuration": record["configuration"]}, record["alpha"])
@@ -136,11 +138,11 @@ def summarize_alpha(directory):
             if baseline is None or not all(verified_case(c) for c in baseline["cases"]):
                 reasons.append("unverified_rank_zero_control")
                 continue
-            values = load_increments(directory, seq["arrays"], record["state_dofs"])
+            values = load_increments(origins[rank, rep], seq["arrays"], record["state_dofs"])
             controls = (
                 values
                 if rank == 0
-                else load_increments(directory, baseline["arrays"], record["state_dofs"])
+                else load_increments(origins[0, rep], baseline["arrays"], record["state_dofs"])
             )
             differences.append(float(np.max(np.abs(values - controls))))
             for case, control in zip(seq["cases"], baseline["cases"], strict=True):
@@ -199,14 +201,26 @@ def summarize_alpha(directory):
         "error_message": record.get("error_message"),
         "record_sha256": file_sha256(path),
         "source": record["environment"].get("git_head"),
+        "source_scope": "Original timing source; separately identified continuation drivers preserve every original numerical module byte-for-byte.",
+        "original_record_status": original_status,
+        "continuations": continuation_evidence,
         "rows": rows,
     }, record
 
 
-def summarize(directories):
+def summarize(directories, continuations=()):
+    assignments = {file_sha256(Path(d) / "record.json"): [] for d in directories}
+    for folder in continuations:
+        addition = json.loads((Path(folder) / "record.json").read_text())
+        original_digest = addition.get("original_record_sha256")
+        if original_digest not in assignments:
+            raise ValueError("Every continuation must identify a supplied original attempt")
+        assignments[original_digest].append(folder)
     groups, records = [], []
     for directory in directories:
-        group, record = summarize_alpha(directory)
+        group, record = summarize_alpha(
+            directory, assignments[file_sha256(Path(directory) / "record.json")]
+        )
         groups.append(group)
         records.append(record)
     alphas = [g["alpha"] for g in groups]
@@ -274,10 +288,11 @@ def summarize(directories):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runs", type=Path, nargs="+", required=True)
+    parser.add_argument("--continuations", type=Path, nargs="*", default=[])
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--plot", action="store_true")
     args = parser.parse_args()
-    result = summarize(args.runs)
+    result = summarize(args.runs, args.continuations)
     args.output.mkdir(parents=True, exist_ok=False)
     write_report(args.output / "summary.json", result)
     if args.plot:

@@ -1,0 +1,9 @@
+{
+  "schema": "coupled-regularization-continuation-protocol-v1",
+  "authorization": "The user requested continuation after the two larger-alpha workers reached their twelve-hour limits.",
+  "population": "Complete only the missing members of the original four-alpha, four-rank, three-repetition screen. Preserve all original completed outcomes and interrupted attempts.",
+  "numerical_policy": "All original Python source modules remain byte-identical. Reuse the exact checksummed reference already built for each alpha. Reevaluate the common coupled trajectory and recompute every quadratic. No optimizer or recycling history is restored.",
+  "scheduling": "One missing three-target repetition per fresh CPU worker, with eight threads and a twelve-hour limit. At most four continuation workers run concurrently. No automatic retry or expansion of ranks, parameters, targets, bounds or tolerances.",
+  "timing": "Retain the original three-quadratic online boundary and charge the recorded full reference-construction cost once to each nonzero-rank model total. Measure restart preparation separately. Each continued repetition identifies its actual driver source and original record. Original and fresh-process executions remain distinguishable in the summary.",
+  "selection": "Apply the unchanged screening gate only after the original declared population is complete. A screened candidate still requires a fresh complete nonlinear optimization comparison. Interrupted work is retained and supplies no completed-solve speedup."
+}
