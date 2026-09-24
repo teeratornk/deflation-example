@@ -15,6 +15,7 @@ repetition: 0
 memory_interval: 0.01
 initial_state_snapshot: null
 initial_state_assessment: null
+initial_state_alpha_policy: identical
 initial_trajectory_directory: null
 initial_trajectory_method: reference
 initial_trajectory_position: 0

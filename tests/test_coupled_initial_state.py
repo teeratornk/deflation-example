@@ -106,6 +106,50 @@ def test_initialization_rejects_changed_declared_problem(assessed, key, value):
         snapshot_initial_guess({**cfg, key: value}, problem, baseline, 0)
 
 
+def test_explicit_shared_temperature_recomputes_the_new_objective(assessed):
+    cfg, problem, baseline, arrays = assessed
+    old_alpha = problem.alpha
+    old = problem.evaluate(arrays["state"])
+    desired = np.full(problem.size, 0.12)
+    old_objective, old_gradient = problem.objective_gradient(old, desired)
+    problem.alpha *= 10
+    cfg.update(alpha=problem.alpha, initial_state_alpha_policy="shared_temperature")
+    guess, metadata = snapshot_initial_guess(cfg, problem, baseline, 0)
+    np.testing.assert_array_equal(guess.state, arrays["state"])
+    assert set(vars(guess)) == {"state", "flows"}
+    fresh = problem.evaluate(guess.state, initial=guess)
+    objective, gradient = problem.objective_gradient(fresh, desired)
+    assert objective > old_objective
+    assert not np.allclose(gradient, old_gradient, rtol=1e-8, atol=1e-14)
+    assert metadata["source_alpha"] == old_alpha
+    assert metadata["optimization_alpha"] == problem.alpha
+    assert metadata["alpha_policy"] == "shared_temperature"
+    assert metadata["retained_secant_pairs"] == metadata["retained_recycling_directions"] == 0
+
+
+@pytest.mark.parametrize("key,value", [("slabs", 4), ("lower_K", -1), ("horizon_s", 3)])
+def test_shared_temperature_preserves_physical_guards(assessed, key, value):
+    cfg, problem, baseline, _ = assessed
+    cfg.update(initial_state_alpha_policy="shared_temperature")
+    with pytest.raises(ValueError, match=key):
+        snapshot_initial_guess({**cfg, key: value}, problem, baseline, 0)
+
+
+def test_unknown_policy_and_inconsistent_loaded_alpha_are_rejected(assessed):
+    cfg, problem, baseline, _ = assessed
+    with pytest.raises(ValueError, match="policy"):
+        snapshot_initial_guess(
+            {**cfg, "initial_state_alpha_policy": "ignore"}, problem, baseline, 0
+        )
+    with pytest.raises(ValueError, match="Loaded problem"):
+        snapshot_initial_guess(
+            {**cfg, "initial_state_alpha_policy": "shared_temperature", "alpha": 0.2},
+            problem,
+            baseline,
+            0,
+        )
+
+
 @pytest.mark.parametrize("change", ["baseline", "rule", "snapshot", "failed_check", "target"])
 def test_initialization_requires_matching_assessment_and_target(assessed, change):
     cfg, problem, baseline, _ = assessed

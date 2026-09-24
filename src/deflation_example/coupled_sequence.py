@@ -591,7 +591,17 @@ def run(config):
             tick = time.perf_counter()
             if cfg["method"] == "reference":
                 selection = cfg.get("reference_selection", "thermal")
-                if selection in {"nominal_coupled", "preconditioned_coupled"}:
+                if selection == "krylov_coupled":
+                    from .coupled_nominal_krylov import configured_krylov_reference
+
+                    if stage is not None:
+                        raise ValueError(
+                            "The fixed Krylov reference requires a complete fresh sequence"
+                        )
+                    reference = configured_krylov_reference(
+                        problem, cfg, initial_guess, initial_state
+                    )
+                elif selection in {"nominal_coupled", "preconditioned_coupled"}:
                     from .coupled_selected_reference import configured_selected_reference
 
                     if restore is not None or resume is not None:
@@ -605,7 +615,7 @@ def run(config):
                     reference = configured_reference(problem, cfg, baseline)
                 else:
                     raise ValueError(
-                        "Choose thermal, nominal_coupled or preconditioned_coupled reference selection"
+                        "Choose thermal, nominal_coupled, preconditioned_coupled or krylov_coupled reference selection"
                     )
                 storage = reference.storage()
                 metadata["reference_description"] = reference.description

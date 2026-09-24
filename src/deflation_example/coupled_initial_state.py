@@ -7,6 +7,7 @@ import numpy as np
 
 from .coupled_bounds import temperature_bounds
 from .reporting import file_sha256
+from .validation import positive_real
 
 
 def snapshot_initial_guess(cfg, problem, baseline, position):
@@ -35,7 +36,16 @@ def snapshot_initial_guess(cfg, problem, baseline, position):
     if len(rows) != 4 or any(row.get("status") != "evaluated" for row in rows):
         raise ValueError("The initial-state assessment must retain four evaluated centered checks")
     original = record["configuration"]
-    for key in ("transient", "slabs", "horizon_s", "alpha", "target_count", "lower_K"):
+    alpha_policy = cfg.get("initial_state_alpha_policy", "identical")
+    if alpha_policy not in {"identical", "shared_temperature"}:
+        raise ValueError("Choose identical or shared_temperature initial-state alpha policy")
+    source_alpha = positive_real(original["alpha"], "Snapshot alpha")
+    current_alpha = positive_real(cfg["alpha"], "Optimization alpha")
+    if alpha_policy == "identical" and source_alpha != current_alpha:
+        raise ValueError("Initial-state snapshot differs in alpha")
+    if problem.alpha != current_alpha:
+        raise ValueError("Loaded problem differs from the declared alpha")
+    for key in ("transient", "slabs", "horizon_s", "target_count", "lower_K"):
         if key not in original or original[key] != cfg[key]:
             raise ValueError(f"Initial-state snapshot differs in {key}")
     for key, default in (
@@ -72,6 +82,9 @@ def snapshot_initial_guess(cfg, problem, baseline, position):
         "baseline_sha256": baseline["baseline_sha256"],
         "source_streamline_rule": original.get("streamline_rule", "hard_min"),
         "evaluated_streamline_rule": cfg.get("streamline_rule", "hard_min"),
+        "alpha_policy": alpha_policy,
+        "source_alpha": source_alpha,
+        "optimization_alpha": current_alpha,
         "retained_secant_pairs": 0,
         "retained_recycling_directions": 0,
         "scope": "Complete trajectory reevaluation; saved flows are initial guesses. No old controls, gradients, damping, iteration counts or solver histories are imported. Prior optimization cost is excluded.",
