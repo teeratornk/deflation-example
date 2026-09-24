@@ -86,3 +86,25 @@ follows the timer; all targets and slabs are saved. Predeclared illustrations
 use targets 7 and 14 at levels 7, 32 and 64, corresponding to 65.625, 300 and
 600 seconds. Each illustration must label its actual time, temperature units
 and active bounds. No linear results are asserted before these runs finish.
+
+After the complete comparison, use the same `--settings` and twelve `--records`
+arguments with `deflation_example.coupled_confirmation_figures` to draw every
+repetition, an additive cost breakdown and sampled memory. Its title identifies
+prescribed-flow physics. For saved reference repetition 0, draw the predeclared
+target positions 0 and 2 using:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_figures \
+  --baseline BASELINE --optimization linear-reference-repeat0 --method reference \
+  --target-position 0 --time-indices 6 31 63 --show-active-sets \
+  --format pdf --output linear-target7-fields
+uv run --no-sync python -m deflation_example.coupled_figures \
+  --baseline BASELINE --optimization linear-reference-repeat0 --method reference \
+  --target-position 2 --time-indices 6 31 63 --show-active-sets \
+  --format pdf --output linear-target14-fields
+```
+
+Command-line time indices are zero-based. These figures retain the saved
+temperature and signed control without clipping. Separate panels show lower
+and upper active constraints. If a selected target failed verification, the
+plot command refuses it; another successful target is not substituted.

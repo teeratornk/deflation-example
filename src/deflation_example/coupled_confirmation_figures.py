@@ -98,6 +98,7 @@ def figure_data(records, settings, fields=None):
         )
     return {
         "schema": "coupled-confirmation-figures-v1",
+        "physics": records[0]["configuration"].get("physics", "coupled"),
         "summary": summary,
         "methods": groups,
         "timing_scope": "Each curve is one independently timed complete sequence. Initial construction and setup are included. The last point includes remaining query bookkeeping and cleanup. Calibration and process preparation are excluded and reported separately.",
@@ -182,7 +183,12 @@ def plot(data, output):
     for marker, label in (("o", "Host RSS"), ("^", "GPU")):
         axes[2].scatter([], [], marker=marker, color="black", label=label)
     axes[2].legend(fontsize=8)
-    fig.suptitle("Complete coupled optimization: " + data["summary"]["phase"], fontsize=11)
+    title = (
+        "Complete prescribed-flow space–time optimization"
+        if data.get("physics") == "prescribed_flow"
+        else "Complete coupled optimization"
+    )
+    fig.suptitle(title + ": " + data["summary"]["phase"], fontsize=11)
     for extension in ("pdf", "png"):
         fig.savefig(output / ("complete_sequences." + extension), dpi=220)
     plt.close(fig)

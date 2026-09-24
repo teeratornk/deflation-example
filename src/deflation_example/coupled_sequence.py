@@ -777,6 +777,7 @@ def run(config, *, problem_loader=None, target_optimizer=None, numerical_policy=
             **metadata,
             "status": "complete" if fatal_error is None else "sequence_error",
             "error_type": None if fatal_error is None else type(fatal_error).__name__,
+            "failure_diagnostics": getattr(fatal_error, "diagnostics", None),
             # The type alone does not identify a failure that took a quarter of an
             # hour to reach. The message and the traceback's last frames say where.
             "error_message": None if fatal_error is None else str(fatal_error),

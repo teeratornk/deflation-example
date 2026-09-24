@@ -19,6 +19,14 @@ from .linear_spacetime import FixedFlowProblem, solve_trajectory
 NUMERICAL_POLICY = "fixed-flow-exact-affine-spacetime-pdas-v1"
 
 
+class IsothermalRefinementError(ValueError):
+    """Preserve the actual residuals and field change when preparation fails."""
+
+    def __init__(self, diagnostics):
+        self.diagnostics = diagnostics
+        super().__init__("Isothermal refinement fails accuracy or the fixed-baseline change limit")
+
+
 def refine_isothermal(problem, cfg):
     """Verify the saved flow and, if needed, refine the same steady equations.
 
@@ -56,13 +64,6 @@ def refine_isothermal(problem, cfg):
     difference = np.linalg.norm(refined.velocity - original.velocity)
     norm = np.linalg.norm(original.velocity)
     relative = difference / norm if norm else difference
-    if (
-        refined.status != "converged"
-        or not np.isfinite(list(after.values())).all()
-        or max(after.values()) > tolerance
-        or relative > 1e-6
-    ):
-        raise ValueError("Isothermal refinement fails accuracy or the fixed-baseline change limit")
     preparation = {
         "policy": "Same steady isothermal equations; independent verification with factor-ten margin",
         "internal_tolerance": tolerance,
@@ -77,11 +78,19 @@ def refine_isothermal(problem, cfg):
             np.max(np.abs(refined.pressure - original.pressure))
         ),
         "history": refined.history if refined is not original else [],
+        "status": refined.status,
         "velocity_sha256": hashlib.sha256(
             np.ascontiguousarray(refined.velocity).tobytes()
         ).hexdigest(),
         "seconds": time.perf_counter() - start,
     }
+    if (
+        refined.status != "converged"
+        or not np.isfinite(list(after.values())).all()
+        or max(after.values()) > tolerance
+        or relative > 1e-6
+    ):
+        raise IsothermalRefinementError(preparation)
     problem.initial_flow = refined
     problem.assembly = problem.assemble(refined.velocity)
     if not problem.consistent_stabilization:

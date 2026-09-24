@@ -67,3 +67,16 @@ def test_component_display_uses_an_actual_sequence():
     for method in data["methods"]:
         chosen = method["representative_record_index"]
         assert records[chosen]["configuration"]["repetition"] == 2
+
+
+def test_fixed_flow_figures_keep_the_physics_label(tmp_path):
+    settings, records, fields = measured_population()
+    for record in records:
+        record["configuration"]["physics"] = "prescribed_flow"
+        for case in record["cases"]:
+            case["pdas_history"] = case.pop("history")[0]["attempts"][0]["qp_history"]
+            case["pdas_steps"] = 1
+    data = figure_data(records, settings, fields)
+    assert data["physics"] == "prescribed_flow"
+    plot(data, tmp_path)
+    assert (tmp_path / "complete_sequences.png").stat().st_size > 1000

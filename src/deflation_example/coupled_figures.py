@@ -12,12 +12,14 @@ from .coupled_saved import load_saved_solution, require_matching_baseline
 from .reporting import write_report
 
 
-def plot_fields(problem, fields, source_scale, upper_K, output, indices=None):
+def plot_fields(problem, fields, source_scale, upper_K, output, indices=None, *, lower_K=None):
     output = Path(output)
     if output.exists():
         raise FileExistsError(output)
     if not np.isfinite(upper_K):
         raise ValueError("The displayed temperature bound must be finite")
+    if lower_K is not None and (not np.isfinite(lower_K) or lower_K >= upper_K):
+        raise ValueError("The lower temperature bound must be finite and below the upper bound")
     import matplotlib
 
     matplotlib.use("Agg")
@@ -66,10 +68,18 @@ def plot_fields(problem, fields, source_scale, upper_K, output, indices=None):
     qmax = max(float(np.max(np.abs(source[indices])) * source_scale / 1e6), np.finfo(float).eps)
     vmax = max(float(np.max(np.linalg.norm(velocity[indices], axis=-1))), np.finfo(float).eps)
     times = np.cumsum(problem.physical_steps) if len(problem.physical_steps) else np.array([0.0])
+    active_rows = []
+    if lower_K is not None:
+        lower = (lower_K - problem.temperature_offset) / problem.temperature_scale
+        upper = (upper_K - problem.temperature_offset) / problem.temperature_scale
+        epsilon = 32 * np.finfo(float).eps * np.maximum(1, np.abs(state))
+        lower_active = state <= lower + epsilon
+        upper_active = state >= upper - epsilon
+        violations = np.maximum(np.maximum(lower - state, state - upper), 0)
     fig, axes = plt.subplots(
         len(indices),
-        4,
-        figsize=(11, 2.5 * len(indices)),
+        4 if lower_K is None else 5,
+        figsize=(11 if lower_K is None else 14, 2.5 * len(indices)),
         squeeze=False,
         layout="constrained",
         sharex=True,
@@ -114,6 +124,29 @@ def plot_fields(problem, fields, source_scale, upper_K, output, indices=None):
         )
         if row == 0:
             artists.append(artist)
+        if lower_K is not None:
+            ax = axes[row, 4]
+            ax.triplot(tri, color="0.85", linewidth=0.15, rasterized=True)
+            for mask, color, label in (
+                (~(lower_active[index] | upper_active[index]), "0.7", "Inactive"),
+                (lower_active[index], "#0072B2", "Lower bound"),
+                (upper_active[index], "#D55E00", "Upper bound"),
+            ):
+                points = nodes[problem.free[mask]]
+                ax.scatter(
+                    points[:, 1], points[:, 0], s=2, color=color, rasterized=True, label=label
+                )
+            active_rows.append(
+                {
+                    "time_index": int(index),
+                    "time_s": float(times[index]),
+                    "lower_active_dofs": int(lower_active[index].sum()),
+                    "upper_active_dofs": int(upper_active[index].sum()),
+                    "maximum_bound_violation_K": float(
+                        violations[index].max() * problem.temperature_scale
+                    ),
+                }
+            )
         axes[row, 0].set_ylabel("$r$ (m)")
         if len(problem.physical_steps):
             # Separate time labels from the radial axis so long times remain
@@ -130,12 +163,19 @@ def plot_fields(problem, fields, source_scale, upper_K, output, indices=None):
         fig.colorbar(
             artists[col], ax=axes[:, col], orientation="horizontal", label=unit, shrink=0.9
         )
+    if lower_K is not None:
+        axes[0, 4].set_title("Temperature constraints")
+        axes[-1, 4].set_xlabel("$z$ (m)")
+        axes[0, 4].legend(loc="upper right", fontsize=6, markerscale=3)
     fig.savefig(output, dpi=220, bbox_inches="tight")
     plt.close(fig)
     return {
         "time_indices": indices.tolist(),
         "times_s": times[indices].tolist(),
         "temperature_bound_K": float(upper_K),
+        "lower_temperature_bound_K": None if lower_K is None else float(lower_K),
+        "active_constraints": active_rows,
+        "active_constraint_scope": "Free thermal degrees of freedom at the displayed time levels; bound identification uses the PDAS roundoff tolerance. Temperature fields are never clipped for plotting.",
         "source_scale_W_m3": float(source_scale),
         "thermal_rendering": "P1 temperature and source fields; source is zero at prescribed-temperature nodes.",
         "velocity_rendering": "P2 nodal speed on four linear subtriangles per fluid element; solid regions are gray.",
@@ -153,6 +193,7 @@ def main():
     )
     parser.add_argument("--target-position", type=int)
     parser.add_argument("--time-indices", nargs="+", type=int)
+    parser.add_argument("--show-active-sets", action="store_true")
     parser.add_argument("--format", choices=("pdf", "png"), default="pdf")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -185,6 +226,7 @@ def main():
             cfg["upper_K"],
             args.output / ("coupled_fields." + args.format),
             args.time_indices,
+            lower_K=cfg["lower_K"] if args.show_active_sets else None,
         )
         write_report(
             args.output / "figure.json",
@@ -195,6 +237,7 @@ def main():
                 "method": args.method,
                 "target": cfg["query"],
                 "target_position": args.target_position,
+                "physics": cfg.get("physics", "coupled"),
             },
         )
 
