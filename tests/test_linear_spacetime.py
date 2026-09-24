@@ -180,7 +180,7 @@ def test_failed_isothermal_candidate_keeps_initial_state_and_its_residual(monkey
     physical, _, cfg = setup()
     cfg.update(equation_acceptance_tolerance=1e-12, flow_cap=4)
     original = physical.initial_flow
-    candidate = replace(original, velocity=original.velocity + 1e-14, status="iteration_cap")
+    candidate = replace(original, velocity=original.velocity + 1e-14, status="newton_correction")
 
     def verify(result, *args, **kwargs):
         return {
@@ -189,7 +189,7 @@ def test_failed_isothermal_candidate_keeps_initial_state_and_its_residual(monkey
         }
 
     monkeypatch.setattr(physical.flow, "verify", verify)
-    monkeypatch.setattr(physical.flow, "solve", lambda *a, **k: candidate)
+    monkeypatch.setattr(sequence, "isothermal_newton_correction", lambda *a, **k: candidate)
     with pytest.raises(sequence.IsothermalRefinementError) as failure:
         sequence.refine_isothermal(physical, cfg)
     report = failure.value.diagnostics
@@ -207,7 +207,7 @@ def test_initial_isothermal_accuracy_bypasses_corrections(monkeypatch):
     def forbidden(*args, **kwargs):
         raise AssertionError("An already verified flow needs no Newton step")
 
-    monkeypatch.setattr(physical.flow, "solve", forbidden)
+    monkeypatch.setattr(sequence, "isothermal_newton_correction", forbidden)
     report = sequence.refine_isothermal(physical, cfg)
     assert report["status"] == "verified" and report["history"] == []
 

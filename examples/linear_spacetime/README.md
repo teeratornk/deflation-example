@@ -28,7 +28,11 @@ Before freezing the isothermal velocity, the loader independently verifies it
 in the actual time-discrete momentum equations. If needed, single Newton
 corrections solve the same steady isothermal equations, retaining candidates
 that improve the independently recomputed time-discrete residual. The final
-criterion remains `1e-12`; the internal step requests a factor-ten margin.
+criterion remains `1e-12` in the original double-precision evaluator. The
+correction residual is accumulated with `numpy.longdouble`; factorization
+and correction solves use double precision. The actual accumulation precision
+is recorded. This targets cancellation in the small residual without changing
+the equations or final acceptance test.
 The steady-baseline check remains `1e-8`, as in the nonlinear loader. A relative
 velocity change greater than `1e-6`, stagnation above final accuracy or an
 exhausted correction budget stops the comparison. The resulting field, all

@@ -10,7 +10,9 @@ import hashlib
 import time
 
 import numpy as np
+from scipy.sparse.linalg import splu
 
+from .axisymmetric_flow import FlowResult
 from .coupled_bounds import temperature_bounds
 from .coupled_optimize import adjoint_acceptance, equation_acceptance, load_problem
 from .coupled_targets import desired_temperature
@@ -26,6 +28,45 @@ class IsothermalRefinementError(ValueError):
     def __init__(self, diagnostics):
         self.diagnostics = diagnostics
         super().__init__("Isothermal refinement fails accuracy or the fixed-baseline change limit")
+
+
+def isothermal_newton_correction(problem, result):
+    """Accumulate the small residual accurately; keep the solve in float64.
+
+    This corrects the already verified steady isothermal baseline. The final
+    test still uses the original float64 time-discrete residual evaluator.
+    """
+    flow = problem.flow
+    x = np.r_[result.velocity[:, 0], result.velocity[:, 1], result.pressure]
+    operator = flow.operator(result.velocity)
+    force = flow.load(problem.acceleration)
+    rhs = np.r_[force[:, 0], force[:, 1], np.zeros(flow.np)]
+    defect = operator.astype(np.longdouble) @ x.astype(np.longdouble) - rhs.astype(np.longdouble)
+    free = problem.flow_free
+    jacobian = (operator + flow.convection_derivative(result.velocity))[free][:, free].tocsc()
+    correction_rhs = -np.asarray(defect[free], dtype=np.float64)
+    step = splu(jacobian).solve(correction_rhs)
+    if not np.isfinite(step).all():
+        raise RuntimeError("The isothermal correction is nonfinite")
+    x[free] += step
+    residual = jacobian @ step - correction_rhs
+    norm = np.linalg.norm(correction_rhs)
+    history = [
+        {
+            "residual_accumulation_epsilon": float(np.finfo(np.longdouble).eps),
+            "linear_relative_residual": float(
+                np.linalg.norm(residual) / norm if norm else np.linalg.norm(residual)
+            ),
+            "newton_step_norm": float(np.linalg.norm(step)),
+            "linear_solve_dtype": "float64",
+        }
+    ]
+    return FlowResult(
+        np.column_stack((x[: flow.nv], x[flow.nv : 2 * flow.nv])),
+        x[2 * flow.nv :].copy(),
+        "newton_correction",
+        history,
+    )
 
 
 def refine_isothermal(problem, cfg):
@@ -74,20 +115,11 @@ def refine_isothermal(problem, cfg):
         if not np.isfinite(score(after)):
             status = "invalid_residual"
             break
-        candidate = flow.solve(
-            problem.acceleration,
-            problem.boundary_indices,
-            problem.boundary_values,
-            initial=refined,
-            pressure_gauge=problem.pressure_gauge,
-            method="newton",
-            tolerance=0.1 * tolerance,
-            max_iterations=1,
-        )
+        candidate = isothermal_newton_correction(problem, refined)
         candidate_checks = trajectory_checks(candidate)
-        retained = candidate.status in {"converged", "iteration_cap"} and score(
-            candidate_checks
-        ) < score(after)
+        retained = candidate.status == "newton_correction" and score(candidate_checks) < score(
+            after
+        )
         history.append(
             {
                 "attempt": attempt,
@@ -111,7 +143,8 @@ def refine_isothermal(problem, cfg):
     relative = difference / norm if norm else difference
     preparation = {
         "policy": "Newton corrections of the same steady isothermal equations; independently verify the actual time-discrete residual and retain improving candidates",
-        "internal_tolerance": 0.1 * tolerance,
+        "correction_residual_accumulation": "numpy.longdouble; correction factors and solves use float64",
+        "final_residual_accumulation": "Unchanged float64 time-discrete evaluator",
         "final_equation_tolerance": tolerance,
         "residual_time_steps_s": steps,
         "steady_before": steady_before,
