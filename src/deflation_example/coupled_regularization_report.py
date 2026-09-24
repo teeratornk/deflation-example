@@ -304,10 +304,13 @@ def plot(result, output):
     """Show all ranks and repetitions, including ineligible comparisons."""
     import matplotlib.pyplot as plt
 
-    figure, axes = plt.subplots(2, 2, figsize=(10, 6.8), layout="constrained")
+    figure, axes = plt.subplots(2, 2, figsize=(10, 7.4))
+    # Separate the scope title and legend explicitly; constrained layout can
+    # allocate their outside-upper positions to the same strip.
+    figure.subplots_adjust(left=0.09, right=0.985, bottom=0.09, top=0.85, hspace=0.40, wspace=0.25)
     for axis, alpha in zip(axes.flat, ALPHAS, strict=True):
         group = next((g for g in result["groups"] if g["alpha"] == alpha), None)
-        axis.set_title(rf"$\alpha={alpha:.0e}$")
+        axis.set_title(rf"$\alpha=10^{{{int(round(np.log10(alpha)))}}}$")
         axis.set(xlabel="Three-quadratic sequence time (s)", ylabel="Reference rank")
         axis.set_yticks(range(len(RANKS)), [str(r) for r in RANKS])
         if group is None:
@@ -365,7 +368,8 @@ def plot(result, output):
                 label="Individual online repetition",
             ),
         ],
-        loc="outside upper center",
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.95),
         ncol=3,
         fontsize=9,
     )

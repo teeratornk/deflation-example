@@ -237,9 +237,28 @@ def test_initially_optimal_quadratic_needs_no_inner_solve(tmp_path):
     assert all("no_nonzero_reference_deployment" in r["reasons"] for r in result["rows"][1:])
 
 
-def test_plot_retains_all_ranks_and_incomplete_populations(tmp_path):
+def test_plot_retains_all_ranks_and_incomplete_populations(tmp_path, monkeypatch):
     pytest.importorskip("matplotlib")
+    import matplotlib.figure
     from deflation_example.coupled_regularization_report import plot
+
+    original = matplotlib.figure.Figure.savefig
+    checked = []
+
+    def save(figure, path, **kwargs):
+        original(figure, path, **kwargs)
+        if str(path).endswith(".png"):
+            figure.canvas.draw()
+            renderer = figure.canvas.get_renderer()
+            title = figure._suptitle.get_window_extent(renderer)
+            legend = figure.legends[0].get_window_extent(renderer)
+            assert not title.overlaps(legend)
+            assert all(
+                not legend.overlaps(ax.title.get_window_extent(renderer)) for ax in figure.axes
+            )
+            checked.append(True)
+
+    monkeypatch.setattr(matplotlib.figure.Figure, "savefig", save)
 
     path = tmp_path / "run"
     make_record(path, ALPHAS[0])
@@ -247,3 +266,4 @@ def test_plot_retains_all_ranks_and_incomplete_populations(tmp_path):
     plot(result, tmp_path)
     assert (tmp_path / "regularization_cost.png").stat().st_size > 1000
     assert (tmp_path / "regularization_cost.pdf").stat().st_size > 1000
+    assert checked == [True]
