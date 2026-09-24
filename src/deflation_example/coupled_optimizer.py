@@ -75,6 +75,8 @@ def box_quadratic(
     fixed_mask_corrections=4,
     observer=None,
     preconditioner_factory=None,
+    initial=None,
+    kkt_evaluator=None,
 ):
     """Solve min 0.5*x.T H x + gradient.T x under two-sided finite bounds.
 
@@ -106,19 +108,27 @@ def box_quadratic(
         raise ValueError(
             "Finite compatible quadratic data, positive diagonal and strict bounds are required"
         )
-    x = np.clip(np.zeros_like(g), lo, hi)
+    x = np.zeros_like(g) if initial is None else np.asarray(initial, dtype=float).copy()
+    if x.shape != g.shape or not np.isfinite(x).all():
+        raise ValueError("Initial quadratic state must be finite and dimensionally matched")
+    x = np.clip(x, lo, hi)
     # The preconditioner is restricted to the active set and factorized one block
     # per slab, which is neither free nor inside the solver's own timers. Cache it
     # while the active set is unchanged and record what building it cost.
     cached = {"key": None, "preconditioner": None, "seconds": 0.0, "builds": 0}
     history = []
     scale = max(1.0, np.linalg.norm(g, np.inf))
+    assess = (
+        (lambda state, derivative: box_kkt(state, derivative, lo, hi, scale))
+        if kkt_evaluator is None
+        else kkt_evaluator
+    )
     status = "active_set_cap"
     previous_partition = None
     corrections = 0
     for step in range(max_steps):
         current_gradient = H @ x + g
-        kkt = box_kkt(x, current_gradient, lo, hi, scale)
+        kkt = assess(x, current_gradient)
         if max(kkt.values()) <= tolerance:
             return BoxQPResult(x, "converged", kkt, history)
         projected = x - current_gradient / d
@@ -200,7 +210,7 @@ def box_quadratic(
         else:
             row.update(linear_status="empty", linear_iterations=0, deployed_rank=0)
         if correction:
-            candidate_kkt = box_kkt(fixed, H @ fixed + g, lo, hi, scale)
+            candidate_kkt = assess(fixed, H @ fixed + g)
             if max(candidate_kkt.values()) >= max(kkt.values()):
                 row["candidate_retained"] = False
                 history.append(row)
@@ -210,7 +220,7 @@ def box_quadratic(
         x = fixed
         previous_partition = partition
         history.append(row)
-    kkt = box_kkt(x, H @ x + g, lo, hi, scale)
+    kkt = assess(x, H @ x + g)
     if status == "active_set_cap" and max(kkt.values()) <= tolerance:
         status = "converged"
     return BoxQPResult(x, status, kkt, history)

@@ -445,7 +445,11 @@ def utc_now():
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
-def run(config):
+def run(config, *, problem_loader=None, target_optimizer=None, numerical_policy=None):
+    """Time a complete sequence; optional strategies support a fixed-flow control.
+
+    Omitted strategies retain the coupled implementation and its numerical policy.
+    """
     cfg = OmegaConf.to_container(config, resolve=True)
     if cfg["method"] not in {"jacobi", "reference", "recycling"}:
         raise ValueError("The coupled study compares jacobi, reference and recycling")
@@ -504,12 +508,17 @@ def run(config):
         process_start = time.perf_counter()
         metadata = {
             "schema": COMPLETE_SCHEMA if stage is None else STAGE_SCHEMA,
-            "numerical_policy": NUMERICAL_POLICY,
+            "numerical_policy": NUMERICAL_POLICY if numerical_policy is None else numerical_policy,
             "environment": environment(),
             "configuration": configuration,
             "timing_boundary": "Reference construction, model assembly, all nonlinear and active-set solves, transfers, independent verification and cleanup. Array serialization follows the timer. Common isothermal calibration and process preparation are separate.",
             "scope": "Coupled nonlinear stationary solutions; final physical-resolution and performance populations require their declared gates.",
         }
+        if cfg.get("physics") == "prescribed_flow":
+            metadata.update(
+                timing_boundary="Fixed-flow model assembly, reference construction, all active-set solves, transfers, independent verification and cleanup. Array serialization follows the timer. Common isothermal calibration and process preparation are separate.",
+                scope="Complete linear-quadratic trajectory optimization at fixed computed isothermal velocity; no temperature-to-flow feedback or nonlinear optimization.",
+            )
         if initial_snapshot:
             metadata["initialization_scope"] = (
                 "Fresh optimization from a declared checkpoint temperature. The full trajectory "
@@ -532,7 +541,7 @@ def run(config):
         checkpoint_log, exported_history = [], None
         prior_seconds = 0.0 if resume is None else resume["prior_seconds"]
         try:
-            problem, baseline = load_problem(cfg)
+            problem, baseline = (load_problem if problem_loader is None else problem_loader)(cfg)
             if cfg.get("evaluation_progress", False):
                 problem.evaluation_callback = lambda row: write_report(
                     output / "evaluation-progress.json", row
@@ -563,6 +572,12 @@ def run(config):
                 initial_guess, metadata["initial_state"] = snapshot_initial_guess(
                     cfg, problem, baseline, 0 if stage is None else stage["positions"][0]
                 )
+                if cfg.get("physics") == "prescribed_flow":
+                    metadata["initial_state"]["scope"] = (
+                        "Only the common initial temperature is used. Saved coupled velocities "
+                        "are ignored; the calibrated isothermal velocity remains fixed. No old "
+                        "controls or numerical histories are imported. Prior optimization is excluded."
+                    )
             elif initial_snapshot:
                 metadata["initial_state"] = {"status": "superseded_by_same_configuration_resume"}
             if initial_trajectory and resume is None:
@@ -703,7 +718,7 @@ def run(config):
                 observer = CoupledTrace(
                     output / "linear-systems", configuration, baseline["baseline_sha256"]
                 )
-            cases, fields = optimize_targets(
+            cases, fields = (optimize_targets if target_optimizer is None else target_optimizer)(
                 problem,
                 solver,
                 cfg,

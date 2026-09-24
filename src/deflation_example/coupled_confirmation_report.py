@@ -26,11 +26,20 @@ def inner_evidence(record):
     requested = integer(record["configuration"]["rank"], "Requested rank", 0)
     tolerance = record["configuration"]["inner_tolerance"]
     for case in record["cases"]:
-        if "history" not in case:
+        if "history" in case and "pdas_history" in case:
+            raise ValueError("Keep linear PDAS and nonlinear optimization histories distinct")
+        if "history" not in case and "pdas_history" not in case:
             complete = False
             continue
+        histories = case.get("history")
+        if "pdas_history" in case:
+            if record["configuration"].get("physics") != "prescribed_flow":
+                raise ValueError("Direct trajectory PDAS requires prescribed-flow physics")
+            histories = [
+                {"attempts": [{"qp_history": case["pdas_history"], "qp_status": case["status"]}]}
+            ]
         case_iterations = 0
-        for outer in case["history"]:
+        for outer in histories:
             for attempt in outer["attempts"]:
                 for step in attempt["qp_history"]:
                     if "linear_status" not in step:
@@ -163,6 +172,7 @@ def summarize(records, settings, fields=None):
                 "case_statuses": [c["status"] for c in record["cases"]],
                 "inner_iterations": sum(c.get("inner_iterations", 0) for c in record["cases"]),
                 "outer_iterations": sum(c.get("nonlinear_iterations", 0) for c in record["cases"]),
+                "direct_pdas_steps": sum(c.get("pdas_steps", 0) for c in record["cases"]),
                 "sampled_gpu_peak_bytes": record["memory"].get("peak_gpu_process_bytes"),
                 "inner_evidence": inner_evidence(record),
             }

@@ -149,3 +149,8 @@ and runtime identities. Five fresh confirmation repetitions require a verified
 development population and lower reference median time than the fastest tested
 alternative. Neither the screening result nor an unfinished baseline establishes
 complete nonlinear acceleration.
+
+The [matched linear space–time control](../linear_spacetime/README.md) uses
+the same alpha/rank and thermal trajectory discretization with the verified
+isothermal velocity held fixed. It establishes a separate within-physics
+comparison and does not change the running nonlinear protocol.

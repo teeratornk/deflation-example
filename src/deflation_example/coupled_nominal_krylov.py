@@ -83,4 +83,9 @@ def configured_krylov_reference(problem, cfg, initial_guess=None, initial_state=
         nominal_policy="Initial temperature; full coupled Gauss-Newton; zero damping and no secants",
         lifetime="Fixed full-domain space across every target and nonlinear/PDAS update",
     )
+    if cfg.get("physics") == "prescribed_flow":
+        reference.description.update(
+            nominal_policy="Exact fixed-flow space-time quadratic operator; zero damping and no secants",
+            lifetime="Fixed full-domain space across every target and PDAS update",
+        )
     return reference
