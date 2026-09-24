@@ -174,6 +174,44 @@ def test_isothermal_refinement_is_verified_and_ignores_targets(monkeypatch):
     assert max(forced["after"].values()) <= 1e-13
 
 
+def test_failed_isothermal_candidate_keeps_initial_state_and_its_residual(monkeypatch):
+    from dataclasses import replace
+
+    physical, _, cfg = setup()
+    cfg.update(equation_acceptance_tolerance=1e-12, flow_cap=4)
+    original = physical.initial_flow
+    candidate = replace(original, velocity=original.velocity + 1e-14, status="iteration_cap")
+
+    def verify(result, *args, **kwargs):
+        return {
+            "momentum_relative_residual": 2e-12 if result is original else 3e-12,
+            "continuity_relative_residual": 1e-16,
+        }
+
+    monkeypatch.setattr(physical.flow, "verify", verify)
+    monkeypatch.setattr(physical.flow, "solve", lambda *a, **k: candidate)
+    with pytest.raises(sequence.IsothermalRefinementError) as failure:
+        sequence.refine_isothermal(physical, cfg)
+    report = failure.value.diagnostics
+    assert report["after"]["momentum_relative_residual"] == 2e-12
+    assert report["history"][0]["trajectory_checks"]["momentum_relative_residual"] == 3e-12
+    assert report["history"][0]["candidate_retained"] is False
+    assert report["velocity_relative_change"] == 0
+    assert physical.initial_flow is original
+
+
+def test_initial_isothermal_accuracy_bypasses_corrections(monkeypatch):
+    physical, _, cfg = setup()
+    cfg.update(equation_acceptance_tolerance=1e-12, flow_cap=4)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("An already verified flow needs no Newton step")
+
+    monkeypatch.setattr(physical.flow, "solve", forbidden)
+    report = sequence.refine_isothermal(physical, cfg)
+    assert report["status"] == "verified" and report["history"] == []
+
+
 @pytest.mark.parametrize("arm", ["jacobi", "frozen", "reference", "recycling"])
 def test_four_linear_solvers_match_independent_constrained_optimizer(arm):
     _, problem, cfg = setup()
