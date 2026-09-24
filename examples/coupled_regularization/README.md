@@ -96,3 +96,56 @@ Pass every continuation directory to the summary command using
 rewriting the original attempts. It checks each repetition against its matching
 rank-zero result, rejects duplicate replacements and retains unsuccessful
 outcomes. A completed numerical population does not erase its earlier timeouts.
+
+## Complete nonlinear comparison
+
+After the completed summary selects a setting, freeze the four-arm development
+comparison. The command refuses an incomplete population or a different choice:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_regularization_complete settings \
+  --screen regularization-summary/summary.json --output complete-settings.json
+uv run --no-sync python -m deflation_example.coupled_regularization_complete run \
+  --screen regularization-summary/summary.json --settings complete-settings.json \
+  --optimization NOMINAL_OPTIMIZATION --baseline BASELINE \
+  --initial-snapshot INITIAL_SNAPSHOT --initial-assessment ASSESSMENT.json \
+  --arm reference --repetition 0 --output complete-reference-repeat0
+```
+
+Run all four arms (`jacobi`, `frozen`, `recycling`, `reference`) for repetitions
+0, 1 and 2 in fresh processes. Use eight CPU threads, a 48-hour limit per complete
+sequence and at most four simultaneous sequences. Rotate arm order by repetition.
+The prescribed three targets, physical inputs, 64 slabs and accuracy are unchanged.
+Retain every output and scheduler status, including time-limited sequences.
+
+All arms use the same assessed initial temperature. The explicit
+`shared_temperature` policy allows the new regularization but still verifies the
+physical configuration, target, bound, snapshot and derivative-assessment hashes.
+The optimizer recomputes flows, recovered control and derivatives; no earlier
+gradients, secants or recycling vectors are imported. Ordinary solver use retains
+the default requirement of identical regularization.
+
+Reference deflation constructs its fixed full-domain space from the initial
+coupled trajectory once per complete sequence. Construction includes the extra
+flow evaluation, frozen inverse and the same 48-step seeded energy-metric Krylov
+procedure used by the screen. Every nonlinear update uses the current coupled
+equations. Recycling retains deployed coarse vectors and new search directions,
+then selects with the current frozen inverse in the operator energy metric. Both
+nonzero-rank arms use the selected rank; both controls use rank zero.
+
+Summarize the twelve complete records with:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_confirmation_report \
+  --settings complete-settings.json --records RUN1/record.json RUN2/record.json \
+  RUN3/record.json RUN4/record.json RUN5/record.json RUN6/record.json \
+  RUN7/record.json RUN8/record.json RUN9/record.json RUN10/record.json \
+  RUN11/record.json RUN12/record.json --output complete-development-summary
+```
+
+The summary checks nonlinear accuracy, all inner attempts, nonzero reference
+deployment, field and objective agreement, timing partitions and matched source
+and runtime identities. Five fresh confirmation repetitions require a verified
+development population and lower reference median time than the fastest tested
+alternative. Neither the screening result nor an unfinished baseline establishes
+complete nonlinear acceleration.
