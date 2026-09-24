@@ -553,6 +553,8 @@ def run(config, *, problem_loader=None, target_optimizer=None, numerical_policy=
                 input_sha256=baseline["input_sha256"],
                 state_dofs_per_problem=problem.size,
             )
+            if cfg.get("physics") == "prescribed_flow":
+                metadata["fixed_flow_preparation"] = getattr(problem, "fixed_flow_preparation", {})
             if restore is not None:
                 previous_record = restore["record"]
                 if (

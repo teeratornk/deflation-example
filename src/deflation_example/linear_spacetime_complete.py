@@ -16,6 +16,7 @@ def linear_settings(screen, path=None):
         schema="linear-spacetime-complete-settings-v1",
         physics="prescribed_flow",
         feedback_multiplier=0.0,
+        isothermal_preparation="Independently verify the saved steady flow; refine the same equations to one tenth of the final equation tolerance before freezing. Require relative velocity change at most 1e-6; record the change and charge preparation equally to every arm.",
         scope="Complete three-target linear-quadratic trajectory optimization at the verified isothermal computed velocity. Consistent thermal source and storage actions, all temporal coupling and the initial temperature are retained. Independent residual, thermal, conservation and weighted KKT criteria match the nonlinear comparison. Reference construction is included once per sequence; common calibration and process preparation are separate.",
         comparison_policy="Compare the four solvers within prescribed-flow physics only. The alpha/rank choice is inherited from the bounded coupled screen, not reselected using the linear outcomes. Retain every development outcome. No ratio combines linear and nonlinear optimization times.",
         field_policy="Retain all targets and all time levels. For the 64-slab trajectory, plot targets 7 and 14 at levels 7, 32 and 64 (65.625, 300 and 600 seconds); levels count from one. Plot the optimized temperature, applied control and both active bounds.",

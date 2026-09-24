@@ -5,6 +5,8 @@ isothermal computed velocity stays fixed at every time level; each target is
 one coupled-in-time quadratic optimization, solved directly by PDAS.
 """
 
+from dataclasses import replace
+import hashlib
 import time
 
 import numpy as np
@@ -17,11 +19,92 @@ from .linear_spacetime import FixedFlowProblem, solve_trajectory
 NUMERICAL_POLICY = "fixed-flow-exact-affine-spacetime-pdas-v1"
 
 
+def refine_isothermal(problem, cfg):
+    """Verify the saved flow and, if needed, refine the same steady equations.
+
+    This once-per-sequence work is charged as model preparation. Refinement
+    never uses a desired temperature, optimized control or buoyancy feedback.
+    """
+    tolerance = float(cfg["equation_acceptance_tolerance"]) * 0.1
+    original = problem.initial_flow
+    flow = problem.flow
+    start = time.perf_counter()
+
+    def verify(result):
+        return flow.verify(
+            result,
+            problem.acceleration,
+            problem.boundary_indices,
+            problem.boundary_values,
+            pressure_gauge=problem.pressure_gauge,
+        )
+
+    before = verify(original)
+    refined = original
+    if max(before.values()) > tolerance:
+        refined = flow.solve(
+            problem.acceleration,
+            problem.boundary_indices,
+            problem.boundary_values,
+            initial=original,
+            pressure_gauge=problem.pressure_gauge,
+            method="newton",
+            tolerance=tolerance,
+            max_iterations=cfg["flow_cap"],
+        )
+    after = verify(refined)
+    difference = np.linalg.norm(refined.velocity - original.velocity)
+    norm = np.linalg.norm(original.velocity)
+    relative = difference / norm if norm else difference
+    if (
+        refined.status != "converged"
+        or not np.isfinite(list(after.values())).all()
+        or max(after.values()) > tolerance
+        or relative > 1e-6
+    ):
+        raise ValueError("Isothermal refinement fails accuracy or the fixed-baseline change limit")
+    preparation = {
+        "policy": "Same steady isothermal equations; independent verification with factor-ten margin",
+        "internal_tolerance": tolerance,
+        "maximum_relative_velocity_change": 1e-6,
+        "before": before,
+        "after": after,
+        "velocity_relative_change": float(relative),
+        "velocity_maximum_absolute_change_m_s": float(
+            np.max(np.abs(refined.velocity - original.velocity))
+        ),
+        "pressure_maximum_absolute_change_m2_s2": float(
+            np.max(np.abs(refined.pressure - original.pressure))
+        ),
+        "history": refined.history if refined is not original else [],
+        "velocity_sha256": hashlib.sha256(
+            np.ascontiguousarray(refined.velocity).tobytes()
+        ).hexdigest(),
+        "seconds": time.perf_counter() - start,
+    }
+    problem.initial_flow = refined
+    problem.assembly = problem.assemble(refined.velocity)
+    if not problem.consistent_stabilization:
+        problem.reference_assembly = problem.assembly
+    elif problem.reference_stabilization == "shipped":
+        problem.reference_assembly = replace(
+            problem.assembly, stabilized_storage=None, stabilized_source=None
+        )
+    else:
+        problem.reference_assembly = problem.assemble(
+            refined.velocity, consistent=False, bound_streamline=False
+        )
+    return preparation
+
+
 def load_fixed_flow(cfg):
     if cfg.get("physics") != "prescribed_flow" or cfg.get("feedback_multiplier") != 0:
         raise ValueError("Declare fixed isothermal flow with zero thermal feedback")
     problem, baseline = load_problem(cfg)
-    return FixedFlowProblem(problem), baseline
+    preparation = refine_isothermal(problem, cfg)
+    fixed = FixedFlowProblem(problem)
+    fixed.fixed_flow_preparation = preparation
+    return fixed, baseline
 
 
 def optimize_targets(

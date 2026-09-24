@@ -24,6 +24,13 @@ a new setting after observing its results. It retains targets 7, 15 and 14,
 temperature bounds, and the same assessed initial temperature supplied to
 the nonlinear comparison. Saved coupled velocities are ignored.
 
+Before freezing the isothermal velocity, the loader independently verifies it
+against the same steady momentum equations. If needed, Newton refinement
+reduces the residual to one tenth of the final equation tolerance. A relative
+velocity change greater than `1e-6` stops the comparison. The resulting field,
+change, residuals and refinement cost are recorded; the preparation is charged
+equally within each complete sequence. The saved baseline remains unchanged.
+
 Four arms compare Jacobi-CG, three-sweep frozen preconditioning, improved
 recycling with that inverse, and a fixed full-domain reference with that
 inverse. Reference construction is charged once per sequence. Recycling

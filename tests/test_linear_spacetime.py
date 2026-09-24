@@ -90,7 +90,8 @@ def test_exact_control_and_transpose_match_feedback_disabled_coupled_model(steps
         for level in range(1, len(steps)):
             np.testing.assert_allclose(
                 J[level * n : (level + 1) * n, (level - 1) * n : level * n],
-                -np.linalg.solve(S, C) / steps[level],
+                -np.linalg.solve(S, C) / problem.steps[level],
+                atol=2e-14,
             )
         assert np.count_nonzero(J[:n, n:]) == 0
         vector = np.zeros(problem.size)
@@ -115,6 +116,62 @@ def test_fixed_flow_evaluation_never_runs_momentum_or_uses_saved_flow(monkeypatc
     for state in [np.zeros(problem.size - 1), np.full(problem.size, np.nan)]:
         with pytest.raises(ValueError):
             problem.evaluate(state)
+
+
+def test_independent_checks_detect_corrupt_control_and_temporal_transpose():
+    _, problem, cfg = setup()
+    from deflation_example.coupled_optimize import equation_acceptance
+
+    state = np.linspace(0.03, 0.1, problem.size)
+    final = problem.evaluate(state)
+    final.control[0] += 0.01
+    assert not equation_acceptance(problem.verify(final), cfg)
+    final = problem.evaluate(state)
+    thermal = problem.jacobian.thermal.copy().tolil()
+    n = problem.spatial_size
+    thermal[-n:, -2 * n : -n] = 0
+    problem.jacobian.thermal = thermal.tocsr()
+    report = problem.verify_adjoint(final, np.full(problem.size, 0.2))
+    assert report["gradient_weight_normalized_difference"] > 1e-6
+
+
+@pytest.mark.parametrize("consistent", [False, True])
+def test_nonuniform_capacity_and_physical_time_weights(consistent):
+    physical = small_coupled_problem([0.2, 0.4], feedback=0, consistent=consistent)
+    problem = FixedFlowProblem(physical)
+    state = np.linspace(0.03, 0.11, problem.size)
+    np.testing.assert_allclose(
+        problem.evaluate(state).control, physical.evaluate(state).control, atol=1e-11
+    )
+    mass = physical.assembly.mass[physical.free]
+    np.testing.assert_allclose(
+        problem.weights, np.kron(np.array([0.2, 0.4]) / 0.3, mass / mass.mean())
+    )
+    assert problem.objective_scale == pytest.approx(mass.mean() * physical.steps.mean())
+
+
+def test_isothermal_refinement_is_verified_and_ignores_targets(monkeypatch):
+    physical, _, cfg = setup()
+    cfg.update(equation_acceptance_tolerance=1e-12, flow_cap=20)
+    report = sequence.refine_isothermal(physical, cfg)
+    assert max(report["after"].values()) <= 1e-13
+    assert report["velocity_relative_change"] <= 1e-6
+    assert report["velocity_sha256"]
+    assert report["seconds"] >= 0
+    calls = []
+    verify = physical.flow.verify
+
+    def residual(*args, **kwargs):
+        actual = verify(*args, **kwargs)
+        calls.append(actual)
+        if len(calls) == 1:
+            actual = {**actual, "momentum_relative_residual": 1e-10}
+        return actual
+
+    monkeypatch.setattr(physical.flow, "verify", residual)
+    forced = sequence.refine_isothermal(physical, cfg)
+    assert forced["history"]
+    assert max(forced["after"].values()) <= 1e-13
 
 
 @pytest.mark.parametrize("arm", ["jacobi", "frozen", "reference", "recycling"])
@@ -181,6 +238,9 @@ def test_warm_initial_quadratic_guard_and_custom_kkt():
     assert result.status == "converged" and not result.history
     np.testing.assert_array_equal(result.x, initial)
     np.testing.assert_array_equal(seen[-1], result.x)
+    zero = box_quadratic(H, np.zeros(3), np.ones(3), -1, 1, solver(), initial=np.zeros(3))
+    assert zero.status == "converged" and zero.history == []
+    assert max(zero.kkt.values()) == 0
     for bad in [np.zeros(2), np.full(3, np.inf)]:
         with pytest.raises(ValueError, match="Initial quadratic"):
             box_quadratic(H, g, np.ones(3), -1, 1, solver(), initial=bad)
@@ -280,3 +340,25 @@ def test_linear_protocol_changes_only_feedback_and_declared_physics(tmp_path):
     frozen.write_text(json.dumps(settings))
     with pytest.raises(ValueError, match="declared matched"):
         linear_settings(path, frozen)
+
+
+def test_linear_population_gates_and_physics_separation():
+    from deflation_example.coupled_confirmation_report import summarize
+    from test_coupled_confirmation_report import population
+
+    settings, records, fields = population()
+    for record in records:
+        record["configuration"]["physics"] = "prescribed_flow"
+        for case in record["cases"]:
+            case["pdas_history"] = case.pop("history")[0]["attempts"][0]["qp_history"]
+            case["pdas_steps"] = len(case["pdas_history"])
+    assert summarize(records, settings, fields)["publication_gate_passed"]
+    records[-1]["configuration"]["physics"] = "coupled"
+    with pytest.raises(ValueError, match="settings must match"):
+        summarize(records, settings, fields)
+    records[-1]["configuration"]["physics"] = "prescribed_flow"
+    case = records[-1]["cases"][0]
+    case.update(status="linear_iteration_cap", verified=False)
+    case["pdas_history"][0].update(linear_status="iteration_cap", candidate_retained=False)
+    records[-1].update(all_problems_verified=False, verified_problems=2)
+    assert not summarize(records, settings, fields)["publication_gate_passed"]

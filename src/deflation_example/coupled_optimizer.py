@@ -88,6 +88,10 @@ def box_quadratic(
     normalized by its own right-hand side. This avoids accepting the same inner
     initial guess indefinitely when the linear and quadratic tests use different
     norms. Verify the updated original system and retain every correction cost.
+
+    ``initial`` supplies a warm state, clipped to the declared box. The optional
+    ``kkt_evaluator(state, gradient)`` supplies application-normalized components;
+    the same function checks every retained state and the final returned state.
     """
     tolerance = positive_real(tolerance, "Quadratic KKT tolerance")
     max_steps = integer(max_steps, "Active-set iteration cap", 1)
