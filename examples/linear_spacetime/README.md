@@ -25,11 +25,15 @@ temperature bounds, and the same assessed initial temperature supplied to
 the nonlinear comparison. Saved coupled velocities are ignored.
 
 Before freezing the isothermal velocity, the loader independently verifies it
-against the same steady momentum equations. If needed, Newton refinement
-reduces the residual to one tenth of the final equation tolerance. A relative
-velocity change greater than `1e-6` stops the comparison. The resulting field,
-change, residuals and refinement cost are recorded; the preparation is charged
-equally within each complete sequence. The saved baseline remains unchanged.
+in the actual time-discrete momentum equations. If needed, single Newton
+corrections solve the same steady isothermal equations, retaining candidates
+that improve the independently recomputed time-discrete residual. The final
+criterion remains `1e-12`; the internal step requests a factor-ten margin.
+The steady-baseline check remains `1e-8`, as in the nonlinear loader. A relative
+velocity change greater than `1e-6`, stagnation above final accuracy or an
+exhausted correction budget stops the comparison. The resulting field, all
+attempts, residuals and cost are recorded; preparation is charged equally
+within each complete sequence. The saved baseline remains unchanged.
 
 Four arms compare Jacobi-CG, three-sweep frozen preconditioning, improved
 recycling with that inverse, and a fixed full-domain reference with that

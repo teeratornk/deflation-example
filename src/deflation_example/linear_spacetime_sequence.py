@@ -15,6 +15,7 @@ from .coupled_bounds import temperature_bounds
 from .coupled_optimize import adjoint_acceptance, equation_acceptance, load_problem
 from .coupled_targets import desired_temperature
 from .linear_spacetime import FixedFlowProblem, solve_trajectory
+from .validation import integer, positive_real
 
 NUMERICAL_POLICY = "fixed-flow-exact-affine-spacetime-pdas-v1"
 
@@ -33,40 +34,89 @@ def refine_isothermal(problem, cfg):
     This once-per-sequence work is charged as model preparation. Refinement
     never uses a desired temperature, optimized control or buoyancy feedback.
     """
-    tolerance = float(cfg["equation_acceptance_tolerance"]) * 0.1
+    tolerance = positive_real(cfg["equation_acceptance_tolerance"], "Equation tolerance")
+    cap = integer(cfg["flow_cap"], "Isothermal correction cap", 1)
     original = problem.initial_flow
     flow = problem.flow
     start = time.perf_counter()
 
-    def verify(result):
+    def verify(result, dt=None):
         return flow.verify(
             result,
             problem.acceleration,
             problem.boundary_indices,
             problem.boundary_values,
             pressure_gauge=problem.pressure_gauge,
+            previous=result.velocity if dt is not None else None,
+            time_step=dt,
         )
 
-    before = verify(original)
-    refined = original
-    if max(before.values()) > tolerance:
-        refined = flow.solve(
+    # The constant velocity cancels transient storage analytically. Evaluate
+    # the actual time-discrete equations and their unchanged normalization.
+    steps = np.unique(problem.physical_steps).tolist() if len(problem.physical_steps) else [None]
+
+    def trajectory_checks(result):
+        rows = [verify(result, dt) for dt in steps]
+        return {key: max(row[key] for row in rows) for key in rows[0]}
+
+    def score(checks):
+        values = np.asarray(list(checks.values()))
+        return float(values.max()) if np.isfinite(values).all() and np.all(values >= 0) else np.inf
+
+    steady_before = verify(original)
+    before = trajectory_checks(original)
+    refined, after, history = original, before, []
+    status = "correction_cap"
+    for attempt in range(cap):
+        if score(after) <= tolerance:
+            status = "verified"
+            break
+        if not np.isfinite(score(after)):
+            status = "invalid_residual"
+            break
+        candidate = flow.solve(
             problem.acceleration,
             problem.boundary_indices,
             problem.boundary_values,
-            initial=original,
+            initial=refined,
             pressure_gauge=problem.pressure_gauge,
             method="newton",
-            tolerance=tolerance,
-            max_iterations=cfg["flow_cap"],
+            tolerance=0.1 * tolerance,
+            max_iterations=1,
         )
-    after = verify(refined)
+        candidate_checks = trajectory_checks(candidate)
+        retained = candidate.status in {"converged", "iteration_cap"} and score(
+            candidate_checks
+        ) < score(after)
+        history.append(
+            {
+                "attempt": attempt,
+                "newton_step_budget": 1,
+                "kernel_status": candidate.status,
+                "newton_history": candidate.history,
+                "trajectory_checks": candidate_checks,
+                "candidate_retained": retained,
+            }
+        )
+        if not retained:
+            status = "stagnation_or_kernel_failure"
+            break
+        refined, after = candidate, candidate_checks
+    after = trajectory_checks(refined)
+    if score(after) <= tolerance:
+        status = "verified"
+    steady_after = verify(refined)
     difference = np.linalg.norm(refined.velocity - original.velocity)
     norm = np.linalg.norm(original.velocity)
     relative = difference / norm if norm else difference
     preparation = {
-        "policy": "Same steady isothermal equations; independent verification with factor-ten margin",
-        "internal_tolerance": tolerance,
+        "policy": "Newton corrections of the same steady isothermal equations; independently verify the actual time-discrete residual and retain improving candidates",
+        "internal_tolerance": 0.1 * tolerance,
+        "final_equation_tolerance": tolerance,
+        "residual_time_steps_s": steps,
+        "steady_before": steady_before,
+        "steady_after": steady_after,
+        "steady_baseline_tolerance": 1e-8,
         "maximum_relative_velocity_change": 1e-6,
         "before": before,
         "after": after,
@@ -77,17 +127,18 @@ def refine_isothermal(problem, cfg):
         "pressure_maximum_absolute_change_m2_s2": float(
             np.max(np.abs(refined.pressure - original.pressure))
         ),
-        "history": refined.history if refined is not original else [],
-        "status": refined.status,
+        "history": history,
+        "status": status,
         "velocity_sha256": hashlib.sha256(
             np.ascontiguousarray(refined.velocity).tobytes()
         ).hexdigest(),
         "seconds": time.perf_counter() - start,
     }
     if (
-        refined.status != "converged"
-        or not np.isfinite(list(after.values())).all()
-        or max(after.values()) > tolerance
+        status != "verified"
+        or score(after) > tolerance
+        or score(steady_after) > 1e-8
+        or not np.isfinite(relative)
         or relative > 1e-6
     ):
         raise IsothermalRefinementError(preparation)

@@ -164,7 +164,7 @@ def test_isothermal_refinement_is_verified_and_ignores_targets(monkeypatch):
     def residual(*args, **kwargs):
         actual = verify(*args, **kwargs)
         calls.append(actual)
-        if len(calls) == 1:
+        if 2 <= len(calls) <= 4:
             actual = {**actual, "momentum_relative_residual": 1e-10}
         return actual
 
@@ -349,10 +349,15 @@ def test_linear_population_gates_and_physics_separation():
     settings, records, fields = population()
     for record in records:
         record["configuration"]["physics"] = "prescribed_flow"
+        record["fixed_flow_preparation"] = {"velocity_sha256": "test-fixed-flow"}
         for case in record["cases"]:
             case["pdas_history"] = case.pop("history")[0]["attempts"][0]["qp_history"]
             case["pdas_steps"] = len(case["pdas_history"])
     assert summarize(records, settings, fields)["publication_gate_passed"]
+    records[-1]["fixed_flow_preparation"]["velocity_sha256"] = "changed"
+    with pytest.raises(ValueError, match="settings must match"):
+        summarize(records, settings, fields)
+    records[-1]["fixed_flow_preparation"]["velocity_sha256"] = "test-fixed-flow"
     records[-1]["configuration"]["physics"] = "coupled"
     with pytest.raises(ValueError, match="settings must match"):
         summarize(records, settings, fields)

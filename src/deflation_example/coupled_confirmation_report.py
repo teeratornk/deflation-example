@@ -156,6 +156,13 @@ def summarize(records, settings, fields=None):
             "numerical_policy": record["numerical_policy"],
             "timing_boundary": record["timing_boundary"],
         }
+        if cfg.get("physics") == "prescribed_flow":
+            velocity_hash = record.get("fixed_flow_preparation", {}).get("velocity_sha256")
+            if not velocity_hash:
+                raise ValueError(
+                    "A matched fixed-flow comparison requires the actual velocity checksum"
+                )
+            current["fixed_flow_velocity_sha256"] = velocity_hash
         if record.get("assembly") or cfg.get("stage"):
             raise ValueError("Confirmation requires independently timed single-process sequences")
         if identity is None:

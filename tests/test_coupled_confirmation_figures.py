@@ -73,6 +73,7 @@ def test_fixed_flow_figures_keep_the_physics_label(tmp_path):
     settings, records, fields = measured_population()
     for record in records:
         record["configuration"]["physics"] = "prescribed_flow"
+        record["fixed_flow_preparation"] = {"velocity_sha256": "test-fixed-flow"}
         for case in record["cases"]:
             case["pdas_history"] = case.pop("history")[0]["attempts"][0]["qp_history"]
             case["pdas_steps"] = 1
