@@ -275,13 +275,22 @@ def test_budget_within_qp_retains_partial_work(monkeypatch):
     assert result.history[-1]["attempts"][-1]["qp_history"]
 
 
-def test_stop_inside_cg_keeps_retained_nonlinear_state_and_records_work():
+def test_stop_inside_cg_keeps_retained_nonlinear_state_and_records_work(monkeypatch):
+    import deflation_example.coupled_trust as trust
+
     problem = small_coupled_problem([0.2, 0.35])
     desired = np.full(problem.size, 0.3)
     adapter = solver()
     events, saved = [], []
-    adapter.progress_callback = events.append
-    adapter.stop_requested = lambda: any(e["iteration"] >= 1 for e in events)
+    clock = [0.0]
+    monkeypatch.setattr(trust.time, "perf_counter", lambda: clock[0])
+
+    def progress(event):
+        events.append(event)
+        if event["iteration"] >= 1:
+            clock[0] = 2.0
+
+    adapter.progress_callback = progress
     result = minimize_trust(
         problem,
         desired,
@@ -289,6 +298,7 @@ def test_stop_inside_cg_keeps_retained_nonlinear_state_and_records_work():
         0.2,
         adapter,
         inner_preconditioner="jacobi",
+        budget_seconds=1.0,
         checkpoint=lambda p: saved.append(copy.deepcopy(p)),
     )
     assert result.status == "budget_exhausted"
@@ -302,6 +312,45 @@ def test_stop_inside_cg_keeps_retained_nonlinear_state_and_records_work():
     np.testing.assert_array_equal(result.gradient, gradient)
     np.testing.assert_array_equal(saved[-1]["state"], result.evaluation.state)
     assert saved[-1]["attempts"][-1]["qp_status"] == "linear_budget_exhausted"
+    assert adapter.stop_requested is None
+
+
+def test_checkpoint_exception_restores_callers_stop_callback():
+    problem = small_coupled_problem()
+    adapter = solver()
+
+    def previous():
+        return False
+
+    adapter.stop_requested = previous
+
+    def interrupted(payload):
+        raise OSError("checkpoint unavailable")
+
+    with pytest.raises(OSError, match="checkpoint unavailable"):
+        minimize_trust(
+            problem,
+            np.full(problem.size, 0.3),
+            -0.05,
+            0.2,
+            adapter,
+            checkpoint=interrupted,
+        )
+    assert adapter.stop_requested is previous
+
+
+def test_trust_runtime_rejects_unsupported_gpu_deadline():
+    from deflation_example.study_solvers import StudySolver
+
+    problem = small_coupled_problem()
+    with pytest.raises(ValueError, match="CPU kernel"):
+        minimize_trust(
+            problem,
+            np.full(problem.size, 0.3),
+            -0.05,
+            0.2,
+            StudySolver("jacobi", device="cuda"),
+        )
 
 
 def test_progress_reports_retained_objective_and_stationarity_scale():

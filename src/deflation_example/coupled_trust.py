@@ -80,6 +80,8 @@ def minimize_trust(
     start = time.perf_counter()
     tolerance = positive_real(tolerance, "Nonlinear tolerance")
     budget_seconds = positive_real(budget_seconds, "Optimization time budget")
+    if solver.device != "cpu":
+        raise ValueError("The coupled trust-region runtime requires the CPU kernel")
     max_iterations = integer(max_iterations, "Nonlinear cap", 1)
     qp_cap = integer(qp_cap, "Quadratic cap", 1)
     secant_memory = integer(secant_memory, "Secant memory", 0)
@@ -114,6 +116,11 @@ def minimize_trust(
 
     def elapsed():
         return prior_seconds + time.perf_counter() - start
+
+    previous_stop = solver.stop_requested
+
+    def stop_requested():
+        return elapsed() >= budget_seconds or (previous_stop is not None and previous_stop())
 
     def save(qp=None):
         if checkpoint is not None:
@@ -151,8 +158,9 @@ def minimize_trust(
             raise BudgetReached
 
     status = "nonlinear_iteration_cap"
-    save(qp_resume)
+    solver.stop_requested = stop_requested
     try:
+        save(qp_resume)
         while iteration < max_iterations:
             kkt, scale = optimality(problem, evaluation, desired, gradient, lower, upper)
             error = max(kkt.values())
@@ -340,6 +348,7 @@ def minimize_trust(
         )
     finally:
         solver.rtol = final_rtol
+        solver.stop_requested = previous_stop
     if attempts:
         history.append(
             {
