@@ -93,7 +93,8 @@ The derivative command checks the retained temperature with three central
 difference steps, an independent adjoint assembly and a transpose dot product.
 Run it on a compute node; its flow evaluations are separate diagnostic work.
 
-Only verified three-target results permit the subsequent four-way comparison.
+Verified single-target diagnostics permit the subsequent four-way, three-target
+comparison. Three fresh development repetitions per method precede confirmation.
 Five fresh confirmation repetitions additionally require solution agreement and
-lower reference median time than the fastest tested alternative in all retained
-development repetitions. Interrupted baselines cannot establish speedups.
+lower reference median time than the fastest tested alternative across the
+retained development repetitions. Interrupted baselines cannot establish speedups.
