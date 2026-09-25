@@ -257,6 +257,18 @@ def run(
                     record["status"] = (
                         result.status if result.status != "converged" else "verification_failed"
                     )
+                    for later in range(position + 1, len(cfg["queries"])):
+                        cases.append(
+                            {
+                                "position": later,
+                                "target": cfg["queries"][later]["target"],
+                                "status": "not_run_after_failure",
+                                "verified": False,
+                                "history": [],
+                                "inner_iterations": 0,
+                                "seconds_this_attempt": 0.0,
+                            }
+                        )
                     break
                 previous = result.evaluation
                 guess, optimizer_resume = None, None
@@ -279,7 +291,7 @@ def run(
         if solver is not None:
             solver.close()
         solver = reference = None
-        problem = None
+        problem = result = previous = guess = None
         gc.collect()
         components["cleanup"] = time.perf_counter() - tick
         record.update(

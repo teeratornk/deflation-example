@@ -82,3 +82,48 @@ def test_inner_original_residuals_and_final_strict_phase():
     assert inner_accuracy(case, cfg)
     strict["qp_history"][0]["linear_residual"] = np.nan
     assert not inner_accuracy(case, cfg)
+
+
+def test_verified_selection_requires_solution_agreement_and_actual_checks():
+    from deflation_example.coupled_trust_gate import verified
+
+    rows = records()
+    equation = dict(
+        momentum_relative_residual=1e-13,
+        continuity_relative_residual=1e-13,
+        thermal_relative_residual=1e-13,
+        mass_relative_imbalance=1e-9,
+        energy={"relative_defect": 1e-9},
+    )
+    case = dict(
+        status="converged",
+        verified=True,
+        objective=1.0,
+        history=[],
+        kkt={
+            key: 0.0
+            for key in (
+                "primal_absolute",
+                "stationarity",
+                "dual_feasibility",
+                "lower_complementarity",
+                "upper_complementarity",
+            )
+        },
+        equations=[equation],
+        adjoint=dict(
+            maximum_momentum_adjoint_relative_residual=1e-13,
+            maximum_source_adjoint_relative_residual=1e-13,
+            gradient_weight_normalized_difference=1e-13,
+        ),
+    )
+    for r in rows:
+        r.update(status="complete", all_problems_verified=True, cases=[copy.deepcopy(case)])
+    rows[1]["cumulative_attempt_seconds"] = 90.0
+    result = decision(rows, [np.ones(3), np.ones(3)])
+    assert result["action"] == "evaluate_four_complete_sequences"
+    assert result["accuracy"] == "adaptive"
+    assert decision(rows, [np.ones(3), np.zeros(3)])["action"] == "stop_solution_disagreement"
+    rows[0]["cases"][0]["equations"][0]["thermal_relative_residual"] = 1e-9
+    assert not verified(rows[0])
+    assert verified(rows[1])

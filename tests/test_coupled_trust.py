@@ -167,7 +167,9 @@ def test_nonfinite_checkpoint_arrays_rejected(tmp_path):
 def test_saved_state_derivative_check():
     from deflation_example.coupled_trust_check import check
 
-    problem = small_coupled_problem([0.2, 0.35], consistent=True, streamline_rule="smooth_p8")
+    problem = small_coupled_problem(
+        [0.2, 0.35], consistent=True, streamline_rule="smooth_p8", uniform_capacity=True
+    )
     state = np.linspace(0.02, 0.08, problem.size)
     result = check(problem, state, None, np.full(problem.size, 0.12))
     assert result["derivatives_passed"], result
