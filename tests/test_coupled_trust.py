@@ -275,6 +275,60 @@ def test_budget_within_qp_retains_partial_work(monkeypatch):
     assert result.history[-1]["attempts"][-1]["qp_history"]
 
 
+def test_stop_inside_cg_keeps_retained_nonlinear_state_and_records_work():
+    problem = small_coupled_problem([0.2, 0.35])
+    desired = np.full(problem.size, 0.3)
+    adapter = solver()
+    events, saved = [], []
+    adapter.progress_callback = events.append
+    adapter.stop_requested = lambda: any(e["iteration"] >= 1 for e in events)
+    result = minimize_trust(
+        problem,
+        desired,
+        -0.05,
+        0.2,
+        adapter,
+        inner_preconditioner="jacobi",
+        checkpoint=lambda p: saved.append(copy.deepcopy(p)),
+    )
+    assert result.status == "budget_exhausted"
+    attempt = result.history[-1]["attempts"][-1]
+    assert attempt["qp_status"] == "linear_budget_exhausted"
+    assert sum(s["linear_iterations"] for s in attempt["qp_history"]) == 1
+    assert attempt["qp_history"][-1]["candidate_retained"] is False
+    np.testing.assert_array_equal(result.evaluation.state, np.zeros(problem.size))
+    objective, gradient = problem.objective_gradient(result.evaluation, desired)
+    assert result.objective == objective
+    np.testing.assert_array_equal(result.gradient, gradient)
+    np.testing.assert_array_equal(saved[-1]["state"], result.evaluation.state)
+    assert saved[-1]["attempts"][-1]["qp_status"] == "linear_budget_exhausted"
+
+
+def test_progress_reports_retained_objective_and_stationarity_scale():
+    from deflation_example.coupled_trust import optimality
+
+    problem = small_coupled_problem([0.2, 0.35])
+    desired = np.full(problem.size, 0.3)
+    rows = []
+    result = minimize_trust(
+        problem,
+        desired,
+        -0.05,
+        0.2,
+        solver(),
+        inner_preconditioner="jacobi",
+        max_iterations=1,
+        callback=lambda row, ev: rows.append(copy.deepcopy(row)),
+    )
+    kkt, scale = optimality(problem, result.evaluation, desired, result.gradient, -0.05, 0.2)
+    assert len(rows) == 1
+    retained = rows[0]["retained"]
+    assert retained["objective"] == result.objective
+    assert retained["kkt"] == kkt
+    assert retained["stationarity_scale"] == scale
+    assert retained["stationarity_numerator"] == pytest.approx(kkt["stationarity"] * scale)
+
+
 @pytest.mark.parametrize("method", ["jacobi", "reference", "recycling"])
 @pytest.mark.parametrize("interrupt", [False, True])
 def test_recovery_runner_verifies_complete_small_sequence(tmp_path, monkeypatch, method, interrupt):

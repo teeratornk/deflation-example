@@ -117,13 +117,18 @@ def minimize_trust(
 
     def save(qp=None):
         if checkpoint is not None:
+            retained_kkt, retained_scale = optimality(
+                problem, evaluation, desired, gradient, lower, upper
+            )
             checkpoint(
                 {
                     "state": evaluation.state.copy(),
                     "velocity": np.stack([f.velocity for f in evaluation.flows]),
                     "pressure": np.stack([f.pressure for f in evaluation.flows]),
                     "objective": objective,
-                    "kkt": optimality(problem, evaluation, desired, gradient, lower, upper)[0],
+                    "kkt": retained_kkt,
+                    "stationarity_scale": retained_scale,
+                    "stationarity_numerator": retained_kkt["stationarity"] * retained_scale,
                     "radius_K": radius,
                     "iteration": iteration,
                     "history": list(history),
@@ -206,7 +211,12 @@ def minimize_trust(
             }
             attempts.append(attempt)
             if qp.status != "converged":
-                status = "quadratic_" + qp.status
+                status = (
+                    "budget_exhausted"
+                    if qp.status == "linear_budget_exhausted"
+                    else "quadratic_" + qp.status
+                )
+                save()
                 break
             candidate = np.clip(evaluation.state + qp.x, lower, upper)
             applied_step = candidate - evaluation.state
@@ -296,6 +306,15 @@ def minimize_trust(
                 }
                 evaluation, objective, gradient = trial, value, derivative
                 last_strict = strict
+                retained_kkt, retained_scale = optimality(
+                    problem, evaluation, desired, gradient, lower, upper
+                )
+                row["retained"] = {
+                    "objective": objective,
+                    "kkt": retained_kkt,
+                    "stationarity_scale": retained_scale,
+                    "stationarity_numerator": retained_kkt["stationarity"] * retained_scale,
+                }
                 history.append(row)
                 if callback is not None:
                     callback(row, evaluation)

@@ -44,7 +44,7 @@ def run(
     factors. Those costs remain in the new interval. Earlier attempts remain
     separate; their final wall intervals must be included when aggregating cost.
     """
-    cfg = {"flow_continuation": False, **cfg}
+    cfg = {"flow_continuation": False, "linear_heartbeat_seconds": 30.0, **cfg}
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     env = environment()
@@ -77,6 +77,7 @@ def run(
         "configuration": cfg,
         "environment": env,
         "status": "running",
+        "runtime_policy": "cpu-cg-heartbeat-cooperative-deadline-v1",
         "scope": "Development comparison with checkpoint I/O; separate from frozen timing studies.",
         "resumed": saved is not None,
         "prior_attempt_seconds": prior_total,
@@ -141,11 +142,16 @@ def run(
                 cg_factor=0.1,
                 refresh=cfg["inner_refresh"],
                 residual_policy="refine",
+                stop_requested=lambda: prior_total + time.perf_counter() - start >= budget_seconds,
             )
             if saved is not None:
                 solver.import_history(saved["recycling"])
                 solver.previous = saved["previous_indices"]
-            observe_linear_solves(solver, output / "linear-progress.json")
+            observe_linear_solves(
+                solver,
+                output / "linear-progress.json",
+                heartbeat_seconds=cfg["linear_heartbeat_seconds"],
+            )
             record.update(components_seconds=components)
             write_report(output / "record.json", record)
             optimizer_resume = None if saved is None else saved["optimizer"]

@@ -97,6 +97,8 @@ def verified_refinement(solve, A, b, initial, tolerance, maxiter, max_correction
             best_result, best_attempt = result, attempt
         if residual <= tolerance:
             final_status = "converged"
+        elif result.status == "budget_exhausted":
+            final_status = "budget_exhausted"
         elif not improved:
             final_status = "residual_stagnation"
         elif iterations >= maxiter:

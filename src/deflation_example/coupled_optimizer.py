@@ -221,10 +221,12 @@ def box_quadratic(
                 timing=timing,
             )
             if result.status != "converged":
+                row["candidate_retained"] = False
                 history.append(row)
                 status = "linear_" + result.status
                 break
             if original_residual > solver.rtol:
+                row["candidate_retained"] = False
                 history.append(row)
                 status = "linear_original_residual_failed"
                 break

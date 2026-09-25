@@ -203,8 +203,17 @@ def adjoint_acceptance(report):
     return bool(np.isfinite(values).all() and np.all(values >= 0) and np.all(values <= 1e-8))
 
 
-def observe_linear_solves(solver, destination):
-    """Optional pilot-only progress; file writes are outside inner timer components."""
+def observe_linear_solves(solver, destination, *, heartbeat_seconds=None):
+    """Report each solve and optionally its CPU kernels.
+
+    Enclosing records are outside kernel timers; heartbeat I/O is included in
+    the measured kernel interval. Kernel residuals refer to that kernel's right-
+    hand side, which may be an error equation during residual correction.
+    """
+    if heartbeat_seconds is not None:
+        heartbeat_seconds = positive_real(heartbeat_seconds, "Heartbeat interval")
+        if solver.device != "cpu":
+            raise ValueError("Iteration heartbeats require the CPU kernel")
     solve = solver.solve
     calls = 0
 
@@ -213,7 +222,22 @@ def observe_linear_solves(solver, destination):
         calls += 1
         metadata = {"call": calls, "inactive_dofs": len(b)}
         write_report(destination, {**metadata, "status": "running"})
-        result, metrics = solve(B, b, indices, initial=initial)
+        previous_progress = solver.progress_callback
+        if heartbeat_seconds is not None:
+            from .linear_progress import LinearProgressWriter
+
+            writer = LinearProgressWriter(destination, metadata, heartbeat_seconds)
+
+            def progress(event):
+                writer(event)
+                if previous_progress is not None:
+                    previous_progress(event)
+
+            solver.progress_callback = progress
+        try:
+            result, metrics = solve(B, b, indices, initial=initial)
+        finally:
+            solver.progress_callback = previous_progress
         write_report(
             destination,
             {

@@ -93,6 +93,30 @@ The derivative command checks the retained temperature with three central
 difference steps, an independent adjoint assembly and a transpose dot product.
 Run it on a compute node; its flow evaluations are separate diagnostic work.
 
+### Iteration-level monitoring
+
+The subsequent `cpu-cg-heartbeat-cooperative-deadline-v1` runtime adds CPU CG
+heartbeats approximately every 30 seconds. Each heartbeat identifies the current
+kernel, its iteration count, and whether the reported residual comes from the
+recurrence or a fresh matrix application. During residual correction, the kernel
+right-hand side is the error-equation load. Final acceptance still checks the
+original inactive system. Heartbeat I/O is included in the measured solve time.
+
+The deadline is checked before coarse construction and between CG iterations.
+A stopped solve verifies its returned candidate; residual correction retains the
+best verified state and performs no further error solves after the deadline.
+Unfinished inner solves do not update the retained nonlinear temperature.
+Native matrix operations, factorizations, and final verification remain
+noninterruptible, so this is a cooperative limit with verification time in
+addition to the numerical budget. The scheduler's hard limit remains separate.
+
+Nonlinear progress now includes a `retained` entry with the updated objective,
+physical KKT components, stationarity numerator and normalization scale. The
+existing top-level objective and KKT describe the state before the step.
+These changes have a separate numerical source. The strict/adaptive runs at
+`bc212fed` keep their original runtime; their records are not attributed to this
+later implementation. Source-bound checkpoints refuse cross-version restarts.
+
 Verified single-target diagnostics permit the subsequent four-way, three-target
 comparison. Three fresh development repetitions per method precede confirmation.
 Five fresh confirmation repetitions additionally require solution agreement and

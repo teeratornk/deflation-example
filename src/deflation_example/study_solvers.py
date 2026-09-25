@@ -55,6 +55,8 @@ class StudySolver:
         api=None,
         resident_recycling=False,
         residual_policy="terminal",
+        progress_callback=None,
+        stop_requested=None,
     ):
         if method not in METHODS or device not in {"cpu", "cuda"}:
             raise ValueError("Unknown study solver or device")
@@ -62,6 +64,13 @@ class StudySolver:
             raise ValueError("AmgX requires its native binding and a CUDA device")
         if method == "reference" and reference is None:
             raise ValueError("Reference deflation requires a declared full-domain reference")
+        for callback in (progress_callback, stop_requested):
+            if callback is not None and not callable(callback):
+                raise ValueError("Progress and stop callbacks must be callable")
+        if device != "cpu" and (progress_callback is not None or stop_requested is not None):
+            raise ValueError("Iteration monitoring and cooperative stops require the CPU kernel")
+        self.progress_callback, self.stop_requested = progress_callback, stop_requested
+        self.kernel_calls = 0
         self.rank = integer(rank, "Rank")
         self.window = integer(window, "Direction window", 1)
         self.rtol = positive_real(rtol, "Final relative tolerance")
@@ -269,6 +278,17 @@ class StudySolver:
             )
         else:
             tick = time.perf_counter()
+            self.kernel_calls += 1
+
+            def progress(event):
+                self.progress_callback(
+                    {
+                        **event,
+                        "kernel_call": self.kernel_calls,
+                        "kernel_rtol": target * self.cg_factor,
+                    }
+                )
+
             result = deflated_cg(
                 B,
                 b,
@@ -282,6 +302,8 @@ class StudySolver:
                 direction_callback=None if self.history is None else self.history.capture,
                 coarse_factory=self.coarse_factory,
                 preconditioner=preconditioner,
+                progress_callback=None if self.progress_callback is None else progress,
+                stop_requested=self.stop_requested,
             )
             kernel_seconds = time.perf_counter() - tick
             if result.status in {"maxiter", "residual_failed"} and result.residual <= target:

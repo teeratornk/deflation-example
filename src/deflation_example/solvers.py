@@ -124,6 +124,8 @@ def deflated_cg(
     coarse_factory=None,
     preconditioner=None,
     coarse_coupling="multiplicative",
+    progress_callback=None,
+    stop_requested=None,
 ):
     """Coarse-corrected, projected-direction CG (exact-coarse A-DEF2).
 
@@ -147,6 +149,12 @@ def deflated_cg(
     two-level form ``M^-1 + Z E^-1 Z'`` reuses the residual already in hand and is a coarse-grid
     correction of two-level preconditioning. The initial and restart coarse corrections
     are unchanged: both forms start from a coarse-corrected iterate.
+
+    Optional progress events identify recurrence and independently recomputed
+    residuals of this kernel's right-hand side. A cooperative stop is checked
+    before coarse construction and between iterations. Native matrix operations
+    remain noninterruptible; final verification always evaluates the returned
+    state. A verified solution takes precedence over a stop request.
     """
     A = matrix(A)
     if direction_callback is not None and not callable(direction_callback):
@@ -155,6 +163,9 @@ def deflated_cg(
         raise ValueError("Coarse-space factory must be callable")
     if preconditioner is not None and not callable(preconditioner):
         raise ValueError("A preconditioner must be callable")
+    for callback in (progress_callback, stop_requested):
+        if callback is not None and not callable(callback):
+            raise ValueError("Progress and stop callbacks must be callable")
     if coarse_coupling not in {"multiplicative", "additive"}:
         raise ValueError("Choose multiplicative or additive coarse coupling")
     flexible = preconditioner is not None
@@ -163,12 +174,39 @@ def deflated_cg(
     b, x, d = validate_linear_inputs(
         A, b, basis, diagonal, x0, rtol, maxiter, refresh, condition_limit
     )
+
+    def finish(result):
+        if progress_callback is not None:
+            progress_callback(
+                {
+                    "stage": "final",
+                    "iteration": result.iterations,
+                    "residual": result.residual,
+                    "residual_kind": "independently_recomputed",
+                    "residual_scope": "current_kernel_rhs",
+                    "status": result.status,
+                }
+            )
+        return result
+
+    if stop_requested is not None and stop_requested():
+        residual = independent_residual(A, x, b)
+        return finish(
+            LinearResult(x, 0, residual, "converged" if residual <= rtol else "budget_exhausted")
+        )
     space = (CpuCoarseSpace if coarse_factory is None else coarse_factory)(
         A, basis, condition_limit
     )
     if space.breakdown:
-        return LinearResult(
-            x, 0, independent_residual(A, x, b), "breakdown", space.requested_rank, space.condition
+        return finish(
+            LinearResult(
+                x,
+                0,
+                independent_residual(A, x, b),
+                "breakdown",
+                space.requested_rank,
+                space.condition,
+            )
         )
     rank, condition, fallback = space.rank, space.condition, space.fallback
 
@@ -188,13 +226,29 @@ def deflated_cg(
     x += Q(b - A @ x)
     r = b - A @ x
     if relative_norm(r, b) <= rtol:
-        return LinearResult(
-            x, 0, independent_residual(A, x, b), "converged", rank, condition, fallback
+        return finish(
+            LinearResult(
+                x, 0, independent_residual(A, x, b), "converged", rank, condition, fallback
+            )
+        )
+    if progress_callback is not None:
+        progress_callback(
+            {
+                "stage": "initial",
+                "iteration": 0,
+                "residual": relative_norm(r, b),
+                "residual_kind": "independently_recomputed",
+                "residual_scope": "current_kernel_rhs",
+                "status": "running",
+            }
         )
     z = precondition(r)
     p, rz = z.copy(), float(r @ z)
     status, iterations = "maxiter", 0
     for k in range(maxiter):
+        if stop_requested is not None and stop_requested():
+            status = "budget_exhausted"
+            break
         if direction_callback is not None:
             direction_callback(p.copy())
         Ap = A @ p
@@ -218,6 +272,17 @@ def deflated_cg(
             if relative_norm(r, b) <= rtol:
                 status = "converged"
                 break
+        if progress_callback is not None:
+            progress_callback(
+                {
+                    "stage": "iteration",
+                    "iteration": iterations,
+                    "residual": relative_norm(r, b),
+                    "residual_kind": "independently_recomputed" if restart else "recurrence",
+                    "residual_scope": "current_kernel_rhs",
+                    "status": "running",
+                }
+            )
         z = precondition(r)
         rz_new = float(r @ z)
         if restart:
@@ -235,7 +300,7 @@ def deflated_cg(
         status = "converged"
     elif status == "converged":
         status = "residual_failed"
-    return LinearResult(x, iterations, residual, status, rank, condition, fallback)
+    return finish(LinearResult(x, iterations, residual, status, rank, condition, fallback))
 
 
 def validate_linear_inputs(A, b, basis, diagonal, x0, rtol, maxiter, refresh, condition_limit):
