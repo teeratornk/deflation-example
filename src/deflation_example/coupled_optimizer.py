@@ -77,6 +77,8 @@ def box_quadratic(
     preconditioner_factory=None,
     initial=None,
     kkt_evaluator=None,
+    checkpoint=None,
+    resume=None,
 ):
     """Solve min 0.5*x.T H x + gradient.T x under two-sided finite bounds.
 
@@ -130,7 +132,23 @@ def box_quadratic(
     status = "active_set_cap"
     previous_partition = None
     corrections = 0
-    for step in range(max_steps):
+    first_step = 0
+    if resume is not None:
+        x = np.asarray(resume["x"], dtype=float).copy()
+        previous_partition = np.asarray(resume["partition"], dtype=np.int8).copy()
+        corrections = integer(resume["corrections"], "Restored correction count", 0)
+        first_step = integer(resume["next_step"], "Restored active-set step", 0)
+        history = list(resume["history"])
+        if (
+            x.shape != g.shape
+            or not np.isfinite(x).all()
+            or previous_partition.shape != g.shape
+            or not np.isin(previous_partition, [-1, 0, 1]).all()
+            or first_step != len(history)
+            or first_step > max_steps
+        ):
+            raise ValueError("Invalid quadratic checkpoint")
+    for step in range(first_step, max_steps):
         current_gradient = H @ x + g
         kkt = assess(x, current_gradient)
         if max(kkt.values()) <= tolerance:
@@ -224,6 +242,17 @@ def box_quadratic(
         x = fixed
         previous_partition = partition
         history.append(row)
+        if checkpoint is not None:
+            checkpoint(
+                {
+                    "x": x.copy(),
+                    "partition": partition.copy(),
+                    "corrections": corrections,
+                    "next_step": step + 1,
+                    "history": list(history),
+                    "kkt": assess(x, H @ x + g),
+                }
+            )
     kkt = assess(x, H @ x + g)
     if status == "active_set_cap" and max(kkt.values()) <= tolerance:
         status = "converged"

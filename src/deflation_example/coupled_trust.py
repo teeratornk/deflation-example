@@ -1,0 +1,334 @@
+"""Temperature-step trust regions for prescribed-temperature coupled optimization.
+
+Temporary step bounds constrain quadratic models only. Final KKT conditions use
+the physical bounds. This policy is separate from the archived line search.
+"""
+
+import time
+
+import numpy as np
+
+from .coupled_control import FlowEvaluationError
+from .coupled_derivatives import GaussNewtonOperator, StabilizationBranchError
+from .coupled_optimizer import CoupledOptimum, NUMERICAL_POLICY, box_kkt, box_quadratic
+from .coupled_sequence import RestoredEvaluation
+from .validation import integer, positive_real
+
+
+POLICY = {
+    "identifier": "coupled-temperature-trust-v1",
+    "initial_radius_K": 0.25,
+    "minimum_radius_K": 1e-6,
+    "maximum_radius_K": 2.0,
+    "acceptance_ratio": 0.1,
+    "expansion_ratio": 0.75,
+    "boundary_fraction": 0.9,
+    "strict_switch_kkt": 1e-4,
+}
+
+
+def optimality(problem, evaluation, desired, gradient, lower, upper):
+    scaled = gradient / problem.weights
+    scale = max(
+        1.0,
+        float(np.max(np.abs(evaluation.state - desired))),
+        float(np.max(np.abs(scaled - (evaluation.state - desired)))),
+    )
+    return box_kkt(evaluation.state, scaled, lower, upper, scale), scale
+
+
+def radius_update(radius, ratio, boundary, *, flow_failed=False):
+    if flow_failed or not np.isfinite(ratio) or ratio < POLICY["acceptance_ratio"]:
+        return radius * 0.5, False
+    if ratio > POLICY["expansion_ratio"] and boundary:
+        radius = min(POLICY["maximum_radius_K"], 2 * radius)
+    return radius, True
+
+
+def intermediate_targets(kkt, mode, qp_tolerance, linear_tolerance):
+    if mode not in {"strict", "adaptive"}:
+        raise ValueError("Choose strict or adaptive intermediate accuracy")
+    if mode == "strict" or kkt <= POLICY["strict_switch_kkt"]:
+        return qp_tolerance, linear_tolerance, True
+    # This target uses the same weight-normalized equations as outer optimality.
+    target = max(qp_tolerance, min(1e-2, 0.1 * kkt**1.5))
+    return target, max(linear_tolerance, min(1e-4, 0.1 * target)), False
+
+
+def minimize_trust(
+    problem,
+    desired,
+    lower,
+    upper,
+    solver,
+    *,
+    initial=None,
+    initial_evaluation=None,
+    tolerance=1e-8,
+    max_iterations=100,
+    qp_tolerance=1e-10,
+    qp_cap=100,
+    secant_memory=10,
+    inner_preconditioner="frozen",
+    frozen_sweeps=3,
+    accuracy="strict",
+    callback=None,
+    checkpoint=None,
+    resume=None,
+    budget_seconds=86400.0,
+):
+    start = time.perf_counter()
+    tolerance = positive_real(tolerance, "Nonlinear tolerance")
+    budget_seconds = positive_real(budget_seconds, "Optimization time budget")
+    max_iterations = integer(max_iterations, "Nonlinear cap", 1)
+    qp_cap = integer(qp_cap, "Quadratic cap", 1)
+    secant_memory = integer(secant_memory, "Secant memory", 0)
+    if inner_preconditioner not in {"jacobi", "frozen"}:
+        raise ValueError("Choose Jacobi or frozen preconditioning")
+    lower = np.broadcast_to(lower, (problem.size,)).astype(float).copy()
+    upper = np.broadcast_to(upper, (problem.size,)).astype(float).copy()
+    if not np.isfinite([lower, upper]).all() or np.any(lower >= upper):
+        raise ValueError("Finite strictly ordered physical bounds are required")
+    final_rtol = solver.rtol
+    intermediate_targets(1.0, accuracy, qp_tolerance, final_rtol)
+    radius, history, secants = POLICY["initial_radius_K"], [], []
+    iteration, attempts, qp_resume = 0, [], None
+    prior_seconds = 0.0
+    pending_qp = None
+    if resume is not None:
+        initial = resume["state"]
+        initial_evaluation = RestoredEvaluation(initial, resume["velocity"], resume["pressure"])
+        radius, history, secants = resume["radius_K"], resume["history"], resume["secants"]
+        iteration, attempts, qp_resume = resume["iteration"], resume["attempts"], resume["qp"]
+        prior_seconds = resume["elapsed_seconds"]
+        if not POLICY["minimum_radius_K"] <= radius <= POLICY["maximum_radius_K"]:
+            raise ValueError("Invalid checkpoint trust radius")
+    y = np.zeros(problem.size) if initial is None else np.asarray(initial, dtype=float).copy()
+    if y.shape != (problem.size,) or not np.isfinite(y).all():
+        raise ValueError("Initial state must be finite and match the trajectory")
+    evaluation = problem.evaluate(np.clip(y, lower, upper), initial=initial_evaluation)
+    objective, gradient = problem.objective_gradient(evaluation, desired)
+    last_strict = (
+        resume.get("last_strict", accuracy == "strict") if resume else accuracy == "strict"
+    )
+
+    def elapsed():
+        return prior_seconds + time.perf_counter() - start
+
+    def save(qp=None):
+        if checkpoint is not None:
+            checkpoint(
+                {
+                    "state": evaluation.state.copy(),
+                    "velocity": np.stack([f.velocity for f in evaluation.flows]),
+                    "pressure": np.stack([f.pressure for f in evaluation.flows]),
+                    "objective": objective,
+                    "kkt": optimality(problem, evaluation, desired, gradient, lower, upper)[0],
+                    "radius_K": radius,
+                    "iteration": iteration,
+                    "history": list(history),
+                    "secants": list(secants),
+                    "attempts": list(attempts),
+                    "qp": qp,
+                    "elapsed_seconds": elapsed(),
+                    "last_strict": last_strict,
+                }
+            )
+
+    class BudgetReached(Exception):
+        pass
+
+    def qp_checkpoint(payload):
+        nonlocal pending_qp
+        pending_qp = payload
+        save(payload)
+        if elapsed() >= budget_seconds:
+            raise BudgetReached
+
+    status = "nonlinear_iteration_cap"
+    save(qp_resume)
+    try:
+        while iteration < max_iterations:
+            kkt, scale = optimality(problem, evaluation, desired, gradient, lower, upper)
+            error = max(kkt.values())
+            if error <= tolerance and last_strict:
+                status = "converged"
+                break
+            if elapsed() >= budget_seconds:
+                status = "budget_exhausted"
+                break
+            qtol, ltol, strict = intermediate_targets(error, accuracy, qp_tolerance, final_rtol)
+            # A loose intermediate step cannot be the last numerical solve.
+            force_strict = error <= tolerance and not last_strict
+            if force_strict:
+                qtol = min(qtol, max(np.finfo(float).eps, error * 0.1))
+            H = GaussNewtonOperator(evaluation.jacobian, problem.weights, problem.alpha)
+            if secants:
+                from .coupled_secant import SecantGaussNewton
+
+                H = SecantGaussNewton(H, secants)
+            diagonal = problem.preconditioning_diagonal(evaluation, 0.0)
+            delta = radius / problem.temperature_scale
+            lo = np.maximum(lower - evaluation.state, -delta)
+            hi = np.minimum(upper - evaluation.state, delta)
+            factory = None
+            if inner_preconditioner == "frozen":
+                from .coupled_frozen_preconditioner import frozen_preconditioner_factory
+
+                factory = frozen_preconditioner_factory(problem, evaluation, sweeps=frozen_sweeps)
+            solver.rtol = ltol
+            pending_qp = None
+            qp = box_quadratic(
+                H,
+                gradient,
+                diagonal,
+                lo,
+                hi,
+                solver,
+                tolerance=qtol,
+                max_steps=qp_cap,
+                preconditioner_factory=factory,
+                kkt_evaluator=lambda x, g: box_kkt(x, g / problem.weights, lo, hi, scale),
+                checkpoint=qp_checkpoint,
+                resume=qp_resume,
+            )
+            solver.rtol = final_rtol
+            qp_resume = None
+            attempt = {
+                "radius_K": radius,
+                "qp_status": qp.status,
+                "qp_kkt": qp.kkt,
+                "qp_history": qp.history,
+                "qp_tolerance": qtol,
+                "linear_tolerance": ltol,
+                "strict_accuracy": strict,
+                "trials": [],
+            }
+            attempts.append(attempt)
+            if qp.status != "converged":
+                status = "quadratic_" + qp.status
+                break
+            predicted = -float(gradient @ qp.x + 0.5 * qp.x @ (H @ qp.x))
+            candidate = np.clip(evaluation.state + qp.x, lower, upper)
+            physical_step = (
+                float(np.max(np.abs(candidate - evaluation.state))) * problem.temperature_scale
+            )
+            attempt.update(predicted_reduction=predicted, temperature_step_K=physical_step)
+            trial = None
+            ratio = float("nan")
+            accepted = False
+            if np.isfinite(predicted) and predicted > 0:
+                try:
+                    trial = problem.evaluate(candidate, initial=evaluation)
+                    value, derivative = problem.objective_gradient(trial, desired)
+                    change = problem.objective_difference(trial, evaluation, desired)
+                    finite = np.isfinite([value, change]).all() and np.isfinite(derivative).all()
+                    ratio = -change / predicted if finite else float("nan")
+                    trial_kkt, _ = optimality(problem, trial, desired, derivative, lower, upper)
+                    new_radius, accepted = radius_update(
+                        radius, ratio, physical_step >= 0.9 * radius
+                    )
+                    allowance = (
+                        NUMERICAL_POLICY["roundoff_epsilon_factor"]
+                        * np.finfo(float).eps
+                        * max(1.0, abs(objective))
+                    )
+                    roundoff = (
+                        finite
+                        and not accepted
+                        and error <= NUMERICAL_POLICY["roundoff_kkt_threshold"]
+                        and predicted <= allowance
+                        and change <= allowance
+                        and max(trial_kkt.values())
+                        <= NUMERICAL_POLICY["roundoff_kkt_contraction"] * error
+                    )
+                    accepted = accepted or roundoff
+                    attempt["trials"].append(
+                        {
+                            "status": "roundoff_kkt_decrease"
+                            if roundoff
+                            else "decrease"
+                            if accepted
+                            else "insufficient_decrease",
+                            "step": 1.0,
+                            "objective": value,
+                            "objective_change": change,
+                            "reduction_ratio": ratio,
+                            "maximum_kkt": max(trial_kkt.values()),
+                            "evaluation_seconds": trial.seconds,
+                        }
+                    )
+                    radius = radius if roundoff else new_radius
+                except FlowEvaluationError as failure:
+                    attempt["trials"].append(
+                        {
+                            "status": "flow_" + failure.result.status,
+                            "slab": failure.slab,
+                            "metrics": failure.metrics,
+                            "flow_history": failure.result.history,
+                        }
+                    )
+                    radius *= 0.5
+                except StabilizationBranchError:
+                    attempt["trials"].append({"status": "stabilization_branch_switch"})
+                    radius *= 0.5
+            elif force_strict and not np.any(qp.x):
+                # Strict zero increment independently verifies stationarity.
+                last_strict = True
+                save()
+                continue
+            else:
+                attempt["trials"].append({"status": "nonpositive_predicted_reduction"})
+                radius *= 0.5
+            if accepted:
+                if secant_memory:
+                    secants.append((trial.state - evaluation.state, derivative - gradient))
+                    secants = secants[-secant_memory:]
+                row = {
+                    "iteration": iteration,
+                    "objective": objective,
+                    "kkt": kkt,
+                    "evaluation_seconds": evaluation.seconds,
+                    "attempts": list(attempts),
+                }
+                evaluation, objective, gradient = trial, value, derivative
+                last_strict = strict
+                history.append(row)
+                if callback is not None:
+                    callback(row, evaluation)
+                iteration += 1
+                attempts = []
+            if radius < POLICY["minimum_radius_K"]:
+                status = "trust_radius_exhausted"
+                break
+            save()
+    except BudgetReached:
+        status = "budget_exhausted"
+        attempts.append(
+            {
+                "radius_K": radius,
+                "qp_status": status,
+                "qp_kkt": pending_qp["kkt"],
+                "qp_history": pending_qp["history"],
+                "qp_tolerance": qtol,
+                "linear_tolerance": ltol,
+                "strict_accuracy": strict,
+                "trials": [],
+            }
+        )
+    finally:
+        solver.rtol = final_rtol
+    if attempts:
+        history.append(
+            {
+                "iteration": iteration,
+                "objective": objective,
+                "kkt": optimality(problem, evaluation, desired, gradient, lower, upper)[0],
+                "evaluation_seconds": evaluation.seconds,
+                "attempts": attempts,
+            }
+        )
+    kkt, _ = optimality(problem, evaluation, desired, gradient, lower, upper)
+    if max(kkt.values()) <= tolerance and last_strict and status == "nonlinear_iteration_cap":
+        status = "converged"
+    return CoupledOptimum(evaluation, objective, gradient, kkt, status, history, elapsed())
