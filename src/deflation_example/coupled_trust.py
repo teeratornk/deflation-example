@@ -208,8 +208,11 @@ def minimize_trust(
             if qp.status != "converged":
                 status = "quadratic_" + qp.status
                 break
-            predicted = -float(gradient @ qp.x + 0.5 * qp.x @ (H @ qp.x))
             candidate = np.clip(evaluation.state + qp.x, lower, upper)
+            applied_step = candidate - evaluation.state
+            # The model ratio must describe the increment actually evaluated,
+            # including any final roundoff-sized projection onto physical bounds.
+            predicted = -float(gradient @ applied_step + 0.5 * applied_step @ (H @ applied_step))
             physical_step = (
                 float(np.max(np.abs(candidate - evaluation.state))) * problem.temperature_scale
             )

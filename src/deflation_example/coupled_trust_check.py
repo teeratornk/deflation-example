@@ -76,7 +76,9 @@ def main():
     saved = payload["optimizer"] or payload["previous_solution"]
     if saved is None:
         raise ValueError("The checkpoint has no retained temperature")
-    position = min(payload["position"], len(cfg["queries"]) - 1)
+    position = payload["position"] - (payload["optimizer"] is None)
+    if not 0 <= position < len(cfg["queries"]):
+        raise ValueError("Checkpoint state has no corresponding target")
     with threadpool_limits(cfg["threads"]):
         problem, _ = load_problem(cfg)
         guess = RestoredEvaluation(saved["state"], saved["velocity"], saved["pressure"])

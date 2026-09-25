@@ -1,6 +1,7 @@
 """Bounded, recoverable development runs of coupled temperature trust regions."""
 
 import argparse
+import gc
 import json
 from pathlib import Path
 import time
@@ -90,7 +91,7 @@ def run(
     sampler.start()
     record["process_preparation_seconds"] = time.perf_counter() - tick
     start = time.perf_counter()
-    solver, reference = None, None
+    solver, reference, problem = None, None, None
     components = {}
     cases = [] if saved is None else list(saved["cases"])
     position = 0 if saved is None else saved["position"]
@@ -278,6 +279,8 @@ def run(
         if solver is not None:
             solver.close()
         solver = reference = None
+        problem = None
+        gc.collect()
         components["cleanup"] = time.perf_counter() - tick
         record.update(
             cases=cases,
