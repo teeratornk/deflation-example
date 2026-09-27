@@ -74,6 +74,7 @@ def decision(
         "capture_trials",
         "optimizer_policy",
         "linear_heartbeat_seconds",
+        "capture_linear_systems",
     }
     original_cfg = {k: v for k, v in adaptive["configuration"].items() if k not in changed_keys}
     for record in repairs:

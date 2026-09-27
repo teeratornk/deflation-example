@@ -90,7 +90,7 @@ def test_captured_temperature_replays_on_small_coupled_problem(tmp_path):
     from deflation_example.coupled_trial_replay import replay
     from test_coupled_derivatives import small_coupled_problem
 
-    problem = small_coupled_problem([0.2, 0.35])
+    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
     base = problem.evaluate(np.zeros(problem.size))
     candidate = np.full(problem.size, 0.03)
     writer = TrialCapture(tmp_path / "trials", "test")

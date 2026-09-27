@@ -87,6 +87,7 @@ def minimize_trust(
     accuracy="strict",
     trial_policy="radius_rebuild",
     trial_callback=None,
+    observer=None,
     callback=None,
     checkpoint=None,
     resume=None,
@@ -206,6 +207,26 @@ def minimize_trust(
             delta = radius / problem.temperature_scale
             lo = np.maximum(lower - evaluation.state, -delta)
             hi = np.minimum(upper - evaluation.state, delta)
+            if observer is not None:
+                observer.begin_quadratic(
+                    iteration,
+                    len(attempts),
+                    evaluation,
+                    desired,
+                    gradient,
+                    diagonal,
+                    0.0,
+                    secants,
+                    evaluation.state + lo,
+                    evaluation.state + hi,
+                )
+                observer.record["quadratics"][-1].update(
+                    trust_radius_K=radius,
+                    linear_tolerance=ltol,
+                    qp_tolerance=qtol,
+                    strict_accuracy=strict,
+                )
+                observer.save()
             factory = None
             if inner_preconditioner == "frozen":
                 from .coupled_frozen_preconditioner import frozen_preconditioner_factory
@@ -226,6 +247,7 @@ def minimize_trust(
                 kkt_evaluator=lambda x, g: box_kkt(x, g / problem.weights, lo, hi, scale),
                 checkpoint=qp_checkpoint,
                 resume=qp_resume,
+                observer=observer,
             )
             solver.rtol = final_rtol
             qp_resume = None

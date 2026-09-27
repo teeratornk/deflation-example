@@ -30,7 +30,7 @@ uv run --no-sync python -m deflation_example.coupled_trust_run \
   --screen regularization-summary/summary.json --settings nonlinear-settings.json \
   --optimization NOMINAL_OPTIMIZATION --baseline BASELINE \
   --initial-snapshot INITIAL_SNAPSHOT --initial-assessment ASSESSMENT.json \
-  --arm frozen --accuracy adaptive --trial-policy backtrack --capture-trials \
+  --arm frozen --accuracy adaptive --trial-policy backtrack --capture-trials --capture-linear-systems \
   --output backtrack
 ```
 
@@ -38,6 +38,10 @@ Repeat with `--continuation --output backtrack-continuation`. Both final solutio
 must satisfy the original equations. The continuation removes an artificial
 residual load; it does not change viscosity, buoyancy, time steps or boundary data.
 All trial capture and continuation work is included in the diagnostic interval.
+The inactive-system trace records the actual right-hand sides, initial guesses,
+temperature and flow states, secants and internal accuracy targets. It also
+records whether the trajectory meets final verification. This additional I/O
+belongs to the diagnostic cost, separately from later uninterrupted timings.
 
 ```sh
 uv run --no-sync python -m deflation_example.coupled_backtrack_gate \

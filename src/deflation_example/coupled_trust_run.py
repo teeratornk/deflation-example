@@ -24,6 +24,7 @@ from .coupled_sequence import RestoredEvaluation
 from .coupled_targets import desired_temperature
 from .coupled_trust import minimize_trust, policy_description
 from .coupled_trial_capture import TrialCapture
+from .coupled_trace import CoupledTrace
 from .memory import ProcessMemory
 from .reporting import environment, file_sha256, write_arrays, write_report
 from .study_solvers import ArrayReference, StudySolver
@@ -50,12 +51,13 @@ def run(
         "linear_heartbeat_seconds": 30.0,
         "trial_policy": "radius_rebuild",
         "capture_trials": False,
+        "capture_linear_systems": False,
         **cfg,
     }
     if cfg["trial_policy"] not in {"radius_rebuild", "backtrack"}:
         raise ValueError("Unknown trial policy")
-    if not isinstance(cfg["capture_trials"], bool):
-        raise ValueError("Trial capture must be Boolean")
+    if any(not isinstance(cfg[k], bool) for k in ("capture_trials", "capture_linear_systems")):
+        raise ValueError("Diagnostic capture settings must be Boolean")
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     env = environment()
@@ -211,6 +213,15 @@ def run(
                     if cfg["capture_trials"]
                     else None
                 )
+                trace = (
+                    CoupledTrace(
+                        output / f"inactive-trace-{position:02d}", cfg, baseline["baseline_sha256"]
+                    )
+                    if cfg["capture_linear_systems"]
+                    else None
+                )
+                if trace is not None:
+                    trace.record["resumed"] = saved is not None
                 result = minimize_trust(
                     problem,
                     desired,
@@ -231,6 +242,7 @@ def run(
                     accuracy=cfg["trust_accuracy"],
                     trial_policy=cfg["trial_policy"],
                     trial_callback=capture,
+                    observer=trace,
                     checkpoint=save_optimizer,
                     resume=optimizer_resume,
                     budget_seconds=max(
@@ -250,6 +262,11 @@ def run(
                     and equation_acceptance(checks, cfg)
                     and adjoint_acceptance(adjoint)
                 )
+                if trace is not None:
+                    trace.record.update(
+                        optimizer_status=result.status, optimization_verified=verified
+                    )
+                    trace.finish()
                 case = {
                     "position": position,
                     "target": query["target"],
@@ -358,6 +375,7 @@ def main():
         "--trial-policy", choices=("radius_rebuild", "backtrack"), default="radius_rebuild"
     )
     parser.add_argument("--capture-trials", action="store_true")
+    parser.add_argument("--capture-linear-systems", action="store_true")
     parser.add_argument("--complete-sequence", action="store_true")
     parser.add_argument("--resume-from", type=Path)
     parser.add_argument("--prior-attempt-seconds", type=float)
@@ -381,6 +399,7 @@ def main():
         optimizer_policy=policy_description(args.trial_policy)["identifier"],
         trial_policy=args.trial_policy,
         capture_trials=args.capture_trials,
+        capture_linear_systems=args.capture_linear_systems,
     )
     # Resolve through the same configuration type used by the other runners.
     cfg = OmegaConf.to_container(OmegaConf.create(cfg), resolve=True)

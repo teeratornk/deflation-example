@@ -229,6 +229,42 @@ def test_checkpoint_rejects_policy_change_and_resumes_same_policy():
     np.testing.assert_allclose(result.evaluation.state, 0.3)
 
 
+def test_trace_preserves_trajectory_and_actual_quadratic_equations(tmp_path):
+    from deflation_example.coupled_retention_replay import rebuild
+    from deflation_example.coupled_trace import CoupledTrace, read_arrays, read_manifest
+
+    problem = small_coupled_problem([0.2, 0.35])
+    desired = np.linspace(-0.2, 0.4, problem.size)
+    arguments = dict(inner_preconditioner="jacobi", trial_policy="backtrack", accuracy="adaptive")
+    plain = minimize_trust(problem, desired, -0.05, 0.15, solver(), **arguments)
+    trace = CoupledTrace(tmp_path / "trace", {}, "test-baseline")
+    captured = minimize_trust(problem, desired, -0.05, 0.15, solver(), observer=trace, **arguments)
+    trace.finish()
+    assert captured.status == plain.status == "converged"
+    np.testing.assert_array_equal(captured.evaluation.state, plain.evaluation.state)
+    manifest = read_manifest(trace.directory)
+    expected = sum(
+        s["linear_status"] != "empty"
+        for h in captured.history
+        for a in h["attempts"]
+        for s in a["qp_history"]
+    )
+    assert len(manifest["systems"]) == expected
+    for row in manifest["systems"]:
+        quadratic = manifest["quadratics"][row["quadratic"]]
+        state = read_arrays(trace.directory, quadratic["file"], quadratic["sha256"])
+        _, H, _, _ = rebuild(problem, state, quadratic)
+        arrays = read_arrays(trace.directory, row["file"], row["sha256"])
+        solution = read_arrays(trace.directory, row["solution_file"], row["solution_sha256"])["x"]
+        expanded = np.zeros(problem.size)
+        expanded[arrays["indices"]] = solution
+        rho = np.linalg.norm(arrays["rhs"] - (H @ expanded)[arrays["indices"]]) / max(
+            np.linalg.norm(arrays["rhs"]), 1e-300
+        )
+        assert rho <= quadratic["linear_tolerance"]
+        assert row["status"] == "converged"
+
+
 def test_legacy_policy_uses_one_trial_per_quadratic(monkeypatch):
     import deflation_example.coupled_trust as trust
 
