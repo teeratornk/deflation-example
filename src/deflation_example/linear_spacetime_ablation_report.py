@@ -77,6 +77,20 @@ def summarize(records, settings, agreements=None):
                 "scope": "Consult the scheduler outcome; a stale running record establishes no completed time.",
             }
             continue
+        if record.get("all_problems_verified") is False and len(record.get("cases", [])) < len(
+            cfg["queries"]
+        ):
+            groups[name][repeat] = {
+                "repetition": repeat,
+                "status": record["status"],
+                "verified": False,
+                "case_statuses": [c["status"] for c in record.get("cases", [])],
+                "completed_target_records": len(record.get("cases", [])),
+                "seconds": record.get("sequence_seconds"),
+                "error_type": record.get("error_type"),
+                "scope": "Preparation or construction stopped before every target had an outcome; retain the attempt without a completed-sequence comparison.",
+            }
+            continue
         valid = validate_record(record)
         current = matched_identity(record)
         if record.get("assembly") or not current["velocity"]:
@@ -190,6 +204,7 @@ def field_agreement(paths, records):
             if r["configuration"]["speedup_ablation_arm"] == "frozen"
             and r["configuration"]["repetition"] == 0
             and r.get("status") != "running"
+            and r.get("all_problems_verified") is True
             and validate_record(r)
         ),
         None,
@@ -198,7 +213,7 @@ def field_agreement(paths, records):
         return {}, []
     agreements, files = {}, []
     for i, record in enumerate(records):
-        if record.get("status") == "running" or not validate_record(record):
+        if record.get("all_problems_verified") is not True or not validate_record(record):
             continue
         errors = {"state_absolute": 0.0, "objective_relative": 0.0}
         for position, case in enumerate(record["cases"]):

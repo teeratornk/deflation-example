@@ -170,7 +170,7 @@ def test_missing_baseline_has_no_completed_solve_speedup(tmp_path):
     assert (tmp_path / "rank-time-memory.pdf").stat().st_size > 1000
 
 
-@pytest.mark.parametrize("status", ["running", "failed"])
+@pytest.mark.parametrize("status", ["running", "failed", "construction_failed"])
 def test_unfinished_or_failed_comparator_is_retained_without_a_ratio(tmp_path, status):
     frozen, records, agreements = population(tmp_path)
     row = next(r for r in records if r["configuration"]["speedup_ablation_arm"] == "frozen")
@@ -182,12 +182,15 @@ def test_unfinished_or_failed_comparator_is_retained_without_a_ratio(tmp_path, s
         row["all_problems_verified"] = False
         row["verified_problems"] -= 1
         row["cases"][0].update(status="iteration_cap", verified=False)
+        if status == "construction_failed":
+            row.update(cases=[], verified_problems=0, error_type="MemoryError")
+            del row["fixed_flow_preparation"]
     result = summarize(records, frozen, agreements)
     assert not result["all_declared_sequences_verified"]
     assert all(c["fastest_alternative_over_reference"] is None for c in result["comparisons"])
     outcome = next(r for r in result["rows"] if r["arm"] == "frozen")["outcomes"][0]
     assert not outcome["verified"]
-    assert outcome["status"] == ("unfinished_record" if status == "running" else "failed")
+    assert outcome["status"] == ("unfinished_record" if status == "running" else status)
 
 
 @pytest.mark.parametrize(
