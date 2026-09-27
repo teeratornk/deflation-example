@@ -103,6 +103,15 @@ replay stops. `--use-recorded-partition` instead retains the saved inactive set
 and reports the reconstruction difference and saved/recomputed KKT components.
 Such a replay is a reconstruction of the recorded system, not a bitwise repeat.
 
+An opt-in quadratic policy, `--qp-correction-policy allow_partition_change`,
+permits a verified correction that changes the next active set even when the
+maximum KKT component increases. With an unchanged active set, the correction
+must still decrease that maximum. The final KKT criteria, independent linear
+residual checks and iteration caps are unchanged. The default `kkt_decrease`
+policy preserves the preceding implementation. Analytic activation and release
+tests check the new policy; its large-problem use requires the diagnostic and
+complete-optimization checks above. Earlier timings retain their original policy.
+
 ## Reference and complete-comparison gates
 
 After a complete target converges, use its deterministic inactive-system sample

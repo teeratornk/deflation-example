@@ -52,10 +52,13 @@ def run(
         "trial_policy": "radius_rebuild",
         "capture_trials": False,
         "capture_linear_systems": False,
+        "qp_correction_policy": "kkt_decrease",
         **cfg,
     }
     if cfg["trial_policy"] not in {"radius_rebuild", "backtrack"}:
         raise ValueError("Unknown trial policy")
+    if cfg["qp_correction_policy"] not in {"kkt_decrease", "allow_partition_change"}:
+        raise ValueError("Unknown quadratic correction policy")
     if any(not isinstance(cfg[k], bool) for k in ("capture_trials", "capture_linear_systems")):
         raise ValueError("Diagnostic capture settings must be Boolean")
     output = Path(output)
@@ -86,7 +89,10 @@ def run(
             raise ValueError("The cumulative diagnostic time budget is exhausted")
     record = {
         "schema": "coupled-trust-development-v1",
-        "policy": policy_description(cfg["trial_policy"]),
+        "policy": {
+            **policy_description(cfg["trial_policy"]),
+            "qp_correction_policy": cfg["qp_correction_policy"],
+        },
         "configuration": cfg,
         "environment": env,
         "status": "running",
@@ -241,6 +247,7 @@ def run(
                     frozen_sweeps=cfg["frozen_sweeps"],
                     accuracy=cfg["trust_accuracy"],
                     trial_policy=cfg["trial_policy"],
+                    qp_correction_policy=cfg["qp_correction_policy"],
                     trial_callback=capture,
                     observer=trace,
                     checkpoint=save_optimizer,
@@ -376,6 +383,11 @@ def main():
     )
     parser.add_argument("--capture-trials", action="store_true")
     parser.add_argument("--capture-linear-systems", action="store_true")
+    parser.add_argument(
+        "--qp-correction-policy",
+        choices=("kkt_decrease", "allow_partition_change"),
+        default="kkt_decrease",
+    )
     parser.add_argument("--complete-sequence", action="store_true")
     parser.add_argument("--resume-from", type=Path)
     parser.add_argument("--prior-attempt-seconds", type=float)
@@ -400,6 +412,7 @@ def main():
         trial_policy=args.trial_policy,
         capture_trials=args.capture_trials,
         capture_linear_systems=args.capture_linear_systems,
+        qp_correction_policy=args.qp_correction_policy,
     )
     # Resolve through the same configuration type used by the other runners.
     cfg = OmegaConf.to_container(OmegaConf.create(cfg), resolve=True)

@@ -86,6 +86,7 @@ def minimize_trust(
     frozen_sweeps=3,
     accuracy="strict",
     trial_policy="radius_rebuild",
+    qp_correction_policy="kkt_decrease",
     trial_callback=None,
     observer=None,
     callback=None,
@@ -111,6 +112,8 @@ def minimize_trust(
     intermediate_targets(1.0, accuracy, qp_tolerance, final_rtol)
     if trial_policy not in {"radius_rebuild", "backtrack"}:
         raise ValueError("Choose radius_rebuild or backtrack trial policy")
+    if qp_correction_policy not in {"kkt_decrease", "allow_partition_change"}:
+        raise ValueError("Unknown quadratic correction policy")
     if trial_callback is not None and not callable(trial_callback):
         raise ValueError("The trial callback must be callable")
     radius, history, secants = POLICY["initial_radius_K"], [], []
@@ -120,6 +123,8 @@ def minimize_trust(
     if resume is not None:
         if resume.get("trial_policy", "radius_rebuild") != trial_policy:
             raise ValueError("Checkpoint trial policy differs")
+        if resume.get("qp_correction_policy", "kkt_decrease") != qp_correction_policy:
+            raise ValueError("Checkpoint quadratic correction policy differs")
         initial = resume["state"]
         initial_evaluation = RestoredEvaluation(initial, resume["velocity"], resume["pressure"])
         radius, history, secants = resume["radius_K"], resume["history"], resume["secants"]
@@ -167,6 +172,7 @@ def minimize_trust(
                     "elapsed_seconds": elapsed(),
                     "last_strict": last_strict,
                     "trial_policy": trial_policy,
+                    "qp_correction_policy": qp_correction_policy,
                 }
             )
 
@@ -248,6 +254,7 @@ def minimize_trust(
                 checkpoint=qp_checkpoint,
                 resume=qp_resume,
                 observer=observer,
+                correction_policy=qp_correction_policy,
             )
             solver.rtol = final_rtol
             qp_resume = None

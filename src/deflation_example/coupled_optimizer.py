@@ -73,6 +73,7 @@ def box_quadratic(
     tolerance=1e-9,
     max_steps=100,
     fixed_mask_corrections=4,
+    correction_policy="kkt_decrease",
     observer=None,
     preconditioner_factory=None,
     initial=None,
@@ -94,10 +95,16 @@ def box_quadratic(
     ``initial`` supplies a warm state, clipped to the declared box. The optional
     ``kkt_evaluator(state, gradient)`` supplies application-normalized components;
     the same function checks every retained state and the final returned state.
+    The opt-in ``allow_partition_change`` correction policy permits a verified
+    linear update that changes the next active set, even when a different KKT
+    component increases. An unchanged partition still requires KKT decrease.
+    Both policies retain the same final accuracy and iteration caps.
     """
     tolerance = positive_real(tolerance, "Quadratic KKT tolerance")
     max_steps = integer(max_steps, "Active-set iteration cap", 1)
     fixed_mask_corrections = integer(fixed_mask_corrections, "Fixed-mask correction cap", 0)
+    if correction_policy not in {"kkt_decrease", "allow_partition_change"}:
+        raise ValueError("Choose kkt_decrease or allow_partition_change correction policy")
     g = np.asarray(gradient, dtype=float)
     d = np.asarray(diagonal, dtype=float)
     lo, hi = np.broadcast_arrays(np.asarray(lower, dtype=float), np.asarray(upper, dtype=float), g)[
@@ -234,8 +241,23 @@ def box_quadratic(
         else:
             row.update(linear_status="empty", linear_iterations=0, deployed_rank=0)
         if correction:
-            candidate_kkt = assess(fixed, H @ fixed + g)
-            if max(candidate_kkt.values()) >= max(kkt.values()):
+            candidate_gradient = H @ fixed + g
+            candidate_kkt = assess(fixed, candidate_gradient)
+            projected_candidate = fixed - candidate_gradient / d
+            next_partition = (projected_candidate >= hi).astype(np.int8) - (
+                projected_candidate <= lo
+            ).astype(np.int8)
+            changes = int(np.count_nonzero(next_partition != partition))
+            row.update(
+                previous_kkt=kkt,
+                candidate_kkt=candidate_kkt,
+                correction_policy=correction_policy,
+                candidate_partition_changes=changes,
+            )
+            finite = np.isfinite(list(candidate_kkt.values())).all()
+            decreasing = max(candidate_kkt.values()) < max(kkt.values())
+            changing = correction_policy == "allow_partition_change" and changes > 0
+            if not finite or not (decreasing or changing):
                 row["candidate_retained"] = False
                 history.append(row)
                 status = "fixed_mask_correction_stagnation"

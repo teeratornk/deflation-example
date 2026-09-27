@@ -187,7 +187,8 @@ def test_shortened_roundoff_step_uses_actual_increment_for_next_radius(monkeypat
 
 
 @pytest.mark.parametrize("accuracy", ["strict", "adaptive"])
-def test_backtracking_solves_small_coupled_equations(accuracy):
+@pytest.mark.parametrize("correction_policy", ["kkt_decrease", "allow_partition_change"])
+def test_backtracking_solves_small_coupled_equations(accuracy, correction_policy):
     problem = small_coupled_problem([0.2, 0.35])
     desired = np.linspace(-0.2, 0.4, problem.size)
     result = minimize_trust(
@@ -199,6 +200,7 @@ def test_backtracking_solves_small_coupled_equations(accuracy):
         inner_preconditioner="jacobi",
         trial_policy="backtrack",
         accuracy=accuracy,
+        qp_correction_policy=correction_policy,
         max_iterations=80,
     )
     assert result.status == "converged"
@@ -224,6 +226,17 @@ def test_checkpoint_rejects_policy_change_and_resumes_same_policy():
         minimize_trust(problem, desired, -0.2, 0.3, solver(), checkpoint=checkpoint, **arguments)
     with pytest.raises(ValueError, match="trial policy"):
         minimize_trust(problem, desired, -0.2, 0.3, solver(), resume=saved[0])
+    with pytest.raises(ValueError, match="quadratic correction policy"):
+        minimize_trust(
+            problem,
+            desired,
+            -0.2,
+            0.3,
+            solver(),
+            resume=saved[0],
+            qp_correction_policy="allow_partition_change",
+            **arguments,
+        )
     result = minimize_trust(problem, desired, -0.2, 0.3, solver(), resume=saved[0], **arguments)
     assert result.status == "converged"
     np.testing.assert_allclose(result.evaluation.state, 0.3)

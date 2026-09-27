@@ -80,11 +80,17 @@ def decision(
         "optimizer_policy",
         "linear_heartbeat_seconds",
         "capture_linear_systems",
+        "qp_correction_policy",
     }
     original_cfg = {k: v for k, v in adaptive["configuration"].items() if k not in changed_keys}
     for record in repairs:
         check_configuration(record)
         cfg = record["configuration"]
+        if cfg.get("qp_correction_policy", "kkt_decrease") not in {
+            "kkt_decrease",
+            "allow_partition_change",
+        }:
+            raise ValueError("Unknown quadratic correction policy")
         if cfg.get("trial_policy") != "backtrack" or cfg.get("capture_trials") is not True:
             raise ValueError("Repair diagnostics must capture backtracking trials")
         if {k: v for k, v in cfg.items() if k not in changed_keys} != original_cfg:

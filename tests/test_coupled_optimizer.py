@@ -155,7 +155,10 @@ def test_qp_verifies_candidate_on_last_allowed_active_set_step():
 
 
 @pytest.mark.parametrize("correction_factor", [1.0, 0.0, -1.0])
-def test_fixed_mask_error_solve_resolves_norm_mismatch_and_retains_best_state(correction_factor):
+@pytest.mark.parametrize("correction_policy", ["kkt_decrease", "allow_partition_change"])
+def test_fixed_mask_error_solve_resolves_norm_mismatch_and_retains_best_state(
+    correction_factor, correction_policy
+):
     from deflation_example.solvers import LinearResult
 
     class InexactSolver:
@@ -172,7 +175,9 @@ def test_fixed_mask_error_solve_resolves_norm_mismatch_and_retains_best_state(co
     inner = InexactSolver()
     H = sparse.eye(3, format="csr")
     g = np.array([-1.0, 4.0, -4.0])
-    result = box_quadratic(H, g, np.ones(3), -2, 2, inner, tolerance=1e-10)
+    result = box_quadratic(
+        H, g, np.ones(3), -2, 2, inner, tolerance=1e-10, correction_policy=correction_policy
+    )
     assert len(inner.calls) == 2
     assert inner.calls[1][0][0] == pytest.approx(1e-8, abs=1e-15)
     np.testing.assert_array_equal(inner.calls[1][1], [0.0])
@@ -186,6 +191,57 @@ def test_fixed_mask_error_solve_resolves_norm_mismatch_and_retains_best_state(co
         assert not result.history[-1]["candidate_retained"]
         np.testing.assert_array_equal(result.x, [1 - 1e-8, -2.0, 2.0])
     assert result.kkt == box_kkt(result.x, H @ result.x + g, -2, 2, 4.0)
+
+
+@pytest.mark.parametrize("kind", ["activation", "release"])
+def test_partition_change_policy_allows_verified_nonmonotone_pdas_updates(kind):
+    from copy import deepcopy
+
+    if kind == "activation":
+        H, g, d = sparse.diags([1e-3], format="csr"), np.array([-0.0011]), np.array([0.01])
+        x, partition, lower, upper = np.array([0.9]), np.array([0], dtype=np.int8), -1, 1
+        expected = [1.0]
+    else:
+        H, g, d = (
+            sparse.csr_matrix([[100.0, -9.0], [-9.0, 1.0]]),
+            np.array([5.0, -1.0]),
+            np.array([100.0, 1.0]),
+        )
+        x, partition, lower, upper = np.array([0.0, 0.5]), np.array([-1, 0], dtype=np.int8), 0, 2
+        expected = [0.13, 2.0]
+    saved = {
+        "x": x,
+        "partition": partition,
+        "corrections": 0,
+        "next_step": 1,
+        "history": [{"step": 0, "linear_equation": "state", "candidate_retained": True}],
+    }
+    legacy = box_quadratic(H, g, d, lower, upper, solver(), resume=deepcopy(saved))
+    assert legacy.status == "fixed_mask_correction_stagnation"
+    np.testing.assert_array_equal(legacy.x, x)
+    result = box_quadratic(
+        H,
+        g,
+        d,
+        lower,
+        upper,
+        solver(),
+        resume=deepcopy(saved),
+        correction_policy="allow_partition_change",
+    )
+    assert result.status == "converged"
+    assert max(result.kkt.values()) <= 1e-9
+    np.testing.assert_allclose(result.x, expected, atol=1e-12)
+    first = result.history[1]
+    assert first["candidate_retained"] and first["candidate_partition_changes"] == 1
+    assert max(first["candidate_kkt"].values()) >= max(first["previous_kkt"].values())
+
+
+def test_unknown_correction_policy_is_rejected():
+    with pytest.raises(ValueError, match="correction policy"):
+        box_quadratic(
+            sparse.eye(1), np.zeros(1), np.ones(1), -1, 1, solver(), correction_policy="unknown"
+        )
 
 
 def test_fixed_mask_correction_cap_keeps_unsatisfied_qp_visible():
