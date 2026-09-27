@@ -122,3 +122,43 @@ comparison. Three fresh development repetitions per method precede confirmation.
 Five fresh confirmation repetitions additionally require solution agreement and
 lower reference median time than the fastest tested alternative across the
 retained development repetitions. Interrupted baselines cannot establish speedups.
+
+### Scheduler interruptions
+
+A hard scheduler stop can leave the last numerical record marked `running`.
+Keep that file unchanged and record the scheduler outcome separately. For each
+declared run, including cancelled repetitions without output, create a manifest:
+
+```json
+{
+  "schema": "coupled-run-status-manifest-v1",
+  "runs": [
+    {
+      "label": "reference-repeat-0",
+      "record": "reference-repeat-0/record.json",
+      "scheduler": {"state": "TIMEOUT", "elapsed_seconds": 172800, "exit_code": "0:0", "started": true}
+    },
+    {
+      "label": "reference-repeat-1",
+      "record": "reference-repeat-1/record.json",
+      "scheduler": {"state": "CANCELLED", "elapsed_seconds": 0, "exit_code": "0:0", "started": false}
+    }
+  ]
+}
+```
+
+Use the actual scheduler state and elapsed seconds. With Slurm, obtain them from
+`sacct -X --array --format=JobID,State%30,ElapsedRaw,ExitCode,Start -P -j JOB_ID`.
+Remove administrative annotations from the state name. Set `started` from the
+scheduler's start record; zero elapsed time alone does not establish that a run
+never started. Record paths are relative to the manifest directory.
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_run_status \
+  --manifest outcomes.json --output terminal-summary
+```
+
+This command retains missing and interrupted outcomes and reports the numerical
+status separately from scheduler termination. Allocation time is not a completed
+optimization timing. The complete-comparison report remains restricted to final
+numerical records and its independent accuracy checks.
