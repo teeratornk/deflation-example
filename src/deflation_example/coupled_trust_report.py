@@ -108,8 +108,7 @@ def main():
             if not data:
                 continue
             label = (
-                f"{row['method']}/{row['inner_preconditioner']}, "
-                f"{row['accuracy']}, {row['status']}"
+                f"{row['method']}/{row['inner_preconditioner']}, {row['accuracy']}, {row['status']}"
             )
             x = np.arange(len(data))
             for ax, field in zip(
