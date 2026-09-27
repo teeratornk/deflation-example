@@ -64,7 +64,20 @@ def read_previous(directory, fingerprint):
     return previous, {"file": path.name, "sha256": digest, "manifest_bound": False}
 
 
-def inspect_correction(H, gradient, diagonal, lower, upper, solver, qp, assess, factory=None):
+def inspect_correction(
+    H,
+    gradient,
+    diagonal,
+    lower,
+    upper,
+    solver,
+    qp,
+    assess,
+    factory=None,
+    *,
+    use_recorded_partition=False,
+    progress=None,
+):
     """Measure the existing rejection test and the candidate's subsequent mask."""
     x = np.asarray(qp["x"]).copy()
 
@@ -73,8 +86,10 @@ def inspect_correction(H, gradient, diagonal, lower, upper, solver, qp, assess, 
         return (projected >= upper).astype(np.int8) - (projected <= lower).astype(np.int8)
 
     derivative = H @ x + gradient
-    mask = partition(x, derivative)
-    if not np.array_equal(mask, qp["partition"]):
+    reconstructed = partition(x, derivative)
+    mask = np.asarray(qp["partition"], dtype=np.int8)
+    mismatch = int(np.count_nonzero(reconstructed != mask))
+    if mismatch and not use_recorded_partition:
         raise ValueError("The saved mask does not repeat")
     indices = np.flatnonzero(mask == 0)
     if not len(indices):
@@ -93,6 +108,14 @@ def inspect_correction(H, gradient, diagonal, lower, upper, solver, qp, assess, 
     rhs = -(gradient + H @ fixed)[indices]
     defect = rhs - B @ x[indices]
     before = assess(x, derivative)
+    preliminary = {
+        "before_kkt": before,
+        "saved_quadratic_kkt": qp.get("kkt"),
+        "reconstructed_partition_changes": mismatch,
+        "partition_policy": "recorded" if use_recorded_partition else "verified_repeated",
+    }
+    if progress is not None:
+        progress(preliminary)
     result, timing = solver.solve(B, defect, indices, initial=np.zeros_like(defect))
     candidate = fixed.copy()
     candidate[indices] = x[indices] + result.x
@@ -102,6 +125,7 @@ def inspect_correction(H, gradient, diagonal, lower, upper, solver, qp, assess, 
     fresh = independent_residual(B, candidate[indices], rhs)
     changed = int(np.count_nonzero(next_mask != mask))
     record = {
+        **preliminary,
         "status": result.status,
         "iterations": result.iterations,
         "solved_equation_residual": result.residual,
@@ -127,6 +151,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--record", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--use-recorded-partition",
+        action="store_true",
+        help="Keep the saved inactive set and report changes after flow reconstruction",
+    )
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     source_record = json.loads(args.record.read_text())
@@ -207,6 +236,8 @@ def main():
                 opt["qp"],
                 lambda x, g: box_kkt(x, g / problem.weights, lo, hi, scale),
                 frozen_preconditioner_factory(problem, evaluation, sweeps=cfg["frozen_sweeps"]),
+                use_recorded_partition=args.use_recorded_partition,
+                progress=lambda row: write_report(args.output / "reconstruction.json", row),
             )
         finally:
             solver.close()

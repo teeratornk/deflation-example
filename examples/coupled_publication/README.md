@@ -98,6 +98,10 @@ The previous slot is hashed and checked against the manifest-bound nonlinear
 state. It is used only for diagnosis, never as a source-compatible restart. A
 change in active set and a change in the maximum KKT component are reported
 separately. This replay neither advances optimization nor establishes a speedup.
+If reevaluating the saved flow changes the reconstructed active set, the default
+replay stops. `--use-recorded-partition` instead retains the saved inactive set
+and reports the reconstruction difference and saved/recomputed KKT components.
+Such a replay is a reconstruction of the recorded system, not a bitwise repeat.
 
 ## Reference and complete-comparison gates
 

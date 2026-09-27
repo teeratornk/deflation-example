@@ -47,6 +47,23 @@ def test_changed_initial_mask_is_not_a_fixed_mask_replay():
         )
 
 
+def test_explicit_recorded_partition_preserves_and_reports_reconstruction_change():
+    report, _ = inspect_correction(
+        sparse.eye(1),
+        np.array([-2.0]),
+        np.ones(1),
+        np.array([-1.0]),
+        np.array([1.0]),
+        solver(),
+        {"x": np.zeros(1), "partition": np.zeros(1, dtype=np.int8)},
+        lambda x, g: box_kkt(x, g, -1, 1),
+        use_recorded_partition=True,
+    )
+    assert report["partition_policy"] == "recorded"
+    assert report["reconstructed_partition_changes"] == 1
+    assert report["linear_checks_pass"]
+
+
 def test_previous_slot_requires_same_manifest_bound_nonlinear_fields(tmp_path):
     store = RecoveryStore(tmp_path, "source-bound")
     opt = {"state": np.zeros(2), "velocity": np.ones((2, 2)), "pressure": np.zeros(2)}
