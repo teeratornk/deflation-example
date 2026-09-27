@@ -45,7 +45,9 @@ def complete(record):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and np.isfinite(value)
 
 
-def decision(adaptive, repairs=None, fields=None, *, adaptive_terminal=False):
+def decision(
+    adaptive, repairs=None, fields=None, *, adaptive_terminal=False, repairs_terminal=(False, False)
+):
     check_configuration(adaptive)
     if (
         adaptive["configuration"].get("trial_policy", "radius_rebuild") != "radius_rebuild"
@@ -58,17 +60,29 @@ def decision(adaptive, repairs=None, fields=None, *, adaptive_terminal=False):
         return {"action": "wait_for_adaptive"}
     if repairs is None:
         return {"action": "run_two_repair_diagnostics", "hours_per_policy": 24}
+    if len(repairs_terminal) != 2 or any(type(value) is not bool for value in repairs_terminal):
+        raise ValueError("Supply a scheduler-termination flag for each repair")
     if len(repairs) != 2 or {r["configuration"]["flow_continuation"] for r in repairs} != {
         False,
         True,
     }:
         raise ValueError("Compare backtracking with and without residual-load continuation")
     identities = []
+    changed_keys = {
+        "flow_continuation",
+        "trial_policy",
+        "capture_trials",
+        "optimizer_policy",
+        "linear_heartbeat_seconds",
+    }
+    original_cfg = {k: v for k, v in adaptive["configuration"].items() if k not in changed_keys}
     for record in repairs:
         check_configuration(record)
         cfg = record["configuration"]
         if cfg.get("trial_policy") != "backtrack" or cfg.get("capture_trials") is not True:
             raise ValueError("Repair diagnostics must capture backtracking trials")
+        if {k: v for k, v in cfg.items() if k not in changed_keys} != original_cfg:
+            raise ValueError("Repair changes settings beyond the declared numerical policy")
         identities.append(
             (
                 {k: v for k, v in cfg.items() if k != "flow_continuation"},
@@ -80,7 +94,7 @@ def decision(adaptive, repairs=None, fields=None, *, adaptive_terminal=False):
             raise ValueError("Physical baselines differ")
     if identities[0] != identities[1]:
         raise ValueError("Repair diagnostics differ beyond flow continuation")
-    if any(r["status"] == "running" for r in repairs):
+    if any(r["status"] == "running" and not done for r, done in zip(repairs, repairs_terminal)):
         return {"action": "wait_for_repairs"}
     successes = [i for i, r in enumerate(repairs) if complete(r)]
     agreement = None
@@ -128,6 +142,11 @@ def main():
         help="Use only after scheduler termination is independently confirmed",
     )
     parser.add_argument("--repairs", type=Path, nargs=2)
+    parser.add_argument(
+        "--repairs-terminal",
+        action="store_true",
+        help="Use only after both repair jobs have independently confirmed scheduler termination",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
@@ -142,7 +161,11 @@ def main():
         else:
             fields.append(None)
     result = decision(
-        records[0], records[1:] or None, fields, adaptive_terminal=args.adaptive_terminal
+        records[0],
+        records[1:] or None,
+        fields,
+        adaptive_terminal=args.adaptive_terminal,
+        repairs_terminal=(args.repairs_terminal, args.repairs_terminal),
     )
     result["record_sha256"] = [file_sha256(p) for p in paths]
     write_report(args.output, result)

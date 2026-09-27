@@ -50,6 +50,11 @@ If neither policy verifies a complete target, stop the timing campaign and
 diagnose the remaining failure. Source-bound checkpoints cannot be used to
 restart a historical run under the new algorithm.
 
+A scheduler timeout can leave the last numerical record marked `running`.
+After independently confirming scheduler termination, `--adaptive-terminal`
+or `--repairs-terminal` allows the gate to retain that incomplete outcome.
+These flags never verify a solution or modify the saved numerical record.
+
 ## Reproduce a rejected trial
 
 Capture writes the actual trial temperature and the starting temperature,

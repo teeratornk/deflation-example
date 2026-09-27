@@ -64,6 +64,7 @@ def summarize(path):
         "status": record["status"],
         "accuracy": cfg["trust_accuracy"],
         "continuation": cfg["flow_continuation"],
+        "trial_policy": cfg.get("trial_policy", "radius_rebuild"),
         "method": cfg["method"],
         "inner_preconditioner": cfg["inner_preconditioner"],
         "resumed": record["resumed"],
@@ -110,6 +111,8 @@ def main():
             label = (
                 f"{row['method']}/{row['inner_preconditioner']}, {row['accuracy']}, {row['status']}"
             )
+            if row["trial_policy"] != "radius_rebuild" or row["continuation"]:
+                label += f", {row['trial_policy']}, continuation={row['continuation']}"
             x = np.arange(len(data))
             for ax, field in zip(
                 axes.flat,

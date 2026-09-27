@@ -69,6 +69,25 @@ def test_two_unsuccessful_repairs_stop_expansion():
     assert decision(a, r)["action"] == "stop_for_numerical_diagnosis"
     r[0]["status"] = "running"
     assert decision(a, r)["action"] == "wait_for_repairs"
+    assert decision(a, r, repairs_terminal=(True, True))["action"] == "stop_for_numerical_diagnosis"
+    assert r[0]["status"] == "running"
+
+
+def test_partial_scheduler_termination_does_not_skip_a_live_repair():
+    a, r = fixtures()
+    for record in r:
+        record["status"] = "running"
+    assert decision(a, r, repairs_terminal=(True, False))["action"] == "wait_for_repairs"
+    with pytest.raises(ValueError, match="termination flag"):
+        decision(a, r, repairs_terminal=(True,))
+
+
+def test_common_undeclared_change_does_not_pass_by_matching_both_repairs():
+    a, r = fixtures()
+    for record in r:
+        record["configuration"]["transport_form"] = "different"
+    with pytest.raises(ValueError, match="beyond the declared"):
+        decision(a, r)
 
 
 def test_one_success_selects_verified_policy_only():
