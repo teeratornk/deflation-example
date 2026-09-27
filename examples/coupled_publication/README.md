@@ -11,6 +11,9 @@ First finish the existing adaptive trust-region diagnostic. A verified solution
 skips the repair stage. Otherwise compare two fresh, 24-hour diagnostics from
 the same initial state: direction backtracking alone and direction backtracking
 with residual-load continuation. Keep the earlier runs and their original gate.
+If the adaptive run fails inside its quadratic solve, first diagnose that failure:
+trial backtracking requires a computed direction. The gate records this distinct
+stop condition instead of launching two runs that would repeat the same inner failure.
 
 The `backtrack` policy tries step lengths 1 through 1/64 from a single quadratic
 direction. Each trial uses the actual projected increment in the model

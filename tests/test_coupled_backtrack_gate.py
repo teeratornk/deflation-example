@@ -73,6 +73,12 @@ def test_two_unsuccessful_repairs_stop_expansion():
     assert r[0]["status"] == "running"
 
 
+def test_quadratic_failure_requires_a_direction_before_trial_repairs():
+    adaptive, _ = fixtures()
+    adaptive["status"] = "quadratic_fixed_mask_correction_stagnation"
+    assert decision(adaptive)["action"] == "stop_for_quadratic_diagnosis"
+
+
 def test_partial_scheduler_termination_does_not_skip_a_live_repair():
     a, r = fixtures()
     for record in r:

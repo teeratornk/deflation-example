@@ -59,6 +59,11 @@ def decision(
     if adaptive["status"] == "running" and not adaptive_terminal:
         return {"action": "wait_for_adaptive"}
     if repairs is None:
+        if adaptive["status"].startswith("quadratic_"):
+            return {
+                "action": "stop_for_quadratic_diagnosis",
+                "reason": "The quadratic solve failed before producing a direction; examine it before testing trial policies.",
+            }
         return {"action": "run_two_repair_diagnostics", "hours_per_policy": 24}
     if len(repairs_terminal) != 2 or any(type(value) is not bool for value in repairs_terminal):
         raise ValueError("Supply a scheduler-termination flag for each repair")

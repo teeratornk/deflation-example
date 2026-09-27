@@ -27,6 +27,7 @@
     "hours_per_policy": 24,
     "capture_trials": true,
     "launch_condition": "The preceding adaptive diagnostic has terminated without a verified complete target, and implementation checks passed.",
+    "quadratic_failure_gate": "If the preceding run fails before producing a quadratic direction, diagnose and verify that inner procedure before the two trial-policy comparisons.",
     "selection": "Choose the fastest verified repair; require state and objective agreement if both converge. If neither converges, stop the performance campaign."
   },
   "reference_screen": {
