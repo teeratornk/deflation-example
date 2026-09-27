@@ -79,6 +79,23 @@ uv run --no-sync python -m deflation_example.coupled_trial_replay \
 The replay preserves the captured temperature and starting flow. It does not
 reoptimize, clip the temperature, or count its cost as optimization work.
 
+## Diagnose a quadratic correction
+
+If a diagnostic stops before producing a quadratic direction, investigate that
+inner failure before launching flow-backtracking comparisons. When the preceding
+recovery slot retains the last quadratic state, the following command reproduces
+one fixed-mask correction and records both KKT components and the next active set:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_qp_diagnostic \
+  --record original-adaptive/record.json --output quadratic-diagnostic
+```
+
+The previous slot is hashed and checked against the manifest-bound nonlinear
+state. It is used only for diagnosis, never as a source-compatible restart. A
+change in active set and a change in the maximum KKT component are reported
+separately. This replay neither advances optimization nor establishes a speedup.
+
 ## Reference and complete-comparison gates
 
 After a complete target converges, use its deterministic inactive-system sample
