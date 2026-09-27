@@ -459,4 +459,5 @@ def test_recovery_runner_verifies_complete_small_sequence(tmp_path, monkeypatch,
     result_directory = tmp_path / (method + "-resumed") if interrupt else directory
     summary = summarize(result_directory / "record.json")
     assert summary["all_problems_verified"]
+    assert summary["inner_preconditioner"] == cfg["inner_preconditioner"]
     assert summary["inner_iterations"] == sum(c["inner_iterations"] for c in result["cases"])

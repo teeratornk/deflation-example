@@ -65,6 +65,7 @@ def summarize(path):
         "accuracy": cfg["trust_accuracy"],
         "continuation": cfg["flow_continuation"],
         "method": cfg["method"],
+        "inner_preconditioner": cfg["inner_preconditioner"],
         "resumed": record["resumed"],
         "all_problems_verified": record.get("all_problems_verified", False),
         "attempt_seconds": record.get("attempt_seconds"),
@@ -106,7 +107,10 @@ def main():
             data = row["series"]
             if not data:
                 continue
-            label = f"{row['method']}, {row['accuracy']}, {row['status']}"
+            label = (
+                f"{row['method']}/{row['inner_preconditioner']}, "
+                f"{row['accuracy']}, {row['status']}"
+            )
             x = np.arange(len(data))
             for ax, field in zip(
                 axes.flat,
@@ -122,7 +126,7 @@ def main():
             (
                 "Scaled objective",
                 "Maximum physical KKT residual",
-                "Temperature radius (K)",
+                "Last attempted temperature radius (K)",
                 "Cumulative inner time (s)",
             ),
             strict=True,
