@@ -19,8 +19,9 @@ from .validation import integer
 
 def configured_krylov_reference(problem, cfg, initial_guess=None, initial_state=None):
     """Construct a full-domain energy-metric reference once, before optimization."""
-    if cfg.get("reference_transfer", "full") != "full" or not cfg["queries"]:
-        raise ValueError("Krylov construction requires full transfer and declared targets")
+    transfer = cfg.get("reference_transfer", "full")
+    if transfer not in {"full", "sequential"} or not cfg["queries"]:
+        raise ValueError("Krylov construction requires a declared transfer and targets")
     if len({q["upper_K"] for q in cfg["queries"]}) != 1:
         raise ValueError("The reference sequence holds the physical bound fixed")
     if initial_guess is not None and initial_state is not None:
@@ -73,6 +74,7 @@ def configured_krylov_reference(problem, cfg, initial_guess=None, initial_state=
         rank,
         steps=steps,
         seed=cfg.get("reference_krylov_seed", 20260923),
+        selection=cfg.get("reference_krylov_selection", "alternating_low_high"),
     )
     reference.description.update(
         nominal_evaluation_seconds=evaluation_seconds,
@@ -88,4 +90,12 @@ def configured_krylov_reference(problem, cfg, initial_guess=None, initial_state=
             nominal_policy="Exact fixed-flow space-time quadratic operator; zero damping and no secants",
             lifetime="Fixed full-domain space across every target and PDAS update",
         )
+    if transfer == "sequential":
+        from .coupled_reference import SequentialReference
+
+        sequential = SequentialReference(reference, problem.size)
+        sequential.description["lifetime"] = (
+            "Previous restricted space, transferred by zero extension at every inactive solve; no learned or replacement directions"
+        )
+        return sequential
     return reference

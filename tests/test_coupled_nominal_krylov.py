@@ -49,6 +49,24 @@ def test_reference_is_deterministic_and_unchanged_by_restriction():
     )
 
 
+def test_sequential_ablation_starts_from_identical_modes_and_loses_released_entries():
+    problem, cfg = setup()
+    cfg["reference_krylov_selection"] = "lowest"
+    state = np.full(problem.size, 0.06)
+    full = configured_krylov_reference(problem, cfg, initial_state=state)
+    seq = configured_krylov_reference(
+        problem, {**cfg, "reference_transfer": "sequential"}, initial_state=state
+    )
+    first, second = np.arange(problem.size)[::2], np.arange(problem.size)
+    seq.begin_system(first)
+    np.testing.assert_array_equal(seq.restrict(first), full.restrict(first))
+    seq.begin_system(second)
+    np.testing.assert_array_equal(seq.restrict(second)[::2], full.restrict(first))
+    np.testing.assert_array_equal(seq.restrict(second)[1::2], 0)
+    assert seq.reference is None
+    assert seq.description["ritz_selection"] == "lowest"
+
+
 @pytest.mark.parametrize("defect", ["nan", "bounds", "shape", "equations"])
 def test_inconsistent_initial_temperature_or_equations_fail(monkeypatch, defect):
     problem, cfg = setup()
@@ -71,7 +89,7 @@ def test_inconsistent_initial_temperature_or_equations_fail(monkeypatch, defect)
     "key,value",
     [
         ("device", "hybrid"),
-        ("reference_transfer", "sequential"),
+        ("reference_transfer", "unknown"),
         ("inner_preconditioner", "jacobi"),
         ("frozen_sweeps", 5),
         ("rank", 7),

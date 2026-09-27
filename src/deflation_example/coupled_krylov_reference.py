@@ -19,7 +19,16 @@ from .study_solvers import ArrayReference
 from .validation import integer, real_array
 
 
-def krylov_reference(operator, inverse, diagonal, rank=8, *, steps=48, seed=20260923):
+def krylov_reference(
+    operator,
+    inverse,
+    diagonal,
+    rank=8,
+    *,
+    steps=48,
+    seed=20260923,
+    selection="alternating_low_high",
+):
     """Rayleigh--Ritz extraction of K H in the H inner product.
 
     Two full orthogonalization passes use cached H-products. Each retained
@@ -27,6 +36,8 @@ def krylov_reference(operator, inverse, diagonal, rank=8, *, steps=48, seed=2026
     no replacement direction is introduced. H and K must be fixed SPD maps.
     """
     start = time.perf_counter()
+    if selection not in {"lowest", "alternating_low_high"}:
+        raise ValueError("Choose lowest or alternating_low_high Ritz selection")
     n = operator.shape[0]
     steps = min(integer(steps, "Krylov steps", 1), n)
     rank = integer(rank, "Reference rank", 1)
@@ -78,7 +89,7 @@ def krylov_reference(operator, inverse, diagonal, rank=8, *, steps=48, seed=2026
     values, vectors = linalg.eigh((projected + projected.T) / 2, (metric + metric.T) / 2)
     if values[0] <= 0:
         raise ValueError("The Ritz form is not positive definite")
-    selected = end_indices(size)[:rank]
+    selected = (np.arange(size) if selection == "lowest" else end_indices(size))[:rank]
     basis = Q @ vectors[:, selected]
     residuals = []
     for index, column in enumerate(selected):
@@ -98,7 +109,7 @@ def krylov_reference(operator, inverse, diagonal, rank=8, *, steps=48, seed=2026
             "seed": seed,
             "termination": termination,
             "energy_orthogonality_error": float(linalg.norm(metric - np.eye(size))),
-            "ritz_selection": "alternating_low_high",
+            "ritz_selection": selection,
             "ritz_values": values[selected].tolist(),
             "all_projected_ritz_values": values.tolist(),
             "relative_ritz_residuals_H_norm": residuals,

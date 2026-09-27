@@ -133,3 +133,9 @@ Retain observed timing ranges and all unsuccessful outcomes. Report global
 conservation and elementwise flux imbalance separately; weak incompressibility
 does not establish exact elementwise conservation. Discrete trajectory
 optimality does not establish a physically resolved temperature trajectory.
+
+The independent [prescribed-flow space–time ablation](../linear_spacetime/ablations.md)
+can proceed while that numerical gate is pending. It compares ranks, selection
+rules, reference transfer and recycling through complete linear-quadratic
+optimization. Its outcomes do not open the fully coupled gate or establish a
+nonlinear speedup.

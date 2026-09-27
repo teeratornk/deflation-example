@@ -38,6 +38,22 @@ def test_rank_prefixes_are_nested_and_deterministic():
     assert a.description["independent_candidates"] == 12
 
 
+def test_selection_rules_use_identical_candidates_and_distinct_ritz_extremes():
+    H = aslinearoperator(np.diag(np.arange(1.0, 17.0)))
+    low = krylov_reference(H, lambda x: x, np.ones(16), 4, steps=12, selection="lowest")
+    ends = krylov_reference(H, lambda x: x, np.ones(16), 4, steps=12)
+    np.testing.assert_array_equal(
+        low.description["all_projected_ritz_values"], ends.description["all_projected_ritz_values"]
+    )
+    assert low.description["ritz_selection"] == "lowest"
+    np.testing.assert_array_equal(
+        low.description["ritz_values"], low.description["all_projected_ritz_values"][:4]
+    )
+    assert ends.description["ritz_values"][1] > low.description["ritz_values"][-1]
+    with pytest.raises(ValueError, match="selection"):
+        krylov_reference(H, lambda x: x, np.ones(16), selection="unknown")
+
+
 @pytest.mark.parametrize("defect", ["shape", "negative", "nonfinite", "asymmetric"])
 def test_invalid_actions_are_rejected(defect):
     H = aslinearoperator(np.diag(np.arange(1.0, 7.0)))
