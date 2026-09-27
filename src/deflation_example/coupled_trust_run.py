@@ -22,7 +22,8 @@ from .coupled_recovery import RecoveryStore, identity
 from .coupled_regularization_complete import checked_settings, complete_configuration
 from .coupled_sequence import RestoredEvaluation
 from .coupled_targets import desired_temperature
-from .coupled_trust import POLICY, minimize_trust
+from .coupled_trust import minimize_trust, policy_description
+from .coupled_trial_capture import TrialCapture
 from .memory import ProcessMemory
 from .reporting import environment, file_sha256, write_arrays, write_report
 from .study_solvers import ArrayReference, StudySolver
@@ -44,7 +45,17 @@ def run(
     factors. Those costs remain in the new interval. Earlier attempts remain
     separate; their final wall intervals must be included when aggregating cost.
     """
-    cfg = {"flow_continuation": False, "linear_heartbeat_seconds": 30.0, **cfg}
+    cfg = {
+        "flow_continuation": False,
+        "linear_heartbeat_seconds": 30.0,
+        "trial_policy": "radius_rebuild",
+        "capture_trials": False,
+        **cfg,
+    }
+    if cfg["trial_policy"] not in {"radius_rebuild", "backtrack"}:
+        raise ValueError("Unknown trial policy")
+    if not isinstance(cfg["capture_trials"], bool):
+        raise ValueError("Trial capture must be Boolean")
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     env = environment()
@@ -73,7 +84,7 @@ def run(
             raise ValueError("The cumulative diagnostic time budget is exhausted")
     record = {
         "schema": "coupled-trust-development-v1",
-        "policy": POLICY,
+        "policy": policy_description(cfg["trial_policy"]),
         "configuration": cfg,
         "environment": env,
         "status": "running",
@@ -195,6 +206,11 @@ def run(
                 lower = (cfg["lower_K"] - problem.temperature_offset) / problem.temperature_scale
                 upper = (query["upper_K"] - problem.temperature_offset) / problem.temperature_scale
                 began = time.perf_counter()
+                capture = (
+                    TrialCapture(output / "trial-capture" / f"target-{position:02d}", fp)
+                    if cfg["capture_trials"]
+                    else None
+                )
                 result = minimize_trust(
                     problem,
                     desired,
@@ -213,6 +229,8 @@ def run(
                     inner_preconditioner=cfg["inner_preconditioner"],
                     frozen_sweeps=cfg["frozen_sweeps"],
                     accuracy=cfg["trust_accuracy"],
+                    trial_policy=cfg["trial_policy"],
+                    trial_callback=capture,
                     checkpoint=save_optimizer,
                     resume=optimizer_resume,
                     budget_seconds=max(
@@ -243,6 +261,7 @@ def run(
                     "objective": result.objective * problem.objective_scale,
                     "history": result.history,
                     "seconds_this_attempt": time.perf_counter() - began,
+                    "trial_capture_seconds": 0.0 if capture is None else capture.seconds,
                     "inner_iterations": sum(
                         step.get("linear_iterations", 0)
                         for outer in result.history
@@ -335,6 +354,10 @@ def main():
     )
     parser.add_argument("--accuracy", choices=("strict", "adaptive"), default="strict")
     parser.add_argument("--continuation", action="store_true")
+    parser.add_argument(
+        "--trial-policy", choices=("radius_rebuild", "backtrack"), default="radius_rebuild"
+    )
+    parser.add_argument("--capture-trials", action="store_true")
     parser.add_argument("--complete-sequence", action="store_true")
     parser.add_argument("--resume-from", type=Path)
     parser.add_argument("--prior-attempt-seconds", type=float)
@@ -355,7 +378,9 @@ def main():
         initial_state_assessment=str(args.initial_assessment),
         trust_accuracy=args.accuracy,
         flow_continuation=args.continuation,
-        optimizer_policy=POLICY["identifier"],
+        optimizer_policy=policy_description(args.trial_policy)["identifier"],
+        trial_policy=args.trial_policy,
+        capture_trials=args.capture_trials,
     )
     # Resolve through the same configuration type used by the other runners.
     cfg = OmegaConf.to_container(OmegaConf.create(cfg), resolve=True)

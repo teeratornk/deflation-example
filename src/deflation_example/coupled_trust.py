@@ -27,6 +27,19 @@ POLICY = {
 }
 
 
+def policy_description(trial_policy):
+    if trial_policy not in {"radius_rebuild", "backtrack"}:
+        raise ValueError("Choose radius_rebuild or backtrack trial policy")
+    return {
+        **POLICY,
+        "identifier": POLICY["identifier"]
+        if trial_policy == "radius_rebuild"
+        else "coupled-temperature-backtrack-v1",
+        "trial_policy": trial_policy,
+        "maximum_step_halvings": 6 if trial_policy == "backtrack" else 0,
+    }
+
+
 def optimality(problem, evaluation, desired, gradient, lower, upper):
     scaled = gradient / problem.weights
     scale = max(
@@ -72,6 +85,8 @@ def minimize_trust(
     inner_preconditioner="frozen",
     frozen_sweeps=3,
     accuracy="strict",
+    trial_policy="radius_rebuild",
+    trial_callback=None,
     callback=None,
     checkpoint=None,
     resume=None,
@@ -93,11 +108,17 @@ def minimize_trust(
         raise ValueError("Finite strictly ordered physical bounds are required")
     final_rtol = solver.rtol
     intermediate_targets(1.0, accuracy, qp_tolerance, final_rtol)
+    if trial_policy not in {"radius_rebuild", "backtrack"}:
+        raise ValueError("Choose radius_rebuild or backtrack trial policy")
+    if trial_callback is not None and not callable(trial_callback):
+        raise ValueError("The trial callback must be callable")
     radius, history, secants = POLICY["initial_radius_K"], [], []
     iteration, attempts, qp_resume = 0, [], None
     prior_seconds = 0.0
     pending_qp = None
     if resume is not None:
+        if resume.get("trial_policy", "radius_rebuild") != trial_policy:
+            raise ValueError("Checkpoint trial policy differs")
         initial = resume["state"]
         initial_evaluation = RestoredEvaluation(initial, resume["velocity"], resume["pressure"])
         radius, history, secants = resume["radius_K"], resume["history"], resume["secants"]
@@ -144,6 +165,7 @@ def minimize_trust(
                     "qp": qp,
                     "elapsed_seconds": elapsed(),
                     "last_strict": last_strict,
+                    "trial_policy": trial_policy,
                 }
             )
 
@@ -226,80 +248,118 @@ def minimize_trust(
                 )
                 save()
                 break
-            candidate = np.clip(evaluation.state + qp.x, lower, upper)
-            applied_step = candidate - evaluation.state
-            # The model ratio must describe the increment actually evaluated,
-            # including any final roundoff-sized projection onto physical bounds.
-            predicted = -float(gradient @ applied_step + 0.5 * applied_step @ (H @ applied_step))
-            physical_step = (
-                float(np.max(np.abs(candidate - evaluation.state))) * problem.temperature_scale
-            )
-            attempt.update(predicted_reduction=predicted, temperature_step_K=physical_step)
+            attempt["trial_policy"] = trial_policy
             trial = None
-            ratio = float("nan")
             accepted = False
-            if np.isfinite(predicted) and predicted > 0:
-                try:
-                    trial = problem.evaluate(candidate, initial=evaluation)
-                    value, derivative = problem.objective_gradient(trial, desired)
-                    change = problem.objective_difference(trial, evaluation, desired)
-                    finite = np.isfinite([value, change]).all() and np.isfinite(derivative).all()
-                    ratio = -change / predicted if finite else float("nan")
-                    trial_kkt, _ = optimality(problem, trial, desired, derivative, lower, upper)
-                    new_radius, accepted = radius_update(
-                        radius, ratio, physical_step >= 0.9 * radius
-                    )
-                    allowance = (
-                        NUMERICAL_POLICY["roundoff_epsilon_factor"]
-                        * np.finfo(float).eps
-                        * max(1.0, abs(objective))
-                    )
-                    roundoff = (
-                        finite
-                        and not accepted
-                        and error <= NUMERICAL_POLICY["roundoff_kkt_threshold"]
-                        and predicted <= allowance
-                        and change <= allowance
-                        and max(trial_kkt.values())
-                        <= NUMERICAL_POLICY["roundoff_kkt_contraction"] * error
-                    )
-                    accepted = accepted or roundoff
-                    attempt["trials"].append(
-                        {
+            strict_zero = force_strict and not np.any(qp.x)
+            if strict_zero:
+                # Strict zero increment independently verifies stationarity.
+                last_strict = True
+                save()
+                continue
+            exhausted = False
+            trial_count = 7 if trial_policy == "backtrack" else 1
+            for backtrack in range(trial_count):
+                if stop_requested():
+                    status, exhausted = "budget_exhausted", True
+                    break
+                step = 2.0 ** (-backtrack)
+                candidate = np.clip(evaluation.state + step * qp.x, lower, upper)
+                applied_step = candidate - evaluation.state
+                # Evaluate the actual increment, including floating-point projection.
+                predicted = -float(
+                    gradient @ applied_step + 0.5 * applied_step @ (H @ applied_step)
+                )
+                physical_step = float(np.max(np.abs(applied_step))) * problem.temperature_scale
+                attempt.update(predicted_reduction=predicted, temperature_step_K=physical_step)
+                event = {
+                    "iteration": iteration,
+                    "attempt": len(attempts) - 1,
+                    "trial": backtrack,
+                    "step": step,
+                    "radius_K": radius,
+                    "predicted_reduction": predicted,
+                    "temperature_step_K": physical_step,
+                }
+                if trial_callback is not None:
+                    trial_callback({**event, "phase": "started"}, evaluation, candidate, None)
+                failed_flow = None
+                began = time.perf_counter()
+                if not np.isfinite(predicted) or predicted <= 0:
+                    outcome = {"status": "nonpositive_predicted_reduction"}
+                else:
+                    try:
+                        trial = problem.evaluate(candidate, initial=evaluation)
+                        value, derivative = problem.objective_gradient(trial, desired)
+                        change = problem.objective_difference(trial, evaluation, desired)
+                        finite = (
+                            np.isfinite([value, change]).all() and np.isfinite(derivative).all()
+                        )
+                        ratio = -change / predicted if finite else float("nan")
+                        trial_kkt, _ = optimality(problem, trial, desired, derivative, lower, upper)
+                        new_radius, accepted = radius_update(
+                            radius, ratio, physical_step >= POLICY["boundary_fraction"] * radius
+                        )
+                        allowance = (
+                            NUMERICAL_POLICY["roundoff_epsilon_factor"]
+                            * np.finfo(float).eps
+                            * max(1.0, abs(objective))
+                        )
+                        roundoff = (
+                            finite
+                            and not accepted
+                            and error <= NUMERICAL_POLICY["roundoff_kkt_threshold"]
+                            and predicted <= allowance
+                            and change <= allowance
+                            and max(trial_kkt.values())
+                            <= NUMERICAL_POLICY["roundoff_kkt_contraction"] * error
+                        )
+                        accepted = accepted or roundoff
+                        outcome = {
                             "status": "roundoff_kkt_decrease"
                             if roundoff
                             else "decrease"
                             if accepted
                             else "insufficient_decrease",
-                            "step": 1.0,
                             "objective": value,
                             "objective_change": change,
                             "reduction_ratio": ratio,
                             "maximum_kkt": max(trial_kkt.values()),
                             "evaluation_seconds": trial.seconds,
                         }
-                    )
-                    radius = radius if roundoff else new_radius
-                except FlowEvaluationError as failure:
-                    attempt["trials"].append(
-                        {
+                        if accepted and not roundoff:
+                            radius = (
+                                max(POLICY["minimum_radius_K"], min(radius, 2 * physical_step))
+                                if backtrack
+                                else new_radius
+                            )
+                    except FlowEvaluationError as failure:
+                        failed_flow = failure.result
+                        outcome = {
                             "status": "flow_" + failure.result.status,
                             "slab": failure.slab,
                             "metrics": failure.metrics,
                             "flow_history": failure.result.history,
                         }
+                    except StabilizationBranchError:
+                        outcome = {"status": "stabilization_branch_switch"}
+                trial_row = {
+                    **event,
+                    **outcome,
+                    "accepted": accepted,
+                    "trial_seconds": time.perf_counter() - began,
+                }
+                attempt["trials"].append(trial_row)
+                if trial_callback is not None:
+                    trial_callback(
+                        {**trial_row, "phase": "finished"}, evaluation, candidate, failed_flow
                     )
-                    radius *= 0.5
-                except StabilizationBranchError:
-                    attempt["trials"].append({"status": "stabilization_branch_switch"})
-                    radius *= 0.5
-            elif force_strict and not np.any(qp.x):
-                # Strict zero increment independently verifies stationarity.
-                last_strict = True
+                if accepted:
+                    break
+            if exhausted:
                 save()
-                continue
-            else:
-                attempt["trials"].append({"status": "nonpositive_predicted_reduction"})
+                break
+            if not accepted:
                 radius *= 0.5
             if accepted:
                 if secant_memory:

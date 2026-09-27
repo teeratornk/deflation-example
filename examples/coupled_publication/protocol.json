@@ -1,0 +1,60 @@
+{
+  "schema": "coupled-publication-development-v1",
+  "scope": "Proposed complete coupled transient optimization study; results require the declared gates.",
+  "physics": {
+    "geometry": "existing body-fitted transformer",
+    "alpha": 1e-11,
+    "slabs": 64,
+    "horizon_s": 600.0,
+    "target_startup_s": 60.0,
+    "lower_K": 337.3,
+    "upper_K": 357.3
+  },
+  "final_accuracy": {
+    "original_linear_residual": 1e-10,
+    "nonlinear_kkt": 1e-8,
+    "coupled_equations": 1e-12,
+    "declared_conservation_checks": 1e-6
+  },
+  "repair": {
+    "target": 7,
+    "preconditioner": "frozen",
+    "rank": 0,
+    "accuracy": "adaptive",
+    "trial_policy": "backtrack",
+    "step_lengths": [1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625],
+    "continuation_options": [false, true],
+    "hours_per_policy": 24,
+    "capture_trials": true,
+    "launch_condition": "The preceding adaptive diagnostic has terminated without a verified complete target, and implementation checks passed.",
+    "selection": "Choose the fastest verified repair; require state and objective agreement if both converge. If neither converges, stop the performance campaign."
+  },
+  "reference_screen": {
+    "ranks": [4, 8, 16, 32],
+    "selection_rules": ["lowest", "alternating_low_high"],
+    "candidate_steps": 96,
+    "seed": 20260923,
+    "trace_samples": "Six evenly spaced completed inactive solves plus greatest constraint release; remove duplicates.",
+    "construction": "One initial full-domain operator; reference remains fixed.",
+    "selection": "Setup-inclusive replay cost; within two percent choose lower memory.",
+    "backends": ["cpu", "matched hybrid block processing after CPU verification"],
+    "status": "Requires a verified complete trajectory before execution."
+  },
+  "comparison": {
+    "arms": ["jacobi", "frozen", "reference", "recycling"],
+    "development_targets": [7, 15, 14],
+    "development_repetitions": 3,
+    "confirmation_targets": [7, 15, 14, 1, 4, 8, 11, 13],
+    "confirmation_repetitions": 5,
+    "hours_per_sequence": 168,
+    "maximum_concurrent_long_sequences": 2,
+    "minimum_reference_saving_fraction": 0.1,
+    "state_agreement_absolute": 1e-6,
+    "objective_agreement_relative": 1e-6,
+    "observed_ranges_must_separate": true,
+    "all_declared_sequences_must_verify": true,
+    "include": ["reference construction", "all nonlinear and active-set work", "all inner solves", "transfers", "verification", "cleanup"],
+    "preparation": "Report common calibration and process initialization separately.",
+    "failure_policy": "Keep every failure, cancellation and timeout; no completed-solve speedup from a failed baseline."
+  }
+}
