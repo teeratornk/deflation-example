@@ -327,12 +327,10 @@ def minimize_trust(
                             "maximum_kkt": max(trial_kkt.values()),
                             "evaluation_seconds": trial.seconds,
                         }
-                        if accepted and not roundoff:
-                            radius = (
-                                max(POLICY["minimum_radius_K"], min(radius, 2 * physical_step))
-                                if backtrack
-                                else new_radius
-                            )
+                        if accepted and backtrack:
+                            radius = max(POLICY["minimum_radius_K"], min(radius, 2 * physical_step))
+                        elif accepted and not roundoff:
+                            radius = new_radius
                     except FlowEvaluationError as failure:
                         failed_flow = failure.result
                         outcome = {

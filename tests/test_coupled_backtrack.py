@@ -161,6 +161,31 @@ def test_shortened_steps_converge_to_independent_quadratic_optimum():
     )
 
 
+def test_shortened_roundoff_step_uses_actual_increment_for_next_radius(monkeypatch):
+    from deflation_example.coupled_trust import POLICY
+
+    problem, checkpoints = QuadraticProblem(maximum_step=1e-8), []
+    # Simulate cancellation in the objective difference at near stationarity.
+    monkeypatch.setattr(problem, "objective_difference", lambda *args: 0.0)
+    result = minimize_trust(
+        problem,
+        np.full(4, 2e-8),
+        -0.2,
+        0.3,
+        solver(),
+        inner_preconditioner="jacobi",
+        trial_policy="backtrack",
+        max_iterations=1,
+        checkpoint=lambda row: checkpoints.append(deepcopy(row)),
+    )
+    trial = result.history[0]["attempts"][0]["trials"][-1]
+    assert trial["step"] == 0.5 and trial["status"] == "roundoff_kkt_decrease"
+    assert checkpoints[-1]["radius_K"] == max(
+        POLICY["minimum_radius_K"], 2 * trial["temperature_step_K"]
+    )
+    assert max(result.kkt.values()) <= 1e-8
+
+
 @pytest.mark.parametrize("accuracy", ["strict", "adaptive"])
 def test_backtracking_solves_small_coupled_equations(accuracy):
     problem = small_coupled_problem([0.2, 0.35])
