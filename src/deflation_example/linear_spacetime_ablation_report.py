@@ -40,7 +40,6 @@ def summarize(records, settings, agreements=None):
     groups = {name: {} for name in settings["arms"]}
     identity = None
     for record in records:
-        valid = validate_record(record)
         cfg = record["configuration"]
         name = cfg["speedup_ablation_arm"]
         repeat = integer(cfg["repetition"], "Repetition", 0)
@@ -69,6 +68,16 @@ def summarize(records, settings, agreements=None):
             {"target": t, "upper_K": 357.3} for t in settings["targets"]
         ]:
             raise ValueError("Physical problem, accuracy or reference protocol differs")
+        if record.get("status") == "running":
+            groups[name][repeat] = {
+                "repetition": repeat,
+                "status": "unfinished_record",
+                "verified": False,
+                "recorded_status": "running",
+                "scope": "Consult the scheduler outcome; a stale running record establishes no completed time.",
+            }
+            continue
+        valid = validate_record(record)
         current = matched_identity(record)
         if record.get("assembly") or not current["velocity"]:
             raise ValueError("Use complete fresh sequences with a verified fixed velocity")
@@ -180,6 +189,7 @@ def field_agreement(paths, records):
             for i, r in enumerate(records)
             if r["configuration"]["speedup_ablation_arm"] == "frozen"
             and r["configuration"]["repetition"] == 0
+            and r.get("status") != "running"
             and validate_record(r)
         ),
         None,
@@ -188,7 +198,7 @@ def field_agreement(paths, records):
         return {}, []
     agreements, files = {}, []
     for i, record in enumerate(records):
-        if not validate_record(record):
+        if record.get("status") == "running" or not validate_record(record):
             continue
         errors = {"state_absolute": 0.0, "objective_relative": 0.0}
         for position, case in enumerate(record["cases"]):

@@ -30,7 +30,11 @@ def test_complete_predeclared_population_and_rotation(tmp_path):
     assert len(frozen["schedule"]) == 66
     assert len({(r["arm"], r["repetition"]) for r in frozen["schedule"]}) == 66
     assert frozen["schedule"][0]["arm"] != frozen["schedule"][22]["arm"]
-    nominal = {"configuration": protocol(), "all_problems_verified": True, "cases": [{}]}
+    nominal = {
+        "configuration": {**protocol(), "queries": [{"target": 7, "upper_K": 357.3}]},
+        "all_problems_verified": True,
+        "cases": [{}],
+    }
     configurations = [ablation_configuration(nominal, frozen, i) for i in range(66)]
     common = [
         {k: v for k, v in c.items() if k not in ARM_KEYS | {"speedup_ablation_arm", "repetition"}}
@@ -62,9 +66,9 @@ def test_complete_small_trajectory_and_independent_agreement(
     from deflation_example.coupled_confirmation_report import inner_evidence
     from test_linear_spacetime import setup
 
-    physical, _, cfg = setup()
+    _, problem, cfg = setup()
     baseline = {"baseline_sha256": "test", "configuration": {}, "input_sha256": {}, "seconds": 0.0}
-    monkeypatch.setattr(sequence, "load_problem", lambda cfg: (physical, baseline))
+    monkeypatch.setattr(sequence, "load_fixed_flow", lambda cfg: (problem, baseline))
     cfg.update(
         method="reference",
         rank=2,
@@ -75,6 +79,7 @@ def test_complete_small_trajectory_and_independent_agreement(
         output=str(tmp_path / "reference"),
     )
     actual = sequence.run(OmegaConf.create(cfg))
+    assert actual["all_problems_verified"], actual
     assert validate_record(actual), actual
     assert inner_evidence(actual)["complete_histories"]
     plain = sequence.run(
@@ -163,6 +168,26 @@ def test_missing_baseline_has_no_completed_solve_speedup(tmp_path):
     assert all(r["status"] == "missing_record" for r in row["outcomes"])
     plot(result, tmp_path)
     assert (tmp_path / "rank-time-memory.pdf").stat().st_size > 1000
+
+
+@pytest.mark.parametrize("status", ["running", "failed"])
+def test_unfinished_or_failed_comparator_is_retained_without_a_ratio(tmp_path, status):
+    frozen, records, agreements = population(tmp_path)
+    row = next(r for r in records if r["configuration"]["speedup_ablation_arm"] == "frozen")
+    row["status"] = status
+    if status == "running":
+        for key in ("sequence_seconds", "cases", "memory", "all_problems_verified"):
+            del row[key]
+    else:
+        row["all_problems_verified"] = False
+        row["verified_problems"] -= 1
+        row["cases"][0].update(status="iteration_cap", verified=False)
+    result = summarize(records, frozen, agreements)
+    assert not result["all_declared_sequences_verified"]
+    assert all(c["fastest_alternative_over_reference"] is None for c in result["comparisons"])
+    outcome = next(r for r in result["rows"] if r["arm"] == "frozen")["outcomes"][0]
+    assert not outcome["verified"]
+    assert outcome["status"] == ("unfinished_record" if status == "running" else "failed")
 
 
 @pytest.mark.parametrize(
