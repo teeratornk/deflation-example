@@ -61,10 +61,27 @@ def summarize(records):
             value is None or not math.isfinite(value) or value < 0 for value in components.values()
         ):
             raise ValueError("Completed execution requires all construction timers")
+        elapsed, reconstruction = record.get("seconds"), record.get("reconstruction_seconds")
+        total = None
+        if elapsed is not None and reconstruction is not None:
+            if (
+                not math.isfinite(elapsed)
+                or not math.isfinite(reconstruction)
+                or not 0 <= reconstruction <= elapsed
+            ):
+                raise ValueError("Invalid total or reconstruction interval")
+            if all(v is not None for v in components.values()):
+                total = elapsed - reconstruction
+                remainder = total - sum(components.values())
+                if remainder < -1e-6:
+                    raise ValueError("Component timers exceed the enclosing interval")
+                # The final independent KKT check, field output and scalar
+                # diagnostics occur after the quadratic timer. Retain them.
+                components["final_verification_and_reporting"] = max(0.0, remainder)
+        if record.get("status") == "complete" and total is None:
+            raise ValueError("Completed execution requires its enclosing interval")
         row["cost_components_seconds"] = components
-        row["construction_inclusive_seconds"] = (
-            sum(components.values()) if all(v is not None for v in components.values()) else None
-        )
+        row["construction_inclusive_seconds"] = total
         # No ratio is assigned to a capped or failed computation.
         row["speedup"] = None
         rows.append(row)
@@ -78,7 +95,7 @@ def summarize(records):
         "schema": "coupled-quadratic-execution-v1",
         "identity": identity,
         "rows": rows,
-        "scope": "Single fixed-quadratic attempts; reconstruction is separate. No nonlinear or repeated-timing claim.",
+        "scope": "Single fixed-quadratic attempts, including construction, solve, final verification and field reporting; reconstruction is separate. No nonlinear or repeated-timing claim.",
     }
 
 

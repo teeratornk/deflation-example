@@ -128,5 +128,7 @@ uv run --locked --extra study python -m deflation_example.coupled_qp_execution_r
 ```
 
 The summary checks source and problem identity, reports requested and deployed
-ranks, and includes solver construction. Missing and failed runs remain visible.
+ranks, and includes solver construction, final verification and field reporting.
+It subtracts only the separately timed reconstruction from the enclosing interval.
+Missing and failed runs remain visible.
 It assigns no speedup to an unverified solve or against an unverified baseline.
