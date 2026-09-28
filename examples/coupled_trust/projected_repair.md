@@ -8,6 +8,18 @@ verified intermediate quadratic does not establish nonlinear convergence.
 
 ## Verification and profiling
 
+The following small verification is self-contained and runs from an installed
+wheel without study data. It compares projected quadratic steps with the
+existing PDAS procedure and checks the coupled equations and final optimality:
+
+```sh
+uv run --locked --extra study python -m deflation_example.coupled_projected_example \
+  --device cpu --output OUTPUT/small-verification
+```
+
+The annular test mesh and nondimensional coefficients provide an implementation
+check. They are separate from the body-fitted application comparisons.
+
 Install the locked environment on a compute node:
 
 ```sh
