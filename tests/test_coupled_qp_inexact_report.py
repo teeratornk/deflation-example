@@ -137,3 +137,33 @@ def test_partial_error_record_preserves_failure():
     result = summarize([value], [1e-2])
     assert result["rows"][0]["error"] == "reconstruction failed"
     assert not result["verified_direction_tolerances"]
+
+
+def test_cli_records_digests_and_missing_declared_arm(tmp_path, monkeypatch):
+    import json
+    from deflation_example.coupled_qp_inexact_report import main
+    from deflation_example.reporting import file_sha256
+
+    existing = tmp_path / "record.json"
+    existing.write_text(json.dumps(record()))
+    output = tmp_path / "summary"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "report",
+            "--records",
+            str(existing),
+            str(tmp_path / "missing.json"),
+            "--tolerances",
+            "1e-2",
+            "1e-4",
+            "--output",
+            str(output),
+        ],
+    )
+    main()
+    result = json.loads((output / "summary.json").read_text())
+    assert result["record_sha256"] == [file_sha256(existing), None]
+    assert result["rows"][1]["status"] == "missing"
+    with pytest.raises(FileExistsError):
+        main()

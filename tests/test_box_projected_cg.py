@@ -10,13 +10,14 @@ from deflation_example.study_solvers import StudySolver
 
 
 @pytest.mark.parametrize("seed", range(6))
-def test_feasible_descent_matches_independent_box_optimizer(seed):
+@pytest.mark.parametrize("direction_rtol", [1e-2, 1e-4, 1e-11])
+def test_feasible_descent_matches_independent_box_optimizer(seed, direction_rtol):
     rng = np.random.default_rng(seed)
     A = rng.normal(size=(16, 16))
     H = sparse.csr_matrix(A.T @ A + np.eye(16))
     g = rng.standard_normal(16)
     lo, hi = np.full(16, -0.1), np.full(16, 0.15)
-    solver = StudySolver("jacobi", rtol=1e-11, maxiter=1000, residual_policy="refine")
+    solver = StudySolver("jacobi", rtol=direction_rtol, maxiter=1000, residual_policy="refine")
     try:
         result = box_projected_cg(H, g, H.diagonal(), lo, hi, solver, tolerance=1e-8)
     finally:
@@ -75,7 +76,8 @@ def test_search_failure_and_invalid_diagonal_remain_explicit():
 
 
 @pytest.mark.parametrize("steps", [None, [0.2, 0.35]])
-def test_coupled_quadratic_matches_pdas_with_weighted_optimality(steps):
+@pytest.mark.parametrize("direction_rtol", [1e-2, 1e-4, 1e-11])
+def test_coupled_quadratic_matches_pdas_with_weighted_optimality(steps, direction_rtol):
     from deflation_example.coupled_derivatives import GaussNewtonOperator
     from deflation_example.coupled_frozen_preconditioner import frozen_preconditioner_factory
     from test_coupled_derivatives import small_coupled_problem
@@ -90,7 +92,12 @@ def test_coupled_quadratic_matches_pdas_with_weighted_optimality(steps):
     factory = frozen_preconditioner_factory(problem, evaluation)
     results = []
     for procedure in (box_quadratic, box_projected_cg):
-        solver = StudySolver("jacobi", rtol=1e-11, maxiter=2000, residual_policy="refine")
+        solver = StudySolver(
+            "jacobi",
+            rtol=1e-11 if procedure is box_quadratic else direction_rtol,
+            maxiter=2000,
+            residual_policy="refine",
+        )
         try:
             results.append(
                 procedure(
