@@ -4,6 +4,7 @@ import pytest
 from omegaconf import OmegaConf
 
 from deflation_example import benchmark_cht
+from deflation_example.memory import ProcessMemory
 
 
 def config(problem="transient", device="cpu", reference_device="cpu"):
@@ -27,7 +28,12 @@ def test_device_restriction_is_declared_and_requires_cuda():
 
 @pytest.mark.gpu
 @pytest.mark.parametrize("problem", ["steady", "transient"])
-def test_device_and_host_restrictions_take_the_same_path(problem):
+def test_device_and_host_restrictions_take_the_same_path(problem, monkeypatch):
+    monkeypatch.setattr(
+        benchmark_cht,
+        "ProcessMemory",
+        lambda *args: ProcessMemory(interval=60, query=lambda: (100, 0)),
+    )
     torch = pytest.importorskip("torch")
     if not torch.cuda.is_available():
         pytest.skip("CUDA is unavailable")
