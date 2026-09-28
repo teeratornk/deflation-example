@@ -35,10 +35,12 @@ def test_intermediate_targets_restore_strict_accuracy():
     assert intermediate_targets(1e-5, "adaptive", 1e-10, 1e-10) == (1e-10, 1e-10, True)
     with pytest.raises(ValueError):
         intermediate_targets(1, "unknown", 1e-10, 1e-10)
+    assert intermediate_targets(1, "adaptive_projected", 1e-10, 1e-10) == (0.01, 0.01, False)
+    assert intermediate_targets(1e-5, "adaptive_projected", 1e-10, 1e-10) == (1e-10, 1e-10, True)
 
 
 @pytest.mark.parametrize("steps", [None, [0.2, 0.35]])
-@pytest.mark.parametrize("accuracy", ["strict", "adaptive"])
+@pytest.mark.parametrize("accuracy", ["strict", "adaptive", "adaptive_projected"])
 def test_trust_solves_small_coupled_problem(steps, accuracy):
     from deflation_example.coupled_optimizer import minimize_coupled
 
@@ -52,6 +54,7 @@ def test_trust_solves_small_coupled_problem(steps, accuracy):
         solver(),
         inner_preconditioner="jacobi",
         accuracy=accuracy,
+        qp_solver="projected" if accuracy == "adaptive_projected" else "pdas",
         max_iterations=80,
     )
     independent = minimize_coupled(problem, desired, -0.04, 0.15, solver(), max_iterations=80)

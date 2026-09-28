@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 import pytest
 from scipy import sparse
 from scipy.optimize import minimize
@@ -7,6 +8,37 @@ from deflation_example.box_projected_cg import box_projected_cg, projected_searc
 from deflation_example.coupled_optimizer import box_kkt, box_quadratic
 from deflation_example.coupled_qp_globalization import validate_reconstruction
 from deflation_example.study_solvers import StudySolver
+
+
+def test_projected_resume_retains_completed_work_and_rejects_changed_policy():
+    rng = np.random.default_rng(43)
+    A = rng.normal(size=(20, 20))
+    H = sparse.csr_matrix(A.T @ A + np.eye(20))
+    g = rng.normal(size=20)
+    saved = []
+
+    class Interrupted(Exception):
+        pass
+
+    def stop(payload):
+        saved.append(copy.deepcopy(payload))
+        raise Interrupted
+
+    solver = StudySolver("jacobi", rtol=1e-8)
+    try:
+        expected = box_projected_cg(H, g, H.diagonal(), -0.1, 0.15, solver)
+        with pytest.raises(Interrupted):
+            box_projected_cg(H, g, H.diagonal(), -0.1, 0.15, solver, checkpoint=stop)
+        result = box_projected_cg(H, g, H.diagonal(), -0.1, 0.15, solver, resume=saved[0])
+        assert result.status == expected.status == "converged"
+        np.testing.assert_allclose(result.x, expected.x, atol=1e-12)
+        assert len(result.history) == len(expected.history)
+        with pytest.raises(ValueError, match="settings differ"):
+            box_projected_cg(
+                H, g, H.diagonal(), -0.1, 0.15, solver, resume=saved[0], tolerance=1e-7
+            )
+    finally:
+        solver.close()
 
 
 @pytest.mark.parametrize("seed", range(6))

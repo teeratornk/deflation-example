@@ -53,6 +53,7 @@ def run(
         "capture_trials": False,
         "capture_linear_systems": False,
         "qp_correction_policy": "kkt_decrease",
+        "qp_solver": "pdas",
         **cfg,
     }
     if cfg["trial_policy"] not in {"radius_rebuild", "backtrack"}:
@@ -136,7 +137,14 @@ def run(
             tick = time.perf_counter()
             if cfg["method"] == "reference":
                 if saved is None:
-                    reference = configured_krylov_reference(problem, cfg, initial_guess=guess)
+                    reference = configured_krylov_reference(
+                        problem,
+                        cfg,
+                        initial_guess=guess,
+                        verification_callback=lambda rows: write_report(
+                            output / "reference-equations.json", {"equations": rows}
+                        ),
+                    )
                 else:
                     path = Path(resume_from) / "reference.npz"
                     if file_sha256(path) != saved["reference_sha256"]:
@@ -248,6 +256,7 @@ def run(
                     accuracy=cfg["trust_accuracy"],
                     trial_policy=cfg["trial_policy"],
                     qp_correction_policy=cfg["qp_correction_policy"],
+                    qp_solver=cfg["qp_solver"],
                     trial_callback=capture,
                     observer=trace,
                     checkpoint=save_optimizer,
@@ -376,7 +385,10 @@ def main():
     parser.add_argument(
         "--arm", choices=("jacobi", "frozen", "recycling", "reference"), default="frozen"
     )
-    parser.add_argument("--accuracy", choices=("strict", "adaptive"), default="strict")
+    parser.add_argument(
+        "--accuracy", choices=("strict", "adaptive", "adaptive_projected"), default="strict"
+    )
+    parser.add_argument("--qp-solver", choices=("pdas", "projected"), default="pdas")
     parser.add_argument("--continuation", action="store_true")
     parser.add_argument(
         "--trial-policy", choices=("radius_rebuild", "backtrack"), default="radius_rebuild"
@@ -413,6 +425,7 @@ def main():
         capture_trials=args.capture_trials,
         capture_linear_systems=args.capture_linear_systems,
         qp_correction_policy=args.qp_correction_policy,
+        qp_solver=args.qp_solver,
     )
     # Resolve through the same configuration type used by the other runners.
     cfg = OmegaConf.to_container(OmegaConf.create(cfg), resolve=True)

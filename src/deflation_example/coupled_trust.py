@@ -59,12 +59,14 @@ def radius_update(radius, ratio, boundary, *, flow_failed=False):
 
 
 def intermediate_targets(kkt, mode, qp_tolerance, linear_tolerance):
-    if mode not in {"strict", "adaptive"}:
+    if mode not in {"strict", "adaptive", "adaptive_projected"}:
         raise ValueError("Choose strict or adaptive intermediate accuracy")
     if mode == "strict" or kkt <= POLICY["strict_switch_kkt"]:
         return qp_tolerance, linear_tolerance, True
     # This target uses the same weight-normalized equations as outer optimality.
     target = max(qp_tolerance, min(1e-2, 0.1 * kkt**1.5))
+    if mode == "adaptive_projected":
+        return target, max(linear_tolerance, min(1e-2, target)), False
     return target, max(linear_tolerance, min(1e-4, 0.1 * target)), False
 
 
@@ -87,6 +89,7 @@ def minimize_trust(
     accuracy="strict",
     trial_policy="radius_rebuild",
     qp_correction_policy="kkt_decrease",
+    qp_solver="pdas",
     trial_callback=None,
     observer=None,
     callback=None,
@@ -110,6 +113,10 @@ def minimize_trust(
         raise ValueError("Finite strictly ordered physical bounds are required")
     final_rtol = solver.rtol
     intermediate_targets(1.0, accuracy, qp_tolerance, final_rtol)
+    if qp_solver not in {"pdas", "projected"}:
+        raise ValueError("Choose pdas or projected quadratic solver")
+    if accuracy == "adaptive_projected" and qp_solver != "projected":
+        raise ValueError("Adaptive projected accuracy requires the projected quadratic solver")
     if trial_policy not in {"radius_rebuild", "backtrack"}:
         raise ValueError("Choose radius_rebuild or backtrack trial policy")
     if qp_correction_policy not in {"kkt_decrease", "allow_partition_change"}:
@@ -121,6 +128,11 @@ def minimize_trust(
     prior_seconds = 0.0
     pending_qp = None
     if resume is not None:
+        if (
+            resume.get("qp_solver", "pdas") != qp_solver
+            or resume.get("accuracy", accuracy) != accuracy
+        ):
+            raise ValueError("Checkpoint quadratic solver or accuracy policy differs")
         if resume.get("trial_policy", "radius_rebuild") != trial_policy:
             raise ValueError("Checkpoint trial policy differs")
         if resume.get("qp_correction_policy", "kkt_decrease") != qp_correction_policy:
@@ -173,6 +185,8 @@ def minimize_trust(
                     "last_strict": last_strict,
                     "trial_policy": trial_policy,
                     "qp_correction_policy": qp_correction_policy,
+                    "qp_solver": qp_solver,
+                    "accuracy": accuracy,
                 }
             )
 
@@ -240,7 +254,13 @@ def minimize_trust(
                 factory = frozen_preconditioner_factory(problem, evaluation, sweeps=frozen_sweeps)
             solver.rtol = ltol
             pending_qp = None
-            qp = box_quadratic(
+            if qp_solver == "projected":
+                from .box_projected_cg import box_projected_cg
+
+                solve_quadratic, extra = box_projected_cg, {}
+            else:
+                solve_quadratic, extra = box_quadratic, {"correction_policy": qp_correction_policy}
+            qp = solve_quadratic(
                 H,
                 gradient,
                 diagonal,
@@ -254,7 +274,7 @@ def minimize_trust(
                 checkpoint=qp_checkpoint,
                 resume=qp_resume,
                 observer=observer,
-                correction_policy=qp_correction_policy,
+                **extra,
             )
             solver.rtol = final_rtol
             qp_resume = None
@@ -266,6 +286,7 @@ def minimize_trust(
                 "qp_tolerance": qtol,
                 "linear_tolerance": ltol,
                 "strict_accuracy": strict,
+                "qp_solver": qp_solver,
                 "trials": [],
             }
             attempts.append(attempt)

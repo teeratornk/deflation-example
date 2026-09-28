@@ -51,13 +51,15 @@ def box_projected_cg(
     preconditioner_factory=None,
     kkt_evaluator=None,
     checkpoint=None,
+    resume=None,
+    observer=None,
 ):
     """Maintain feasible iterates and independently verify every returned state.
 
     Gradient projection identifies a face; CG computes a correction within it.
     Both updates use a projected Armijo search. The supplied positive diagonal
     defines the gradient-projection metric. All unsuccessful solves and searches
-    retain an explicit status. This diagnostic has no nonlinear acceptance role.
+    retain an explicit status. Nonlinear acceptance remains the caller's responsibility.
     """
     tolerance = positive_real(tolerance, "Quadratic KKT tolerance")
     max_steps = integer(max_steps, "Outer iteration cap", 1)
@@ -84,6 +86,35 @@ def box_projected_cg(
     scale = max(1.0, np.linalg.norm(g, np.inf))
     assess = kkt_evaluator or (lambda state, derivative: box_kkt(state, derivative, lo, hi, scale))
     history, cached_indices, cached_preconditioner = [], None, None
+    settings = {
+        "procedure": "projected-v1",
+        "tolerance": tolerance,
+        "linear_tolerance": solver.rtol,
+        "projected_steps": projected_steps,
+    }
+    start_iteration = 0
+    if resume is not None:
+        if initial is not None or resume.get("settings") != settings:
+            raise ValueError("Projected checkpoint settings differ or initial state is ambiguous")
+        x = np.asarray(resume["x"], dtype=float).copy()
+        if x.shape != g.shape or not np.isfinite(x).all() or np.any(x < lo) or np.any(x > hi):
+            raise ValueError("Projected checkpoint state must satisfy the current bounds")
+        history = list(resume["history"])
+        start_iteration = integer(resume["next_iteration"], "Checkpoint iteration", 0)
+        if start_iteration != len(history):
+            raise ValueError("Projected checkpoint history differs from its iteration count")
+
+    def save(next_iteration):
+        if checkpoint is not None:
+            checkpoint(
+                {
+                    "x": x.copy(),
+                    "history": list(history),
+                    "kkt": assess(x, H @ x + g),
+                    "settings": settings,
+                    "next_iteration": next_iteration,
+                }
+            )
 
     def finish(status):
         kkt = assess(x, H @ x + g)
@@ -91,7 +122,7 @@ def box_projected_cg(
             status = "converged"
         return BoxQPResult(x.copy(), status, kkt, history)
 
-    for iteration in range(max_steps):
+    for iteration in range(start_iteration, max_steps):
         if solver.stop_requested is not None and solver.stop_requested():
             return finish("budget_exhausted")
         derivative = H @ x + g
@@ -126,6 +157,7 @@ def box_projected_cg(
         indices = np.flatnonzero((x > lo) & (x < hi))
         row["inactive"] = len(indices)
         if not len(indices):
+            save(iteration + 1)
             continue
 
         def action(z):
@@ -154,7 +186,11 @@ def box_projected_cg(
             preconditioner_seconds=time.perf_counter() - setup_start,
         )
         rhs = -derivative[indices]
+        if observer is not None:
+            observer.before_solve(iteration, indices, rhs, np.zeros_like(rhs), False)
         result, timing = solver.solve(B, rhs, indices, initial=np.zeros_like(rhs))
+        if observer is not None:
+            observer.after_solve(result, timing)
         residual = independent_residual(B, result.x, rhs)
         row.update(
             linear_status=result.status,
@@ -174,6 +210,5 @@ def box_projected_cg(
             return finish("reduced_search_failed")
         x = candidate
         row["kkt"] = assess(x, H @ x + g)
-        if checkpoint is not None:
-            checkpoint({"x": x.copy(), "history": list(history), "kkt": row["kkt"]})
+        save(iteration + 1)
     return finish("iteration_cap")
