@@ -173,6 +173,7 @@ def main():
 
                 report["reference"] = save_reference(args.output, "reference", reference)
             report["reference_construction_seconds"] = time.perf_counter() - tick
+            tick = time.perf_counter()
             solver_type = StudySolver
             extra = {}
             if args.device == "cuda":
@@ -196,8 +197,9 @@ def main():
                 residual_policy="refine",
                 **extra,
             )
-            if args.device == "cuda":
-                cp = solver.cp
+            if args.device in {"cuda", "hybrid"}:
+                import cupy as cp
+
                 properties = cp.cuda.runtime.getDeviceProperties(cp.cuda.runtime.getDevice())
                 report["gpu"] = {
                     "model": properties["name"].decode(),
@@ -205,6 +207,7 @@ def main():
                     "total_memory_bytes": properties["totalGlobalMem"],
                     "cuda_runtime": cp.cuda.runtime.runtimeGetVersion(),
                 }
+            report["solver_construction_seconds"] = time.perf_counter() - tick
             heartbeat = {"time": 0.0}
 
             def progress(event):
