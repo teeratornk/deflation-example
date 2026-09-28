@@ -111,3 +111,38 @@ The summary checks that both records use the same input, source, hardware,
 accuracy and budget. An unsuccessful comparison remains visible and supplies
 no completed-solve speedup. A successful quadratic repair requires separate
 nonlinear integration tests before another optimization campaign.
+
+## Inexact reduced directions
+
+If accurately solved reduced directions dominate the projected method's cost,
+vary their residual target while keeping the quadratic and its final KKT
+criterion fixed. A projected direction is an intermediate search direction;
+the projected search still checks objective decrease, and the final state
+still needs the independent weighted KKT test. This experiment changes neither
+the complete nonlinear optimizer nor its final accuracy requirements.
+
+The bounded comparison declares targets `1e-2` and `1e-4`, with the preceding
+`1e-8` attempt as the strict control. Use the same numerical source, baseline,
+trace, initial zero step, preconditioner and resource limits for all arms:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_qp_globalization \
+  --trace INPUT/inactive-trace-00 --baseline BASELINE --quadratic 2 \
+  --method projected --rtol 1e-2 --budget-seconds 7200 --output OUTPUT/projected-1e-2
+uv run --no-sync python -m deflation_example.coupled_qp_globalization \
+  --trace INPUT/inactive-trace-00 --baseline BASELINE --quadratic 2 \
+  --method projected --rtol 1e-4 --budget-seconds 7200 --output OUTPUT/projected-1e-4
+uv run --no-sync python -m deflation_example.coupled_qp_inexact_report \
+  --records OUTPUT/projected-1e-2/record.json OUTPUT/projected-1e-4/record.json \
+    OUTPUT/projected/record.json --tolerances 1e-2 1e-4 1e-8 \
+  --output OUTPUT/inexact-summary
+```
+
+The internal CG trigger is one tenth of the declared direction target. Each
+returned direction receives an independent residual check at its declared
+target. The recorded intermediate quadratic KKT tolerance is unchanged.
+The summary retains every declared arm, checks the common input and numerical
+environment, and compares iteration totals and accumulated search decreases
+against the final records. A budget-limited direction remains a failed direction,
+even when preceding feasible updates decreased the objective. A single diagnostic
+attempt supplies no repeated-timing or nonlinear-optimization speedup.
