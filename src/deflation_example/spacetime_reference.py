@@ -42,7 +42,12 @@ class SpaceTimeReference:
 
 
 def build_space_time_reference(
-    trajectory, rank, construction="mode_dependent", reference_capacity=1.0
+    trajectory,
+    rank,
+    construction="mode_dependent",
+    reference_capacity=1.0,
+    spatial_modes=None,
+    temporal_modes=None,
 ):
     """Compare exact homogeneous mode-dependent and common temporal constructions.
 
@@ -50,16 +55,32 @@ def build_space_time_reference(
     is W + alpha (lambda I + c_ref T).T W (lambda I + c_ref T). Mode-dependent
     temporal eigenvectors diagonalize this matrix. The tensor alternative uses
     the same pure-time eigenvectors for every spatial mode and orders products
-    by their reference Rayleigh values. Both retain the declared total rank.
+    by their reference Rayleigh values. Both retain the declared total rank. With
+    ``spatial_modes`` S each of the S lowest spatial modes keeps its
+    ``temporal_modes`` K lowest temporal factors (K defaults to the slab count), and
+    the total rank must be S*K.
     """
     rank = integer(rank, "Total space-time rank")
+    per_mode = spatial_modes is not None
+    slab_count = len(trajectory.steps)
+    if per_mode:
+        spatial_modes = integer(spatial_modes, "Spatial reference modes", 1)
+        temporal_modes = integer(
+            slab_count if temporal_modes is None else temporal_modes,
+            "Temporal factors per spatial mode",
+            1,
+        )
+        if temporal_modes > slab_count or spatial_modes * temporal_modes != rank:
+            raise ValueError("The total rank must equal spatial modes times temporal factors")
+    elif temporal_modes is not None:
+        raise ValueError("Temporal factors per mode require a declared spatial mode count")
     if rank >= trajectory.size:
         raise ValueError("Space-time rank must be below the full trajectory dimension")
     if construction not in {"mode_dependent", "tensor"}:
         raise ValueError("Choose mode_dependent or tensor reference construction")
     capacity = positive_real(reference_capacity, "Reference thermal capacity")
     n, slabs = trajectory.spatial.n, len(trajectory.steps)
-    spatial, modes = analytical_reference(n, 3, min(rank, n**3))
+    spatial, modes = analytical_reference(n, 3, spatial_modes if per_mode else min(rank, n**3))
     T = trajectory.time_matrix.toarray()
     W = np.diag(trajectory.steps / trajectory.steps.mean())
     alpha = trajectory.spatial.alpha
@@ -78,7 +99,8 @@ def build_space_time_reference(
             temporal = common
             values = np.diag(temporal.T @ normal @ temporal)
         vectors.append(temporal)
-        candidates.extend((float(value), j, ell) for ell, value in enumerate(values))
+        mode = sorted((float(value), j, ell) for ell, value in enumerate(values))
+        candidates.extend(mode[:temporal_modes] if per_mode else mode)
     selected = sorted(candidates)[:rank]
     used = sorted({j for _, j, _ in selected})
     mapped = {j: i for i, j in enumerate(used)}
@@ -98,5 +120,10 @@ def build_space_time_reference(
             "temporal_column_indices": [ell for _, _, ell in selected],
             "reference_rayleigh_values": [value for value, _, _ in selected],
             "total_rank": rank,
+            "selection_policy": (
+                f"{spatial_modes} spatial modes x {temporal_modes} temporal factors"
+                if per_mode
+                else "global total rank"
+            ),
         },
     )

@@ -17,6 +17,9 @@ recycle_rank: null
 construction: mode_dependent
 spatial_reference: diffusion
 temporal_metric: euclidean
+temporal_solver: dense
+spatial_modes: null
+temporal_modes: null
 reference_device: cpu
 methods: [jacobi, reference, recycling]
 device: cpu

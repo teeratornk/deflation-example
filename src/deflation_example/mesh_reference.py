@@ -92,9 +92,33 @@ def build_mesh_reference(
     spatial_policy="diffusion",
     temporal_metric="euclidean",
     temporal_solver="dense",
+    spatial_modes=None,
+    temporal_modes=None,
 ):
-    """Build one full-domain reference before optimization, including all time levels."""
+    """Build one full-domain reference before optimization, including all time levels.
+
+    By default the candidates of every spatial mode compete for the declared total
+    rank, so a long trajectory keeps few spatial modes. With ``spatial_modes`` S the
+    reference keeps the S lowest spatial modes and, for each, its ``temporal_modes``
+    K lowest temporal factors (K defaults to the slab count), and rank must be S*K.
+    """
     rank = integer(rank, "Total reference rank", 1)
+    per_mode = spatial_modes is not None
+    if per_mode:
+        spatial_modes = integer(spatial_modes, "Spatial reference modes", 1)
+        temporal_modes = integer(
+            len(problem.steps) if temporal_modes is None else temporal_modes,
+            "Temporal factors per spatial mode",
+            1,
+        )
+        if not len(problem.steps) or temporal_modes > len(problem.steps):
+            raise ValueError("Per-mode selection needs a trajectory with that many slabs")
+        if spatial_modes * temporal_modes != rank:
+            raise ValueError("The total rank must equal spatial modes times temporal factors")
+        if temporal_solver != "dense":
+            raise ValueError("Per-mode selection uses the dense temporal eigensolver")
+    elif temporal_modes is not None:
+        raise ValueError("Temporal factors per mode require a declared spatial mode count")
     if construction not in {"mode_dependent", "tensor"}:
         raise ValueError("Unknown temporal reference construction")
     if spatial_policy not in {"diffusion", "scaled_schur"}:
@@ -105,7 +129,9 @@ def build_mesh_reference(
         raise ValueError("Choose dense or tridiagonal temporal eigensolves")
     if temporal_solver == "tridiagonal" and construction != "mode_dependent":
         raise ValueError("Tridiagonal selection requires mode-dependent temporal factors")
-    spatial_rank = min(rank, len(coarse_assembly.mesh.free) - 1)
+    spatial_rank = spatial_modes if per_mode else min(rank, len(coarse_assembly.mesh.free) - 1)
+    if spatial_rank > len(coarse_assembly.mesh.free) - 1:
+        raise ValueError("The coarse mesh cannot support the requested spatial modes")
     values, phi, residuals = spatial_reference(
         coarse_assembly,
         spatial_rank,
@@ -157,7 +183,8 @@ def build_mesh_reference(
             vectors = common
             score = np.diag(vectors.T @ H @ vectors) / np.sum(metric[:, None] * vectors**2, axis=0)
         factors.append(vectors)
-        candidates.extend((float(s), j, k) for k, s in enumerate(score))
+        mode = sorted((float(s), j, k) for k, s in enumerate(score))
+        candidates.extend(mode[:temporal_modes] if per_mode else mode)
     selected = sorted(candidates)[:rank]
     if len(selected) != rank:
         raise ValueError("The coarse space-time pool cannot support the requested rank")
@@ -172,6 +199,11 @@ def build_mesh_reference(
             "temporal_construction": construction,
             "temporal_selection_metric": temporal_metric,
             "temporal_eigensolver": "dense",
+            "selection_policy": (
+                f"{spatial_modes} spatial modes x {temporal_modes} temporal factors"
+                if per_mode
+                else "global total rank"
+            ),
             "selection": selected,
             "temporal_operator": "one-spatial-mode compression of the weighted trajectory Hessian",
         },

@@ -50,6 +50,10 @@ class StudyConfig:
     # "cpu" restricts the reference on the host and uploads it (the v1 campaign);
     # "cuda" keeps the reference factors on the GPU and restricts them there.
     reference_device: str = "cpu"
+    # With spatial_modes S, a transient reference keeps S spatial modes, each with its
+    # temporal_modes K lowest temporal factors (K defaults to slabs); rank = S * K.
+    spatial_modes: int | None = None
+    temporal_modes: int | None = None
     recycle_rank: int | None = None
     window: int = 12
     repeats: int = 1
@@ -182,6 +186,17 @@ def specification(config):
             raise ValueError("Methods and start policies must be distinct declared choices")
     if values["device"] == "cpu" and "amgx" in values["methods"]:
         raise ValueError("The AmgX comparison requires CUDA")
+    if values["spatial_modes"] is not None:
+        per_mode = values["slabs"] if values["temporal_modes"] is None else values["temporal_modes"]
+        if (
+            values["problem"] != "transient"
+            or not 1 <= per_mode <= values["slabs"]
+            or values["spatial_modes"] < 1
+            or values["spatial_modes"] * per_mode != values["rank"]
+        ):
+            raise ValueError("Per-mode ranks need a trajectory and rank = spatial x temporal")
+    elif values["temporal_modes"] is not None:
+        raise ValueError("Temporal factors per mode require a declared spatial mode count")
     if values["reference_device"] not in {"cpu", "cuda"} or (
         values["reference_device"] == "cuda" and values["device"] != "cuda"
     ):
@@ -266,6 +281,8 @@ def build_reference(model, controls):
             controls["rank"],
             controls["reference_construction"],
             controls["reference_capacity"],
+            spatial_modes=controls.get("spatial_modes"),
+            temporal_modes=controls.get("temporal_modes"),
         )
     basis, modes = analytical_reference(controls["n"], 3, controls["rank"])
     return ArrayReference(basis, {"construction": "analytical", "mode_indices": modes})

@@ -42,6 +42,11 @@ class MeshStudyConfig:
     construction: str = "mode_dependent"
     spatial_reference: str = "diffusion"
     temporal_metric: str = "euclidean"
+    temporal_solver: str = "dense"
+    # With spatial_modes S, a transient reference keeps S spatial modes, each with its
+    # temporal_modes K lowest temporal factors (K defaults to slabs); rank = S * K.
+    spatial_modes: int | None = None
+    temporal_modes: int | None = None
     reference_device: str = "cpu"
     methods: list[str] = field(default_factory=lambda: ["jacobi", "reference", "recycling"])
     device: str = "cpu"
@@ -119,6 +124,21 @@ def controls(config):
         raise ValueError("Unknown spatial reference construction")
     if c["temporal_metric"] not in {"euclidean", "jacobi"}:
         raise ValueError("Unknown temporal selection metric")
+    if c["temporal_solver"] not in {"dense", "tridiagonal"}:
+        raise ValueError("Unknown temporal eigensolver")
+    if c["spatial_modes"] is not None:
+        modes = integer(c["spatial_modes"], "Spatial reference modes", 1)
+        per_mode = integer(
+            c["slabs"] if c["temporal_modes"] is None else c["temporal_modes"],
+            "Temporal factors per spatial mode",
+            1,
+        )
+        if not c["transient"] or per_mode > c["slabs"] or modes * per_mode != c["rank"]:
+            raise ValueError("Per-mode ranks need a trajectory and rank = spatial x temporal")
+        if c["temporal_solver"] != "dense":
+            raise ValueError("Per-mode selection uses the dense temporal eigensolver")
+    elif c["temporal_modes"] is not None:
+        raise ValueError("Temporal factors per mode require a declared spatial mode count")
     if c["reference_device"] not in {"cpu", "cuda"} or (
         c["reference_device"] == "cuda" and c["device"] != "cuda"
     ):
@@ -219,6 +239,9 @@ def sequence(c, method, torch=None, api=None):
                 c["construction"],
                 c["spatial_reference"],
                 c["temporal_metric"],
+                temporal_solver=c.get("temporal_solver", "dense"),
+                spatial_modes=c.get("spatial_modes"),
+                temporal_modes=c.get("temporal_modes"),
             )
             if c["reference_device"] == "cuda":
                 reference = DeviceMeshReference(reference, torch)
