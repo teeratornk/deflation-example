@@ -19,7 +19,7 @@ from .benchmark_cht import pack_mask
 from .mesh_control import build_mesh_control
 from .mesh_reference import build_mesh_reference
 from .mesh_reference import DeviceMeshReference
-from .mesh_showcases import build_showcase, desired_temperature
+from .mesh_showcases import build_showcase, desired_temperature, reassemble
 from .reporting import environment, write_report, write_fields
 from .solvers import pdas, independent_residual, LinearResult, relative_norm
 from .study_solvers import StudySolver
@@ -58,6 +58,14 @@ class MeshStudyConfig:
     # tracks target k under the fixed bound.
     query_targets: list[int] | None = None
     query_bounds: list[float] | None = None
+    # Operating scenarios. load_profile multiplies the physical heat source in each
+    # time slab (one value for a steady problem): one row for every query, or one row
+    # per query (row-major). query_flows scales the prescribed velocity of each query;
+    # the reference stays at the nominal flow. chain_initial starts each transient
+    # query from the final slab of the previous one (a receding horizon).
+    load_profile: list[float] | None = None
+    query_flows: list[float] | None = None
+    chain_initial: bool = False
     rank: int = 20
     recycle_rank: int | None = None
     construction: str = "mode_dependent"
@@ -201,13 +209,71 @@ def controls(config):
         for bound in c["query_bounds"]:
             if not np.isfinite(bound) or bound < 0 or bound < c["initial_temperature"]:
                 raise ValueError("Query bounds must be finite and admit the initial temperature")
-        if len(set(zip(c["query_targets"], c["query_bounds"]))) != len(c["query_bounds"]):
-            raise ValueError("Declared queries must be distinct target and bound pairs")
+    count = len(query_plan(c))
+    width = c["slabs"] if c["transient"] else 1
+    if c["load_profile"] is not None and (
+        len(c["load_profile"]) not in {width, width * count}
+        or any(not np.isfinite(v) or v < 0 for v in c["load_profile"])
+    ):
+        raise ValueError("A load profile holds nonnegative slab multipliers, once or per query")
+    if c["query_flows"] is not None and (
+        len(c["query_flows"]) != count
+        or any(not np.isfinite(v) or v <= 0 for v in c["query_flows"])
+    ):
+        raise ValueError("Every query needs one positive flow scale")
+    if c["chain_initial"] and not c["transient"]:
+        raise ValueError("Receding-horizon chaining needs a trajectory")
+    if not c["chain_initial"]:
+        keys = [operating_key(c, q, *plan) for q, plan in enumerate(query_plan(c))]
+        if len(set(keys)) != len(keys):
+            raise ValueError("Declared queries must be distinct operating problems")
     if c["phase"] == "final" and (c["repeats"] < 5 or len(query_plan(c)) < 16):
         raise ValueError(
             "Final populations require at least 16 targets and five complete repetitions"
         )
     return c
+
+
+def load_row(c, query):
+    """The slab load multipliers of one query, or None for the nominal source."""
+    profile = c.get("load_profile")
+    if profile is None:
+        return None
+    width = c["slabs"] if c["transient"] else 1
+    start = 0 if len(profile) == width else query * width
+    return [float(v) for v in profile[start : start + width]]
+
+
+def operating_key(c, query, target, bound):
+    """What distinguishes one declared query from another."""
+    row = load_row(c, query)
+    flows = c.get("query_flows")
+    return (
+        target,
+        bound,
+        None if row is None else tuple(row),
+        None if flows is None else float(flows[query]),
+    )
+
+
+def operating_problem(problem, row=None, initial=None):
+    """The problem of one query: slab load multipliers and a chained initial state.
+
+    Only the forcing changes (the Hessian does not); without a row or an initial
+    state the problem is returned unchanged.
+    """
+    if row is None and initial is None:
+        return problem
+    from dataclasses import replace
+
+    width = max(len(problem.steps), 1)
+    forcing = np.kron(
+        np.ones(width) if row is None else np.asarray(row, float), problem.spatial_forcing
+    )
+    y0 = problem.initial if initial is None else np.asarray(initial, float)
+    if len(problem.steps):
+        forcing[: problem.spatial_size] += problem.nodal_capacity * y0 / problem.steps[0]
+    return replace(problem, forcing=forcing, initial=y0.copy())
 
 
 def query_plan(c):
@@ -228,10 +294,14 @@ def build_model(c, *, transport_form="advective"):
         transport_form=transport_form,
         reference_level=c.get("reference_level", 0),
     )
+    return showcase, control_model(c, showcase.assembly)
+
+
+def control_model(c, assembly):
     steps = np.full(c["slabs"], c["horizon"] / c["slabs"]) if c["transient"] else None
-    initial = np.full(len(showcase.assembly.mesh.free), c["initial_temperature"])
+    initial = np.full(len(assembly.mesh.free), c["initial_temperature"])
     model = build_mesh_control(
-        showcase.assembly,
+        assembly,
         alpha=c["alpha"],
         time_steps=steps,
         initial=initial,
@@ -243,7 +313,26 @@ def build_model(c, *, transport_form="advective"):
         from .sparse_restriction import PreassembledRestriction
 
         model = replace(model, H=PreassembledRestriction(model.H))
-    return showcase, model
+    return model
+
+
+def solver_problem(c, method, problem, storage=None):
+    """Attach the block-in-time preconditioner for the block methods."""
+    if method not in BLOCK_METHODS:
+        return problem
+    from dataclasses import replace
+
+    from .block_time import BlockTimeRestriction
+
+    if storage is not None:
+        storage["block_preconditioner"] = {
+            "sweeps": c["block_sweeps"],
+            "slab_blocks": "factored at every inactive restriction (SuperLU)",
+            "kernel": "host CG",
+        }
+    return replace(
+        problem, H=BlockTimeRestriction(problem.H, problem.spatial_size, c["block_sweeps"])
+    )
 
 
 def sequence(c, method, torch=None, api=None):
@@ -281,20 +370,7 @@ def sequence(c, method, torch=None, api=None):
     initial_setup_seconds = None
     try:
         showcase, problem = build_model(c)
-        if method in BLOCK_METHODS:
-            from dataclasses import replace
-
-            from .block_time import BlockTimeRestriction
-
-            problem = replace(
-                problem,
-                H=BlockTimeRestriction(problem.H, problem.spatial_size, c["block_sweeps"]),
-            )
-            storage["block_preconditioner"] = {
-                "sweeps": c["block_sweeps"],
-                "slab_blocks": "factored at every inactive restriction (SuperLU)",
-                "kernel": "host CG",
-            }
+        problem = solver_problem(c, method, problem, storage)
         components["assembly"] = time.perf_counter() - tick
         storage["state_operator_bytes"] = sum(
             a.nbytes for a in (problem.A.data, problem.A.indices, problem.A.indptr)
@@ -341,10 +417,24 @@ def sequence(c, method, torch=None, api=None):
         components["solver_resources"] = time.perf_counter() - tick
         initial_setup_seconds = time.perf_counter() - start
         previous = None
+        nominal, flow, chained = problem, 1.0, None
+        flows = c.get("query_flows")
         for query, (target, bound) in enumerate(query_plan(c)):
             tick = time.perf_counter()
-            desired = desired_temperature(problem, target, c["targets"])
-            load = problem.load(desired)
+            reassembly_seconds = 0.0
+            if flows is not None and float(flows[query]) != flow:
+                flow = float(flows[query])
+                nominal = None
+                nominal = (
+                    problem
+                    if flow == 1.0
+                    else solver_problem(c, method, control_model(c, reassemble(showcase, flow)))
+                )
+                reassembly_seconds = time.perf_counter() - tick
+            row = load_row(c, query)
+            case_problem = operating_problem(nominal, row, chained)
+            desired = desired_temperature(case_problem, target, c["targets"])
+            load = case_problem.load(desired)
             warm = c["warm_start"] == "outer_inner"
             active = (
                 previous["active"] if previous is not None and warm else np.ones(problem.size, bool)
@@ -390,7 +480,7 @@ def sequence(c, method, torch=None, api=None):
                 return solved
 
             solved = pdas(
-                problem.H,
+                case_problem.H,
                 load,
                 bound,
                 initial_active=active,
@@ -398,10 +488,10 @@ def sequence(c, method, torch=None, api=None):
                 maxiter=c["outer_cap"],
                 linear_solver=solve,
             )
-            control, adjoint = problem.recover(solved["y"])
+            control, adjoint = case_problem.recover(solved["y"])
             recovery = relative_norm(
-                problem.weights * (solved["y"] - desired)
-                + problem.apply_transpose(adjoint)
+                case_problem.weights * (solved["y"] - desired)
+                + case_problem.apply_transpose(adjoint)
                 + solved["multiplier"],
                 load,
             )
@@ -428,9 +518,15 @@ def sequence(c, method, torch=None, api=None):
                 "active_mask_bits": pack_mask(solved["active"]),
                 "target_index": target,
                 "bound": bound,
-                "objective": problem.objective(solved["y"], desired),
+                "objective": case_problem.objective(solved["y"], desired),
                 "adjoint_recovery_relative": recovery,
             }
+            if row is not None or flows is not None or c.get("chain_initial"):
+                case["load_row"] = row
+                case["flow_scale"] = flow
+                case["reassembly_seconds"] = reassembly_seconds
+                case["initial_sha256"] = _hash(case_problem.initial)
+                case["operation_sha256"] = _hash(np.concatenate((case_problem.forcing, [flow])))
             if previous is not None:
                 case["query_newly_active"] = int(np.sum(solved["active"] & ~previous["active"]))
                 case["query_newly_inactive"] = int(np.sum(~solved["active"] & previous["active"]))
@@ -453,6 +549,11 @@ def sequence(c, method, torch=None, api=None):
             previous = solved if status == "converged" else None
             if previous is None and adapter is not None:
                 adapter.reset_history()
+            if c.get("chain_initial"):
+                if previous is None:
+                    # The next window starts from this one's final state.
+                    break
+                chained = solved["y"][-case_problem.spatial_size :].copy()
     except Exception as error:
         failure = {
             "status": "memory_error" if isinstance(error, MemoryError) else "exception",

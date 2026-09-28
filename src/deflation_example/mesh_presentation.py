@@ -184,8 +184,15 @@ def summarize(directory):
                 )
                 if len(record["cases"]) != count:
                     raise ValueError("An accepted sequence has an incorrect population")
+                # Operating scenarios (load rows, flows, chained windows) also
+                # distinguish queries that share a target and a bound.
                 problems = {
-                    (c["target_sha256"], c.get("bound", controls["bound"])) for c in record["cases"]
+                    (
+                        c["target_sha256"],
+                        c.get("bound", controls["bound"]),
+                        c.get("operation_sha256"),
+                    )
+                    for c in record["cases"]
                 }
                 if len(problems) != count:
                     raise ValueError("A sequence repeats a desired-temperature field")

@@ -20,6 +20,9 @@ class MeshShowcase:
     prolongation: sparse.csr_matrix
     parameters: dict
     preparation: dict
+    # Final-level flow and source inputs, kept so the target mesh can be reassembled
+    # at another flow rate (None where the preset computes them from the mesh).
+    flow_inputs: dict | None = None
 
 
 def engine_velocity(points, speed=50.0):
@@ -36,9 +39,13 @@ def engine_velocity(points, speed=50.0):
     return np.column_stack((-dy * factor, dx * factor, np.zeros_like(x)))
 
 
-def _assembly(mesh, parameters, velocity=None, source=None, *, transport_form="advective"):
+def _assembly(
+    mesh, parameters, velocity=None, source=None, *, transport_form="advective", velocity_scale=1.0
+):
     nc, dim = len(mesh.cells), mesh.dimension
     p = parameters["physical"]
+    if velocity_scale != 1.0 and velocity is not None:
+        velocity = velocity * velocity_scale
     k = np.tile(np.eye(dim), (nc, 1, 1))
     if parameters["geometry"] == "transformer_2d":
         conductivity_scale = p["oil_conductivity_W_m_K"]
@@ -52,7 +59,8 @@ def _assembly(mesh, parameters, velocity=None, source=None, *, transport_form="a
         )
     k[mesh.materials == 1] *= p["conductivity_ratio"]
     center = mesh.nodes[mesh.cells].mean(axis=1)
-    velocity = engine_velocity(center, p["velocity_max"])
+    speed = p["velocity_max"] if velocity_scale == 1.0 else p["velocity_max"] * velocity_scale
+    velocity = engine_velocity(center, speed)
     velocity[mesh.materials != 0] = 0
     capacity = np.array(p["dimensionless_capacity"])[mesh.materials]
     result = assemble_thermal(mesh, k, capacity, velocity, streamline=True)
@@ -151,6 +159,26 @@ def build_showcase(
             "weighted_volume": float(current.mass.sum()),
             "coarse_weighted_volume": float(coarse.mass.sum()),
         },
+        {"velocity": velocity, "source": source, "transport_form": transport_form},
+    )
+
+
+def reassemble(showcase, velocity_scale):
+    """The target-mesh assembly with the prescribed velocity scaled by velocity_scale.
+
+    Sources, capacities and the mesh are unchanged; the reference coarse assembly of
+    the showcase stays at the nominal flow.
+    """
+    if not np.isfinite(velocity_scale) or velocity_scale <= 0:
+        raise ValueError("The flow scale must be positive and finite")
+    inputs = showcase.flow_inputs
+    return _assembly(
+        showcase.assembly.mesh,
+        showcase.parameters,
+        inputs["velocity"],
+        inputs["source"],
+        transport_form=inputs["transport_form"],
+        velocity_scale=float(velocity_scale),
     )
 
 

@@ -15,6 +15,9 @@ initial_temperature: 0.0
 targets: 3
 query_targets: null
 query_bounds: null
+load_profile: null
+query_flows: null
+chain_initial: false
 rank: 20
 recycle_rank: null
 construction: mode_dependent
