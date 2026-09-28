@@ -139,6 +139,7 @@ def main():
 
             def assess(x, g):
                 return box_kkt(x, g / problem.weights, lo, hi, scale)
+
             procedure = box_quadratic if args.method == "pdas" else box_projected_cg
             options = (
                 {"correction_policy": cfg["qp_correction_policy"]} if args.method == "pdas" else {}
