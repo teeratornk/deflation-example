@@ -2,6 +2,8 @@ import pytest
 
 from deflation_example.coupled_projected_example import run
 
+pytestmark = pytest.mark.cupy
+
 
 @pytest.mark.parametrize(
     "device",
