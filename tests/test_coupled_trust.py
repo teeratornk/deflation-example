@@ -384,7 +384,10 @@ def test_progress_reports_retained_objective_and_stationarity_scale():
 
 @pytest.mark.parametrize("method", ["jacobi", "reference", "recycling"])
 @pytest.mark.parametrize("interrupt", [False, True])
-def test_recovery_runner_verifies_complete_small_sequence(tmp_path, monkeypatch, method, interrupt):
+@pytest.mark.parametrize("accuracy", ["strict", "adaptive_projected"])
+def test_recovery_runner_verifies_complete_small_sequence(
+    tmp_path, monkeypatch, method, interrupt, accuracy
+):
     import deflation_example.coupled_trust_run as runner
     from deflation_example.study_solvers import ArrayReference
 
@@ -421,7 +424,9 @@ def test_recovery_runner_verifies_complete_small_sequence(tmp_path, monkeypatch,
         secant_memory=3,
         inner_preconditioner="jacobi",
         frozen_sweeps=3,
-        trust_accuracy="strict",
+        trust_accuracy=accuracy,
+        qp_solver="projected" if accuracy == "adaptive_projected" else "pdas",
+        slabs=2,
         equation_acceptance_tolerance=1e-9,
         conservation_tolerance=1e-6,
     )
@@ -465,3 +470,8 @@ def test_recovery_runner_verifies_complete_small_sequence(tmp_path, monkeypatch,
     assert summary["all_problems_verified"]
     assert summary["inner_preconditioner"] == cfg["inner_preconditioner"]
     assert summary["inner_iterations"] == sum(c["inner_iterations"] for c in result["cases"])
+    if accuracy == "adaptive_projected":
+        from deflation_example.coupled_projected_report import audit
+
+        checked = audit(result)
+        assert checked["verified"], checked

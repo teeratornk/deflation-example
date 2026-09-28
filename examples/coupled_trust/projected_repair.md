@@ -105,6 +105,19 @@ the same access given to competing methods.
 Keep every capped or failed attempt. Compare complete time only when both
 methods meet all final criteria; report intermediate progress separately.
 
+Check the completed nonlinear record with the policy-specific verifier:
+
+```sh
+uv run --locked --extra study python -m deflation_example.coupled_projected_report \
+  --record OUTPUT/nonlinear-frozen/record.json --output OUTPUT/nonlinear-check.json
+```
+
+It checks every declared target, intermediate original residuals, the final
+strict phase, coupled equations, adjoint checks, KKT components and elapsed-time
+accounting. It reads independently computed checks saved by the run; it does
+not replace a recomputation from the saved fields. Earlier strict/adaptive
+diagnostics retain their own verifier and are separate evidence.
+
 Generate a matched fixed-quadratic summary from every execution record:
 
 ```sh
