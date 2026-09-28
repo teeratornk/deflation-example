@@ -17,7 +17,9 @@ from .coupled_optimize import equation_acceptance
 from .validation import integer
 
 
-def configured_krylov_reference(problem, cfg, initial_guess=None, initial_state=None):
+def configured_krylov_reference(
+    problem, cfg, initial_guess=None, initial_state=None, *, verification_callback=None
+):
     """Construct a full-domain energy-metric reference once, before optimization."""
     transfer = cfg.get("reference_transfer", "full")
     if transfer not in {"full", "sequential"} or not cfg["queries"]:
@@ -59,6 +61,8 @@ def configured_krylov_reference(problem, cfg, initial_guess=None, initial_state=
         raise ValueError("The nominal temperature must be finite, feasible and full-domain")
     evaluation = problem.evaluate(state.copy(), initial=initial_guess)
     diagnostics = problem.verify(evaluation)
+    if verification_callback is not None:
+        verification_callback(diagnostics)
     if not equation_acceptance(diagnostics, cfg):
         raise ValueError("The nominal coupled equations fail independent verification")
     operator = GaussNewtonOperator(evaluation.jacobian, problem.weights, problem.alpha)

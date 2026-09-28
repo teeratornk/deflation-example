@@ -635,6 +635,10 @@ class CoupledControlProblem:
                     "slab": n,
                     **flow_checks,
                     "thermal_relative_residual": relative_norm(reaction[self.free], rhs[self.free]),
+                    "thermal_residual_norm": float(np.linalg.norm(reaction[self.free])),
+                    "thermal_rhs_norm": float(np.linalg.norm(rhs[self.free])),
+                    "mass_net_flux": float(abs(flux.sum())),
+                    "mass_flux_normalization": float(max(np.abs(flux).sum() / 2, 1e-30)),
                     "mass_relative_imbalance": float(
                         abs(flux.sum()) / max(np.abs(flux).sum() / 2, 1e-30)
                     ),
@@ -642,6 +646,7 @@ class CoupledControlProblem:
                         **components,
                         "defect": defect,
                         "relative_defect": abs(defect) / scale,
+                        "normalization": scale,
                     },
                 }
             )
