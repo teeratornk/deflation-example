@@ -31,6 +31,14 @@ solves. Reconstruction and preconditioner preparation are separate from the
 inner solver's component timings. No optimized trajectory or complete-solve
 speedup follows from a one-system replay.
 
+Summarize the four paths in tolerance order, retaining missing paths and failures:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_qp_accuracy_report \
+  --records accuracy-1e-4/record.json accuracy-1e-6/record.json \
+    accuracy-1e-8/record.json accuracy-1e-10/record.json --output accuracy-summary
+```
+
 If tighter solves change the next partition substantially, a bounded replay of
 the full failed quadratic is the next test. If the strict replay retains the
 large activation/release changes, investigate active-set globalization on that
