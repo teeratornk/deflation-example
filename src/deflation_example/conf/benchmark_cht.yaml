@@ -16,6 +16,9 @@ reference_construction: mode_dependent
 reference_capacity: 1.0
 targets: 4
 rank: 12
+reference_device: cpu
+spatial_modes: null
+temporal_modes: null
 recycle_rank: null
 window: 12
 repeats: 1

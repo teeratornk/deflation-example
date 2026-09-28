@@ -20,6 +20,7 @@ temporal_metric: euclidean
 temporal_solver: dense
 spatial_modes: null
 temporal_modes: null
+block_sweeps: 3
 reference_device: cpu
 methods: [jacobi, reference, recycling]
 device: cpu
