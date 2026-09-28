@@ -133,7 +133,13 @@ def box_projected_cg(
             full[indices] = np.asarray(z).ravel()
             return (H @ full)[indices]
 
-        B = LinearOperator((len(indices),) * 2, matvec=action, rmatvec=action, dtype=float)
+        # Preserve coupled-parent metadata and batched products for CUDA solvers.
+        # Both paths apply the same zero-extension restriction.
+        B = (
+            H.restrict(indices)
+            if hasattr(H, "restrict")
+            else LinearOperator((len(indices),) * 2, matvec=action, rmatvec=action, dtype=float)
+        )
         B.diagonal = lambda: d[indices].copy()
         setup_start = time.perf_counter()
         rebuilt = False

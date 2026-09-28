@@ -21,7 +21,7 @@ from .coupled_trace import read_arrays, read_manifest
 from .coupled_trust import optimality
 from .reporting import environment, file_sha256, write_arrays, write_report
 from .study_solvers import StudySolver
-from .validation import positive_real
+from .validation import integer, positive_real
 
 
 def relative_difference(actual, expected):
@@ -50,9 +50,16 @@ def main():
     parser.add_argument("--rtol", type=float, required=True)
     parser.add_argument("--budget-seconds", type=float, default=7200)
     parser.add_argument("--restriction", choices=["product", "submatrix"], default="product")
+    parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+    parser.add_argument("--reference-rank", type=int, default=0)
+    parser.add_argument("--reference-steps", type=int, default=48)
     args = parser.parse_args()
     positive_real(args.rtol, "Linear tolerance")
     positive_real(args.budget_seconds, "Quadratic time budget")
+    integer(args.reference_rank, "Reference rank", 0)
+    integer(args.reference_steps, "Reference construction steps", 1)
+    if args.reference_rank > args.reference_steps:
+        raise ValueError("Reference rank must not exceed its construction steps")
     manifest = read_manifest(args.trace)
     if manifest["status"] != "complete" or not 0 <= args.quadratic < len(manifest["quadratics"]):
         raise ValueError("Select a recorded quadratic from a complete trace")
@@ -74,6 +81,8 @@ def main():
         "initial": "zero temperature step",
         "restriction": args.restriction,
         "budget_seconds": args.budget_seconds,
+        "device": args.device,
+        "reference_rank": args.reference_rank,
         "scope": "One unchanged quadratic; nonlinear optimality is not assessed.",
     }
     write_report(args.output / "record.json", report)
@@ -111,15 +120,61 @@ def main():
                 restriction=args.restriction,
             )
             report["preconditioner_construction_seconds"] = time.perf_counter() - tick
-            solver = StudySolver(
-                "jacobi",
-                rank=0,
+            reference = None
+            tick = time.perf_counter()
+            if args.reference_rank:
+                from .coupled_nominal_krylov import configured_krylov_reference
+
+                reference = configured_krylov_reference(
+                    problem,
+                    {
+                        **cfg,
+                        "device": "cpu",
+                        "inner_preconditioner": "frozen",
+                        "frozen_sweeps": 3,
+                        "rank": args.reference_rank,
+                        "reference_transfer": "full",
+                        "reference_krylov_steps": args.reference_steps,
+                        "reference_krylov_selection": "alternating_low_high",
+                    },
+                )
+                from .coupled_retention_replay import save_reference
+
+                report["reference"] = save_reference(args.output, "reference", reference)
+            report["reference_construction_seconds"] = time.perf_counter() - tick
+            solver_type = StudySolver
+            if args.device == "cuda":
+                from .coupled_cuda_solver import CudaCoupledSolver
+
+                solver_type = CudaCoupledSolver
+            solver = solver_type(
+                "reference" if reference is not None else "jacobi",
+                rank=args.reference_rank,
+                reference=reference,
                 rtol=args.rtol,
                 maxiter=cfg["inner_cap"],
                 cg_factor=0.1,
                 refresh=cfg["inner_refresh"],
                 residual_policy="refine",
             )
+            if args.device == "cuda":
+                cp = solver.cp
+                properties = cp.cuda.runtime.getDeviceProperties(cp.cuda.runtime.getDevice())
+                report["gpu"] = {
+                    "model": properties["name"].decode(),
+                    "cupy": cp.__version__,
+                    "total_memory_bytes": properties["totalGlobalMem"],
+                    "cuda_runtime": cp.cuda.runtime.runtimeGetVersion(),
+                }
+            heartbeat = {"time": 0.0}
+
+            def progress(event):
+                now = time.perf_counter()
+                if event["stage"] in {"initial", "final"} or now - heartbeat["time"] >= 30:
+                    write_report(args.output / "iteration-progress.json", event)
+                    heartbeat["time"] = now
+
+            solver.progress_callback = progress
             observe_linear_solves(solver, args.output / "linear-progress.json")
             solve_start = time.perf_counter()
             solver.stop_requested = lambda: time.perf_counter() - solve_start >= args.budget_seconds

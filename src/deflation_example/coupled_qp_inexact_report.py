@@ -45,6 +45,9 @@ def summarize(records, tolerances):
             k: record["environment"].get(k)
             for k in ("git_head", "source_sha256", "cpu_model", "python", "numpy", "scipy", "blas")
         }
+        key.update(
+            device=record.get("device", "cpu"), reference_rank=record.get("reference_rank", 0)
+        )
         if identity is not None and key != identity:
             raise ValueError(
                 "Match quadratic, final criterion, source, backend, hardware and budget"

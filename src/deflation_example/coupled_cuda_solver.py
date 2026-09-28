@@ -110,10 +110,14 @@ class CudaCoupledSolver(StudySolver):
             raise RuntimeError("Coupled CUDA solves require the CuPy CUDA extra") from error
         self.cp = cp
         self.device_jacobian, self.cpu_jacobian = None, None
+        self.device_preconditioner, self.cpu_preconditioner = None, None
         if self.history is not None:
             self.history = CudaRecycleSpace(cp, self.rank, kwargs.get("window", 20))
 
     def close(self):
+        if self.device_preconditioner is not None:
+            self.device_preconditioner.close()
+        self.device_preconditioner, self.cpu_preconditioner = None, None
         if self.device_jacobian is not None:
             self.device_jacobian.close()
         self.cp.cuda.get_current_stream().synchronize()
@@ -132,11 +136,17 @@ class CudaCoupledSolver(StudySolver):
         parent = getattr(B, "coupled_parent", None)
         if parent is None or not np.array_equal(indices, B.inactive_indices):
             raise ValueError("A matching restricted coupled Gauss--Newton operator is required")
-        if getattr(B, "preconditioner", None) is not None:
-            raise ValueError(
-                "An operator preconditioner is supported by the host kernel only; "
-                "this solver keeps its own recurrence on the device"
-            )
+        preconditioner = getattr(B, "preconditioner", None)
+        if preconditioner is not None:
+            from .coupled_frozen_preconditioner import FrozenSweepPreconditioner
+
+            if (
+                not isinstance(preconditioner, FrozenSweepPreconditioner)
+                or preconditioner.correction is not None
+            ):
+                raise ValueError(
+                    "CUDA coupled solves support only the declared frozen sweep operator preconditioner"
+                )
         b, guess, diagonal = validate_linear_inputs(
             B, b, None, B.diagonal(), initial, target, cap, self.refresh, 1e10
         )
@@ -146,6 +156,33 @@ class CudaCoupledSolver(StudySolver):
         def mark(phase):
             cp.cuda.get_current_stream().synchronize()
             timer.mark(phase)
+
+        if self.stop_requested is not None and self.stop_requested():
+            residual = independent_residual(B, guess, b)
+            mark("verification")
+            metrics = timer.finish()
+            metrics.update(
+                callback_seconds=time.perf_counter() - start,
+                restriction_and_transfer_seconds=0.0,
+                iteration_rtol=target * self.cg_factor,
+                acceptance_rtol=target,
+                termination_test=None,
+            )
+            return LinearResult(
+                guess, 0, residual, "converged" if residual <= target else "budget_exhausted"
+            ), metrics
+
+        preconditioner_rebuilt = preconditioner is not self.cpu_preconditioner
+        if preconditioner_rebuilt:
+            if self.device_preconditioner is not None:
+                self.device_preconditioner.close()
+            self.device_preconditioner, self.cpu_preconditioner = None, None
+            if preconditioner is not None:
+                from .coupled_cuda_preconditioner import CudaFrozenSweepPreconditioner
+
+                self.device_preconditioner = CudaFrozenSweepPreconditioner(preconditioner)
+                self.cpu_preconditioner = preconditioner
+        mark("coarse_or_hierarchy_setup")
 
         if self.cpu_jacobian is not parent.jacobian:
             if self.device_jacobian is not None:
@@ -202,7 +239,7 @@ class CudaCoupledSolver(StudySolver):
             return Z @ coarse_coefficients(Z.T @ z) if rank else cp.zeros_like(z)
 
         def precondition(r):
-            z = r / d
+            z = self.device_preconditioner(r) if self.device_preconditioner is not None else r / d
             return z - Z @ coarse_coefficients(AZ.T @ z) if rank else z
 
         rhs_scale = float(cp.max(cp.abs(rhs)))
@@ -215,13 +252,34 @@ class CudaCoupledSolver(StudySolver):
         r = rhs - apply(x)
         mark("initialization")
         iterations, status, termination = 0, "maxiter", None
+        self.kernel_calls += 1
+
+        def progress(stage, residual, kind, status="running"):
+            if self.progress_callback is not None:
+                self.progress_callback(
+                    {
+                        "stage": stage,
+                        "iteration": iterations,
+                        "residual": residual,
+                        "residual_kind": kind,
+                        "residual_scope": "current_kernel_rhs",
+                        "status": status,
+                        "kernel_call": self.kernel_calls,
+                        "kernel_rtol": target * self.cg_factor,
+                    }
+                )
+
         internal_target = target * self.cg_factor
+        progress("initial", relative(r), "device_recomputed")
         if relative(r) <= internal_target:
             status = "converged"
         else:
             z = precondition(r)
             p, rz = z.copy(), float(r @ z)
             for k in range(cap):
+                if self.stop_requested is not None and self.stop_requested():
+                    status = "budget_exhausted"
+                    break
                 if self.history is not None:
                     self.history.capture(p)
                 Ap = apply(p)
@@ -238,6 +296,7 @@ class CudaCoupledSolver(StudySolver):
                     break
                 step = rz / curvature
                 x += step * p
+                previous_residual = r.copy() if preconditioner is not None else None
                 r -= step * Ap
                 iterations = k + 1
                 restart = iterations % self.refresh == 0 or relative(r) <= internal_target
@@ -253,8 +312,16 @@ class CudaCoupledSolver(StudySolver):
                         break
                 z = precondition(r)
                 new_rz = float(r @ z)
-                p = z.copy() if restart else z + (new_rz / rz) * p
+                if restart:
+                    p = z.copy()
+                elif preconditioner is not None:
+                    # Match the CPU operator-preconditioned recurrence.
+                    beta = float((r - previous_residual) @ z) / rz
+                    p = z + max(beta, 0.0) * p
+                else:
+                    p = z + (new_rz / rz) * p
                 rz = new_rz
+                progress("iteration", relative(r), "device_recomputed" if restart else "recurrence")
         mark("iteration")
         host = cp.asnumpy(x)
         mark("download")
@@ -267,6 +334,7 @@ class CudaCoupledSolver(StudySolver):
             else status
         )
         mark("verification")
+        progress("final", residual, "independently_recomputed_cpu", status)
         selection = self.history.finish(apply, d, Z, status) if self.history is not None else None
         mark("basis_processing")
         previous = self.previous
@@ -283,6 +351,12 @@ class CudaCoupledSolver(StudySolver):
             restricted_basis_bytes=Z.nbytes,
             cached_operator_product_bytes=0 if AZ is None else AZ.nbytes,
             derivative_device_bytes=self.device_jacobian.storage_bytes(),
+            frozen_preconditioner_device_bytes=0
+            if self.device_preconditioner is None
+            else self.device_preconditioner.storage_bytes(),
+            frozen_preconditioner_uploaded=preconditioner_rebuilt and preconditioner is not None,
+            vector_device="cuda",
+            independent_verification_device="cpu",
             cuda_pool_used_bytes=cp.get_default_memory_pool().used_bytes(),
             cuda_pool_reserved_bytes=cp.get_default_memory_pool().total_bytes(),
             newly_inactive=None if previous is None else len(np.setdiff1d(indices, previous)),

@@ -71,6 +71,8 @@ def test_verified_result_still_requires_separate_nonlinear_tests():
         ("initial", "warm"),
         ("budget_seconds", 8000),
         ("restriction", "submatrix"),
+        ("device", "cuda"),
+        ("reference_rank", 16),
     ],
 )
 def test_unmatched_conditions_are_rejected(key, value):

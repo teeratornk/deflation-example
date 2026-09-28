@@ -35,6 +35,9 @@ def summarize(records):
             )
         }
         key.update(source=record["environment"]["git_head"], cpu=record["environment"]["cpu_model"])
+        key.update(
+            device=record.get("device", "cpu"), reference_rank=record.get("reference_rank", 0)
+        )
         if identity is not None and key != identity:
             raise ValueError("Compare matched input, source, hardware, accuracy and budget")
         identity = key
@@ -64,6 +67,9 @@ def summarize(records):
                     "quadratic_seconds",
                     "reconstruction_seconds",
                     "preconditioner_construction_seconds",
+                    "reference_construction_seconds",
+                    "device",
+                    "reference_rank",
                     "seconds",
                     "error",
                 )
