@@ -98,3 +98,16 @@ It uses residual-based CG stopping rather than that paper's objective-decrease
 test. This diagnostic is separate from the published optimization algorithm.
 Its timers include the projected searches and independent checks. A completed
 quadratic at an intermediate tolerance does not establish nonlinear optimality.
+
+After both attempts finish, retain every outcome in a summary:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_qp_globalization_report \
+  --pdas OUTPUT/pdas/record.json --projected OUTPUT/projected/record.json \
+  --output OUTPUT/comparison
+```
+
+The summary checks that both records use the same input, source, hardware,
+accuracy and budget. An unsuccessful comparison remains visible and supplies
+no completed-solve speedup. A successful quadratic repair requires separate
+nonlinear integration tests before another optimization campaign.
