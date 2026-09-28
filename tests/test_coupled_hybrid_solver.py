@@ -101,8 +101,11 @@ def test_cpu_sparse_gpu_coarse_policy_avoids_gpu_derivative_factors(monkeypatch)
             assert sum(timing["components_seconds"].values()) == pytest.approx(
                 timing["total_seconds"]
             )
+        last_space = solver.coarse_records[-1]
     finally:
         solver.close()
+    assert last_space.Z is None and last_space.AZ is None and last_space.factor is None
+    solver.close()
 
 
 def test_cpu_coarse_space_matches_default_reference_solve():

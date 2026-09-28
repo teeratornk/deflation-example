@@ -61,6 +61,9 @@ class HybridCoupledSolver(StudySolver):
         self.coarse_records = []
 
     def close(self):
+        self.coarse_records = [
+            space if isinstance(space, dict) else space.retire() for space in self.coarse_records
+        ]
         if self.device_jacobian is not None:
             self.device_jacobian.close()
             self.device_jacobian.cp.cuda.get_current_stream().synchronize()
