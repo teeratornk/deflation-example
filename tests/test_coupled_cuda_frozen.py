@@ -12,14 +12,94 @@ from deflation_example.coupled_frozen_preconditioner import (
 pytestmark = [pytest.mark.gpu, pytest.mark.cupy]
 
 
+@pytest.mark.parametrize("device", ["cuda", "hybrid"])
+def test_projected_nonlinear_policy_restores_final_accuracy(device):
+    pytest.importorskip("cupy")
+    from deflation_example.coupled_cuda_solver import CudaCoupledSolver
+    from deflation_example.coupled_hybrid_solver import HybridCoupledSolver
+    from deflation_example.coupled_trust import minimize_trust
+    from deflation_example.study_solvers import StudySolver, ArrayReference
+    from test_coupled_derivatives import small_coupled_problem
+
+    problem = small_coupled_problem([0.2, 0.35])
+    desired = np.linspace(-0.2, 0.4, problem.size)
+    reference = ArrayReference(np.eye(problem.size)[:, :3], {})
+    if device == "cuda":
+        solver = CudaCoupledSolver(
+            "reference",
+            rank=3,
+            reference=reference,
+            frozen_layout="block_diagonal",
+            rtol=1e-10,
+            residual_policy="refine",
+        )
+    else:
+        solver = HybridCoupledSolver(
+            "reference",
+            rank=3,
+            reference=reference,
+            block_device="cpu",
+            coarse_device="cuda",
+            rtol=1e-10,
+            residual_policy="refine",
+        )
+    cpu = StudySolver("jacobi", rtol=1e-10, residual_policy="refine")
+    try:
+        expected = minimize_trust(problem, desired, -0.05, 0.15, cpu, max_iterations=80)
+        actual = minimize_trust(
+            problem,
+            desired,
+            -0.05,
+            0.15,
+            solver,
+            max_iterations=80,
+            qp_solver="projected",
+            accuracy="adaptive_projected",
+        )
+        assert actual.status == expected.status == "converged", (actual.status, actual.kkt)
+        assert max(actual.kkt.values()) <= 1e-8
+        np.testing.assert_allclose(actual.evaluation.state, expected.evaluation.state, atol=2e-7)
+        assert solver.rtol == 1e-10
+    finally:
+        cpu.close()
+        solver.close()
+
+
+def test_grouped_factors_preserve_permutations_transpose_and_owned_results():
+    cp = pytest.importorskip("cupy")
+    from scipy.sparse.linalg import splu
+    from deflation_example.coupled_triangular import PersistentSuperLU
+
+    rng = np.random.default_rng(410)
+    matrices = [sparse.csc_matrix(rng.normal(size=(n, n)) + np.eye(n)) for n in (5, 8, 4)]
+    factors = [splu(A) for A in matrices]
+    device = PersistentSuperLU.block_diagonal(factors)
+    try:
+        for transpose in ("N", "T"):
+            for columns in (1, 3, 2, 1):
+                rhs = rng.normal(size=(17, columns))
+                parts = np.split(rhs, [5, 13])
+                expected = np.concatenate(
+                    [f.solve(r, trans=transpose) for f, r in zip(factors, parts, strict=True)]
+                )
+                actual = device.solve(cp.asarray(rhs), trans=transpose)
+                saved = actual.copy()
+                np.testing.assert_allclose(cp.asnumpy(actual), expected, atol=1e-11, rtol=1e-11)
+                device.solve(cp.asarray(rhs * 2), trans=transpose)
+                cp.testing.assert_array_equal(actual, saved)
+    finally:
+        device.close()
+
+
 @pytest.mark.parametrize("sweeps", [1, 3, 4])
-def test_device_sweeps_match_host_vectors_blocks_and_do_not_mutate(sweeps):
+@pytest.mark.parametrize("layout", ["serial", "block_diagonal"])
+def test_device_sweeps_match_host_vectors_blocks_and_do_not_mutate(sweeps, layout):
     cp = pytest.importorskip("cupy")
     from deflation_example.coupled_cuda_preconditioner import CudaFrozenSweepPreconditioner
 
     P = sparse.diags([-0.2 * np.ones(11), 2 * np.ones(12), -0.2 * np.ones(11)], [-1, 0, 1])
     host = FrozenSweepPreconditioner(P, np.arange(12) % 3, sweeps=sweeps)
-    device = CudaFrozenSweepPreconditioner(host)
+    device = CudaFrozenSweepPreconditioner(host, layout=layout)
     rng = np.random.default_rng(48)
     try:
         for shape in ((12,), (12, 3), (12, 1), (12, 3)):

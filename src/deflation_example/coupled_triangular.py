@@ -220,6 +220,32 @@ class PersistentSuperLU:
         self.plans = {}
         self.analysis_count = 0
 
+    @classmethod
+    def block_diagonal(cls, factors):
+        """Group independent LU factors without refactorization or permutation changes."""
+        from types import SimpleNamespace
+        import cupy as cp
+        from scipy import sparse as host_sparse
+        from cupyx.scipy import sparse
+
+        if not factors:
+            raise ValueError("At least one independent factor is required")
+        instance = cls.__new__(cls)
+        offsets = np.cumsum([0, *(factor.shape[0] for factor in factors)])
+        instance.L = sparse.csr_matrix(host_sparse.block_diag([f.L for f in factors], format="csr"))
+        instance.U = sparse.csr_matrix(host_sparse.block_diag([f.U for f in factors], format="csr"))
+        instance.perm_r = cp.asarray(
+            np.concatenate([f.perm_r + o for f, o in zip(factors, offsets[:-1], strict=True)])
+        )
+        instance.perm_c = cp.asarray(
+            np.concatenate([f.perm_c + o for f, o in zip(factors, offsets[:-1], strict=True)])
+        )
+        instance.factor = SimpleNamespace(
+            _perm_r_rev=cp.argsort(instance.perm_r), _perm_c_rev=cp.argsort(instance.perm_c)
+        )
+        instance.plans, instance.analysis_count = {}, 0
+        return instance
+
     def solve(self, rhs, trans="N"):
         if trans not in {"N", "T"}:
             raise ValueError("Real momentum solves support N and T")

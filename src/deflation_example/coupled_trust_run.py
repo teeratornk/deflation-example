@@ -54,6 +54,8 @@ def run(
         "capture_linear_systems": False,
         "qp_correction_policy": "kkt_decrease",
         "qp_solver": "pdas",
+        "device": "cpu",
+        "frozen_layout": "serial",
         **cfg,
     }
     if cfg["trial_policy"] not in {"radius_rebuild", "backtrack"}:
@@ -108,7 +110,9 @@ def run(
     }
     write_report(output / "record.json", record)
     tick = time.perf_counter()
-    sampler = ProcessMemory("cpu", cfg.get("memory_interval", 0.1))
+    sampler = ProcessMemory(
+        "cpu" if cfg["device"] == "cpu" else "cuda", cfg.get("memory_interval", 0.1)
+    )
     sampler.start()
     record["process_preparation_seconds"] = time.perf_counter() - tick
     start = time.perf_counter()
@@ -139,7 +143,7 @@ def run(
                 if saved is None:
                     reference = configured_krylov_reference(
                         problem,
-                        cfg,
+                        {**cfg, "device": "cpu"},
                         initial_guess=guess,
                         verification_callback=lambda rows: write_report(
                             output / "reference-equations.json", {"equations": rows}
@@ -159,7 +163,21 @@ def run(
                     reference_description=reference.description,
                 )
             components["reference_construction_or_restore"] = time.perf_counter() - tick
-            solver = StudySolver(
+            solver_type, options = StudySolver, {}
+            if cfg["device"] == "cuda":
+                from .coupled_cuda_solver import CudaCoupledSolver
+
+                solver_type = CudaCoupledSolver
+                options["frozen_layout"] = cfg["frozen_layout"]
+            elif cfg["device"] == "hybrid":
+                from .coupled_hybrid_solver import HybridCoupledSolver
+
+                solver_type = HybridCoupledSolver
+                options.update(block_device="cpu", coarse_device="cuda")
+            elif cfg["device"] != "cpu":
+                raise ValueError("Choose cpu, cuda or hybrid execution")
+            record["runtime_policy"] = f"{cfg['device']}-cg-heartbeat-cooperative-deadline-v2"
+            solver = solver_type(
                 cfg["method"],
                 reference=reference,
                 rank=cfg["rank"],
@@ -170,6 +188,7 @@ def run(
                 refresh=cfg["inner_refresh"],
                 residual_policy="refine",
                 stop_requested=lambda: prior_total + time.perf_counter() - start >= budget_seconds,
+                **options,
             )
             if saved is not None:
                 solver.import_history(saved["recycling"])
@@ -389,6 +408,10 @@ def main():
         "--accuracy", choices=("strict", "adaptive", "adaptive_projected"), default="strict"
     )
     parser.add_argument("--qp-solver", choices=("pdas", "projected"), default="pdas")
+    parser.add_argument("--device", choices=("cpu", "cuda", "hybrid"), default="cpu")
+    parser.add_argument("--frozen-layout", choices=("serial", "block_diagonal"), default="serial")
+    parser.add_argument("--budget-seconds", type=float, default=86400)
+    parser.add_argument("--rank", type=int)
     parser.add_argument("--continuation", action="store_true")
     parser.add_argument(
         "--trial-policy", choices=("radius_rebuild", "backtrack"), default="radius_rebuild"
@@ -426,7 +449,13 @@ def main():
         capture_linear_systems=args.capture_linear_systems,
         qp_correction_policy=args.qp_correction_policy,
         qp_solver=args.qp_solver,
+        device=args.device,
+        frozen_layout=args.frozen_layout,
     )
+    if args.rank is not None:
+        from .validation import integer
+
+        cfg["rank"] = integer(args.rank, "Reference rank", 1)
     # Resolve through the same configuration type used by the other runners.
     cfg = OmegaConf.to_container(OmegaConf.create(cfg), resolve=True)
     result = run(
@@ -434,6 +463,7 @@ def main():
         args.output,
         resume_from=args.resume_from,
         prior_attempt_seconds=args.prior_attempt_seconds,
+        budget_seconds=args.budget_seconds,
     )
     if not result["all_problems_verified"]:
         raise SystemExit(2)

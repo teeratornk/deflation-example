@@ -61,6 +61,50 @@ def test_hybrid_rejects_unknown_coarse_device():
         HybridCoupledSolver("jacobi", rank=0, coarse_device="tpu")
 
 
+@pytest.mark.gpu
+def test_cpu_sparse_gpu_coarse_policy_avoids_gpu_derivative_factors(monkeypatch):
+    pytest.importorskip("cupy")
+    import deflation_example.coupled_hybrid_solver as hybrid
+    from deflation_example.coupled_frozen_preconditioner import frozen_preconditioner_factory
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("CPU sparse policy must not upload derivative factors")
+
+    monkeypatch.setattr(hybrid, "CudaControlJacobian", forbidden)
+    problem = small_coupled_problem([0.2, 0.35])
+    evaluation = problem.evaluate(np.linspace(0.03, 0.1, problem.size))
+    H = GaussNewtonOperator(evaluation.jacobian, problem.weights, problem.alpha)
+    diagonal = problem.preconditioning_diagonal(evaluation)
+    rng = np.random.default_rng(29)
+    reference = ArrayReference(rng.normal(size=(problem.size, 3)), {})
+    solver = HybridCoupledSolver(
+        "reference",
+        reference=reference,
+        rank=3,
+        rtol=1e-10,
+        block_device="cpu",
+        coarse_device="cuda",
+        residual_policy="refine",
+    )
+    try:
+        for indices in (np.arange(problem.size)[::2], np.arange(problem.size)):
+            B = H.restrict(indices)
+            B.diagonal = lambda: diagonal[indices]
+            B.preconditioner = frozen_preconditioner_factory(problem, evaluation)(indices)
+            exact = rng.normal(size=len(indices))
+            rhs = B @ exact
+            result, timing = solver.solve(B, rhs, indices)
+            assert result.status == "converged"
+            assert independent_residual(B, result.x, rhs) <= 1e-10
+            assert solver.device_jacobian is None
+            assert timing["hybrid_block_processing"]["block_device"] == "cpu"
+            assert sum(timing["components_seconds"].values()) == pytest.approx(
+                timing["total_seconds"]
+            )
+    finally:
+        solver.close()
+
+
 def test_cpu_coarse_space_matches_default_reference_solve():
     # With CUDA unavailable the host coarse space must equal the in-line kernel.
     problem, H, diagonal = system()

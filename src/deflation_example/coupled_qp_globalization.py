@@ -50,7 +50,13 @@ def main():
     parser.add_argument("--rtol", type=float, required=True)
     parser.add_argument("--budget-seconds", type=float, default=7200)
     parser.add_argument("--restriction", choices=["product", "submatrix"], default="product")
-    parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+    parser.add_argument("--device", choices=["cpu", "cuda", "hybrid"], default="cpu")
+    parser.add_argument("--frozen-layout", choices=["serial", "block_diagonal"], default="serial")
+    parser.add_argument(
+        "--reference-initial", choices=["clipped_zero", "optimizer"], default="clipped_zero"
+    )
+    parser.add_argument("--initial-snapshot", type=Path)
+    parser.add_argument("--initial-assessment", type=Path)
     parser.add_argument("--reference-rank", type=int, default=0)
     parser.add_argument("--reference-steps", type=int, default=48)
     args = parser.parse_args()
@@ -60,6 +66,10 @@ def main():
     integer(args.reference_steps, "Reference construction steps", 1)
     if args.reference_rank > args.reference_steps:
         raise ValueError("Reference rank must not exceed its construction steps")
+    if args.reference_initial == "optimizer" and (
+        args.initial_snapshot is None or args.initial_assessment is None
+    ):
+        raise ValueError("Optimizer reference initialization requires snapshot and assessment")
     manifest = read_manifest(args.trace)
     if manifest["status"] != "complete" or not 0 <= args.quadratic < len(manifest["quadratics"]):
         raise ValueError("Select a recorded quadratic from a complete trace")
@@ -83,6 +93,8 @@ def main():
         "budget_seconds": args.budget_seconds,
         "device": args.device,
         "reference_rank": args.reference_rank,
+        "reference_initial": args.reference_initial,
+        "frozen_layout": args.frozen_layout,
         "scope": "One unchanged quadratic; nonlinear optimality is not assessed.",
     }
     write_report(args.output / "record.json", report)
@@ -125,6 +137,21 @@ def main():
             if args.reference_rank:
                 from .coupled_nominal_krylov import configured_krylov_reference
 
+                guess = None
+                if args.reference_initial == "optimizer":
+                    from .coupled_initial_state import snapshot_initial_guess
+
+                    guess, report["initial_state"] = snapshot_initial_guess(
+                        {
+                            **cfg,
+                            "initial_state_snapshot": str(args.initial_snapshot),
+                            "initial_state_assessment": str(args.initial_assessment),
+                        },
+                        problem,
+                        baseline,
+                        0,
+                    )
+
                 reference = configured_krylov_reference(
                     problem,
                     {
@@ -137,16 +164,27 @@ def main():
                         "reference_krylov_steps": args.reference_steps,
                         "reference_krylov_selection": "alternating_low_high",
                     },
+                    initial_guess=guess,
+                    verification_callback=lambda rows: write_report(
+                        args.output / "reference-equations.json", {"equations": rows}
+                    ),
                 )
                 from .coupled_retention_replay import save_reference
 
                 report["reference"] = save_reference(args.output, "reference", reference)
             report["reference_construction_seconds"] = time.perf_counter() - tick
             solver_type = StudySolver
+            extra = {}
             if args.device == "cuda":
                 from .coupled_cuda_solver import CudaCoupledSolver
 
                 solver_type = CudaCoupledSolver
+                extra["frozen_layout"] = args.frozen_layout
+            elif args.device == "hybrid":
+                from .coupled_hybrid_solver import HybridCoupledSolver
+
+                solver_type = HybridCoupledSolver
+                extra.update(block_device="cpu", coarse_device="cuda")
             solver = solver_type(
                 "reference" if reference is not None else "jacobi",
                 rank=args.reference_rank,
@@ -156,6 +194,7 @@ def main():
                 cg_factor=0.1,
                 refresh=cfg["inner_refresh"],
                 residual_policy="refine",
+                **extra,
             )
             if args.device == "cuda":
                 cp = solver.cp

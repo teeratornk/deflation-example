@@ -40,18 +40,22 @@ class HybridCoupledSolver(StudySolver):
         block_min_columns=20,
         block_max_columns=100,
         coarse_device="cpu",
+        block_device="cuda",
         **kwargs,
     ):
         if method not in {"jacobi", "reference", "recycling"}:
             raise ValueError("Hybrid coupled policies are jacobi, reference and recycling")
         if coarse_device not in {"cpu", "cuda"}:
             raise ValueError("The hybrid coarse-space correction runs on cpu or cuda")
+        if block_device not in {"cpu", "cuda"}:
+            raise ValueError("The hybrid operator blocks run on cpu or cuda")
         super().__init__(method, device="cpu", **kwargs)
         self.block_min_columns = integer(block_min_columns, "CUDA block threshold", 2)
         # Device block products are applied in bounded column chunks: every
         # per-slab triangular plan holds buffers proportional to the chunk width.
         self.block_max_columns = integer(block_max_columns, "CUDA block chunk width", 1)
         self.coarse_device = coarse_device
+        self.block_device = block_device
         self.cpu_jacobian = self.device_jacobian = None
         self.block_records = []
         self.coarse_records = []
@@ -73,7 +77,7 @@ class HybridCoupledSolver(StudySolver):
             "seconds": sum(row["seconds"] for row in self.block_records),
             "timing_scope": "Included in the CPU kernel and recycling-selection intervals; do not add again to total_seconds.",
             "vector_and_verification_device": "cpu",
-            "block_device": "cuda",
+            "block_device": self.block_device,
         }
         if self.coarse_device == "cuda":
             spaces = [
@@ -144,7 +148,7 @@ class HybridCoupledSolver(StudySolver):
             return normal
 
         def block(vectors):
-            if vectors.shape[1] < self.block_min_columns:
+            if self.block_device == "cpu" or vectors.shape[1] < self.block_min_columns:
                 return B @ vectors
             start = time.perf_counter()
             apply = device_operator()
@@ -184,9 +188,16 @@ class HybridCoupledSolver(StudySolver):
                     return CpuCoarseSpace(A, basis, condition_limit)
                 from .coupled_hybrid_coarse import CudaCoarseSpace
 
-                apply = device_operator()
+                if self.block_device == "cpu":
+                    import cupy as cp
+
+                    def apply(vectors):
+                        return cp.asarray(B @ cp.asnumpy(vectors))
+                else:
+                    apply = device_operator()
+                    cp = self.device_jacobian.cp
                 space = CudaCoarseSpace(
-                    self.device_jacobian.cp,
+                    cp,
                     apply,
                     A.shape[0],
                     basis,

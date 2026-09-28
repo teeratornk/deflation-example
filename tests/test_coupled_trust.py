@@ -116,7 +116,8 @@ def test_qp_resume_preserves_partition_and_solution():
 
 
 @pytest.mark.parametrize("at_qp", [True, False])
-def test_trust_resume_matches_uninterrupted(at_qp):
+@pytest.mark.parametrize("qp_solver", ["pdas", "projected"])
+def test_trust_resume_matches_uninterrupted(at_qp, qp_solver):
     problem = small_coupled_problem([0.2, 0.35])
     desired = np.linspace(-0.2, 0.4, problem.size)
     saved = []
@@ -129,7 +130,7 @@ def test_trust_resume_matches_uninterrupted(at_qp):
             saved.append(copy.deepcopy(payload))
             raise Interrupted
 
-    arguments = dict(inner_preconditioner="jacobi", max_iterations=80)
+    arguments = dict(inner_preconditioner="jacobi", max_iterations=80, qp_solver=qp_solver)
     plain = minimize_trust(problem, desired, -0.05, 0.15, solver(), **arguments)
     with pytest.raises(Interrupted):
         minimize_trust(problem, desired, -0.05, 0.15, solver(), checkpoint=stop, **arguments)

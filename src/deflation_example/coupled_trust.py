@@ -100,8 +100,8 @@ def minimize_trust(
     start = time.perf_counter()
     tolerance = positive_real(tolerance, "Nonlinear tolerance")
     budget_seconds = positive_real(budget_seconds, "Optimization time budget")
-    if solver.device != "cpu":
-        raise ValueError("The coupled trust-region runtime requires the CPU kernel")
+    if solver.device not in {"cpu", "cuda"}:
+        raise ValueError("The coupled trust-region runtime requires a supported vector kernel")
     max_iterations = integer(max_iterations, "Nonlinear cap", 1)
     qp_cap = integer(qp_cap, "Quadratic cap", 1)
     secant_memory = integer(secant_memory, "Secant memory", 0)

@@ -100,7 +100,10 @@ class CudaRecycleSpace:
 class CudaCoupledSolver(StudySolver):
     """Keep coupled factors on the GPU across all masks of one nonlinear iterate."""
 
-    def __init__(self, method, **kwargs):
+    def __init__(self, method, *, frozen_layout="serial", **kwargs):
+        if frozen_layout not in {"serial", "block_diagonal"}:
+            raise ValueError("Choose serial or block_diagonal frozen solves")
+        self.frozen_layout = frozen_layout
         if method not in {"jacobi", "reference", "recycling"}:
             raise ValueError("Coupled CUDA policies are jacobi, reference and recycling")
         super().__init__(method, device="cpu", **kwargs)
@@ -180,7 +183,9 @@ class CudaCoupledSolver(StudySolver):
             if preconditioner is not None:
                 from .coupled_cuda_preconditioner import CudaFrozenSweepPreconditioner
 
-                self.device_preconditioner = CudaFrozenSweepPreconditioner(preconditioner)
+                self.device_preconditioner = CudaFrozenSweepPreconditioner(
+                    preconditioner, layout=self.frozen_layout
+                )
                 self.cpu_preconditioner = preconditioner
         mark("coarse_or_hierarchy_setup")
 
