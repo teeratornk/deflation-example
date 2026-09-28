@@ -12,6 +12,8 @@ alpha: 0.000001
 bound: 0.2
 initial_temperature: 0.0
 targets: 3
+query_targets: null
+query_bounds: null
 rank: 20
 recycle_rank: null
 construction: mode_dependent

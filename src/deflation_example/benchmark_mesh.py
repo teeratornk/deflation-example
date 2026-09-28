@@ -51,6 +51,11 @@ class MeshStudyConfig:
     bound: float = 0.2
     initial_temperature: float = 0.0
     targets: int = 3
+    # An explicit query plan: query k tracks target query_targets[k] of the
+    # targets-member family under upper bound query_bounds[k]. Without it, query k
+    # tracks target k under the fixed bound.
+    query_targets: list[int] | None = None
+    query_bounds: list[float] | None = None
     rank: int = 20
     recycle_rank: int | None = None
     construction: str = "mode_dependent"
@@ -181,11 +186,31 @@ def controls(config):
         raise ValueError("Choose spgemm or submatrix restriction of an assembled Hessian")
     if c["matrix_free_inner"] and c["device"] != "cpu":
         raise ValueError("Matrix-free inner solves currently support CPU execution")
-    if c["phase"] == "final" and (c["repeats"] < 5 or c["targets"] < 16):
+    if (c["query_targets"] is None) != (c["query_bounds"] is None):
+        raise ValueError("Declare query targets and query bounds together")
+    if c["query_bounds"] is not None:
+        if not c["query_bounds"] or len(c["query_bounds"]) != len(c["query_targets"]):
+            raise ValueError("Every declared query needs one target and one bound")
+        for target in c["query_targets"]:
+            if integer(target, "Query target") >= c["targets"]:
+                raise ValueError("Query targets index the declared target family")
+        for bound in c["query_bounds"]:
+            if not np.isfinite(bound) or bound < 0 or bound < c["initial_temperature"]:
+                raise ValueError("Query bounds must be finite and admit the initial temperature")
+        if len(set(zip(c["query_targets"], c["query_bounds"]))) != len(c["query_bounds"]):
+            raise ValueError("Declared queries must be distinct target and bound pairs")
+    if c["phase"] == "final" and (c["repeats"] < 5 or len(query_plan(c)) < 16):
         raise ValueError(
             "Final populations require at least 16 targets and five complete repetitions"
         )
     return c
+
+
+def query_plan(c):
+    """The (target, bound) pair of every query, in solve order."""
+    if c.get("query_bounds") is None:
+        return [(q, c["bound"]) for q in range(c["targets"])]
+    return [(int(t), float(b)) for t, b in zip(c["query_targets"], c["query_bounds"])]
 
 
 def _hash(array):
@@ -307,9 +332,9 @@ def sequence(c, method, torch=None, api=None):
         components["solver_resources"] = time.perf_counter() - tick
         initial_setup_seconds = time.perf_counter() - start
         previous = None
-        for query in range(c["targets"]):
+        for query, (target, bound) in enumerate(query_plan(c)):
             tick = time.perf_counter()
-            desired = desired_temperature(problem, query, c["targets"])
+            desired = desired_temperature(problem, target, c["targets"])
             load = problem.load(desired)
             warm = c["warm_start"] == "outer_inner"
             active = (
@@ -335,7 +360,7 @@ def sequence(c, method, torch=None, api=None):
                 else:
                     solved, timing = adapter.solve(B, b, I, initial)
                 if warm and solved.status == "converged":
-                    state[:] = c["bound"]
+                    state[:] = bound
                     state[I] = solved.x
                 mask = np.zeros(problem.size, dtype=bool)
                 mask[I] = True
@@ -358,7 +383,7 @@ def sequence(c, method, torch=None, api=None):
             solved = pdas(
                 problem.H,
                 load,
-                c["bound"],
+                bound,
                 initial_active=active,
                 tolerance=c["kkt_tolerance"],
                 maxiter=c["outer_cap"],
@@ -392,6 +417,8 @@ def sequence(c, method, torch=None, api=None):
                 "inner": inner,
                 "active_count": int(solved["active"].sum()),
                 "active_mask_bits": pack_mask(solved["active"]),
+                "target_index": target,
+                "bound": bound,
                 "objective": problem.objective(solved["y"], desired),
                 "adjoint_recovery_relative": recovery,
             }
@@ -443,7 +470,7 @@ def sequence(c, method, torch=None, api=None):
             "components_seconds": components,
             "initial_setup_seconds": initial_setup_seconds,
             "success": failure is None
-            and len(cases) == c["targets"]
+            and len(cases) == len(query_plan(c))
             and all(row["status"] == "converged" for row in cases),
             "failure": failure,
             "cases": cases,

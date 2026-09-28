@@ -175,15 +175,25 @@ def summarize(directory):
                 if attempt["status"] != "completed":
                     failures.append(attempt["status"])
                     continue
-                if len(record["cases"]) != controls["targets"]:
+                # A declared query plan pairs targets with bounds; each query is a
+                # distinct (target, bound) problem even when a target repeats.
+                count = (
+                    len(controls["query_bounds"])
+                    if controls.get("query_bounds") is not None
+                    else controls["targets"]
+                )
+                if len(record["cases"]) != count:
                     raise ValueError("An accepted sequence has an incorrect population")
-                if len({c["target_sha256"] for c in record["cases"]}) != controls["targets"]:
+                problems = {
+                    (c["target_sha256"], c.get("bound", controls["bound"])) for c in record["cases"]
+                }
+                if len(problems) != count:
                     raise ValueError("A sequence repeats a desired-temperature field")
                 hashes = [c["target_sha256"] for c in record["cases"]]
                 if target_hashes is not None and hashes != target_hashes:
                     raise ValueError("Methods or repetitions use different target sequences")
                 target_hashes = hashes
-                if [c["query"] for c in record["cases"]] != list(range(controls["targets"])):
+                if [c["query"] for c in record["cases"]] != list(range(count)):
                     raise ValueError("Query indices do not match the declared sequence")
                 if any(
                     not np.isfinite(t) or t < -1e-9 for t in record["components_seconds"].values()
