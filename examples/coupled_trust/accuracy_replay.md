@@ -55,9 +55,8 @@ uv run --no-sync pytest tests/test_coupled_qp_accuracy.py tests/test_coupled_qp_
 
 ## Sparse preconditioner construction
 
-The optional `restriction="submatrix"` factory uses the committed slicing
-implementation from the neighboring prescribed-flow study (`4631927`). It
-assembles the sparse frozen normal operator once and slices that matrix for
+The optional `restriction="submatrix"` factory assembles the sparse frozen
+normal operator once and slices that matrix for
 each inactive set. The true consistent-source and coupled operators remain
 matrix-free. `restriction="product"` remains the default.
 
@@ -74,7 +73,8 @@ same seeded residuals check preconditioner-action agreement. These component
 measurements identify potential setup savings; they cannot establish a change
 in complete optimization time. Tests cover changing masks, damping, consistent
 source weighting, invalid indices and the timing sums.
-# Globalization of one recorded quadratic
+
+## Globalization of one recorded quadratic
 
 If matched high-accuracy inner solves leave active-set instability, the separate
 `coupled_qp_globalization` diagnostic compares PDAS with gradient projection and
@@ -83,10 +83,10 @@ initial zero step, and recorded quadratic tolerance fixed. Both methods use
 independent original-residual checks and fresh weighted KKT checks.
 
 ```sh
-python -m deflation_example.coupled_qp_globalization \
+uv run --no-sync python -m deflation_example.coupled_qp_globalization \
   --trace INPUT/inactive-trace-00 --baseline BASELINE --quadratic 2 \
   --method projected --rtol 1e-8 --output OUTPUT/projected
-python -m deflation_example.coupled_qp_globalization \
+uv run --no-sync python -m deflation_example.coupled_qp_globalization \
   --trace INPUT/inactive-trace-00 --baseline BASELINE --quadratic 2 \
   --method pdas --rtol 1e-8 --output OUTPUT/pdas
 ```
