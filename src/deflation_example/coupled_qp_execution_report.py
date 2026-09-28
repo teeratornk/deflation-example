@@ -36,6 +36,20 @@ def summarize(records):
             frozen_layout=record.get("frozen_layout", "serial"),
             gpu=record.get("gpu"),
         )
+        attempts = [
+            attempt
+            for step in record.get("history", [])
+            for attempt in step.get("timing", {}).get("refinement_attempts", [])
+        ]
+        row.update(
+            requested_rank=row["rank"],
+            deployed_ranks=sorted({a["rank"] for a in attempts}),
+            zero_rank_kernel_attempts=sum(a["rank"] == 0 for a in attempts),
+            initial_guard_returns=sum(
+                h.get("timing", {}).get("initial_guess_accepted", False)
+                for h in record.get("history", [])
+            ),
+        )
         names = (
             "quadratic_seconds",
             "reference_construction_seconds",

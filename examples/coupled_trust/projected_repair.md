@@ -104,3 +104,16 @@ the same access given to competing methods.
 
 Keep every capped or failed attempt. Compare complete time only when both
 methods meet all final criteria; report intermediate progress separately.
+
+Generate a matched fixed-quadratic summary from every execution record:
+
+```sh
+uv run --locked --extra study python -m deflation_example.coupled_qp_execution_report \
+  --records OUTPUT/cpu-frozen/record.json OUTPUT/cpu-reference/record.json \
+  OUTPUT/hybrid-reference/record.json OUTPUT/cuda-frozen/record.json \
+  OUTPUT/cuda-reference/record.json --output OUTPUT/execution-summary
+```
+
+The summary checks source and problem identity, reports requested and deployed
+ranks, and includes solver construction. Missing and failed runs remain visible.
+It assigns no speedup to an unverified solve or against an unverified baseline.
