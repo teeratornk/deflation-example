@@ -40,7 +40,7 @@ def test_failed_reference_equations_are_recorded_before_termination(monkeypatch)
 
 
 def test_verification_reports_absolute_defects_and_normalization():
-    problem = small_coupled_problem([0.2, 0.35])
+    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
     evaluation = problem.evaluate(np.linspace(0.04, 0.1, problem.size))
     for row in problem.verify(evaluation):
         assert row["thermal_rhs_norm"] > 0
