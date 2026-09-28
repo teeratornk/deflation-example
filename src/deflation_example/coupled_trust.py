@@ -102,6 +102,11 @@ def minimize_trust(
     budget_seconds = positive_real(budget_seconds, "Optimization time budget")
     if solver.device not in {"cpu", "cuda"}:
         raise ValueError("The coupled trust-region runtime requires a supported vector kernel")
+    if solver.device == "cuda":
+        from .coupled_cuda_solver import CudaCoupledSolver
+
+        if not isinstance(solver, CudaCoupledSolver):
+            raise ValueError("Coupled optimization requires CudaCoupledSolver or the CPU kernel")
     max_iterations = integer(max_iterations, "Nonlinear cap", 1)
     qp_cap = integer(qp_cap, "Quadratic cap", 1)
     secant_memory = integer(secant_memory, "Secant memory", 0)
