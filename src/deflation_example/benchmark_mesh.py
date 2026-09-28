@@ -44,6 +44,8 @@ BLOCK_METHODS = {"block", "block_reference"}
 class MeshStudyConfig:
     geometry: str = "engine_3d"
     level: int = 0
+    # Refinement level of the mesh the reference coarse space is built on.
+    reference_level: int = 0
     transient: bool = False
     slabs: int = 4
     horizon: float = 0.1
@@ -102,8 +104,10 @@ def controls(config):
     )
     c["recycle_rank"] = c["rank"] if c["recycle_rank"] is None else c["recycle_rank"]
     integer(c["recycle_rank"], "Recycling rank", 1)
-    for key in ("level",):
+    for key in ("level", "reference_level"):
         integer(c[key], key)
+    if c["reference_level"] > c["level"]:
+        raise ValueError("The reference mesh cannot be finer than the target mesh")
     for key in (
         "slabs",
         "targets",
@@ -218,7 +222,12 @@ def _hash(array):
 
 
 def build_model(c, *, transport_form="advective"):
-    showcase = build_showcase(c["geometry"], c["level"], transport_form=transport_form)
+    showcase = build_showcase(
+        c["geometry"],
+        c["level"],
+        transport_form=transport_form,
+        reference_level=c.get("reference_level", 0),
+    )
     steps = np.full(c["slabs"], c["horizon"] / c["slabs"]) if c["transient"] else None
     initial = np.full(len(showcase.assembly.mesh.free), c["initial_temperature"])
     model = build_mesh_control(

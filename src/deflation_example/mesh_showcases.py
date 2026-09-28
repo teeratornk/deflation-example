@@ -73,7 +73,12 @@ def _assembly(mesh, parameters, velocity=None, source=None, *, transport_form="a
 
 
 def build_showcase(
-    geometry="engine_3d", level=0, data_directory=None, *, transport_form="advective"
+    geometry="engine_3d",
+    level=0,
+    data_directory=None,
+    *,
+    transport_form="advective",
+    reference_level=0,
 ):
     import time
 
@@ -85,6 +90,12 @@ def build_showcase(
     if transport_form == "skew" and geometry != "transformer_2d":
         raise ValueError("The skew transport pilot uses the quadratic transformer velocity")
     level = integer(level, "Mesh refinement level")
+    # The reference coarse space comes from the mesh after reference_level
+    # refinements (0, the packaged mesh, by default); the prolongation maps that
+    # mesh's free nodes to the target level's.
+    reference_level = integer(reference_level, "Reference mesh level")
+    if reference_level > level:
+        raise ValueError("The reference mesh cannot be finer than the target mesh")
     directory = (
         Path(__file__).parent / "data" / geometry
         if data_directory is None
@@ -102,16 +113,20 @@ def build_showcase(
             source = inputs["source_W_m3"]
     coarse = _assembly(mesh, parameters, velocity, source, transport_form=transport_form)
     P = sparse.eye(len(mesh.nodes), format="csr")
-    for _ in range(level):
+    for step in range(level):
         fine, interpolation, parent = refine(mesh)
         if velocity is not None:
             velocity = refine_quadratic_flow(mesh, fine, parent, velocity)
             source = source[parent]
         mesh = fine
         P = interpolation @ P
+        if step + 1 == reference_level:
+            base = mesh
+            coarse = _assembly(mesh, parameters, velocity, source, transport_form=transport_form)
+            P = sparse.eye(len(mesh.nodes), format="csr")
     current = (
         coarse
-        if not level
+        if level == reference_level
         else _assembly(mesh, parameters, velocity, source, transport_form=transport_form)
     )
     return MeshShowcase(
@@ -128,6 +143,7 @@ def build_showcase(
             },
             "refinement": "nested simplex subdivision with inherited materials",
             "level": level,
+            "reference_level": reference_level,
             "transport_form": transport_form,
             "nodes": len(mesh.nodes),
             "cells": len(mesh.cells),
