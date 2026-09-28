@@ -47,6 +47,9 @@ class StudyConfig:
     reference_capacity: float = 1.0
     targets: int = 4
     rank: int = 12
+    # "cpu" restricts the reference on the host and uploads it (the v1 campaign);
+    # "cuda" keeps the reference factors on the GPU and restricts them there.
+    reference_device: str = "cpu"
     recycle_rank: int | None = None
     window: int = 12
     repeats: int = 1
@@ -179,6 +182,10 @@ def specification(config):
             raise ValueError("Methods and start policies must be distinct declared choices")
     if values["device"] == "cpu" and "amgx" in values["methods"]:
         raise ValueError("The AmgX comparison requires CUDA")
+    if values["reference_device"] not in {"cpu", "cuda"} or (
+        values["reference_device"] == "cuda" and values["device"] != "cuda"
+    ):
+        raise ValueError("Device restriction of the reference requires CUDA execution")
     return {
         "protocol": "full-reference-cht-study-v1",
         "controls": values,
@@ -295,6 +302,10 @@ def complete_sequence(protocol, method, warm, torch=None, api=None):
         tick = time.perf_counter()
         if method == "reference":
             reference = build_reference(problem, c)
+            if c.get("reference_device", "cpu") == "cuda":
+                from .mesh_reference import DeviceMeshReference
+
+                reference = DeviceMeshReference(reference, torch)
             storage.update(reference.storage())
             storage["reference_description"] = reference.description
         parts["reference_construction"] = time.perf_counter() - tick

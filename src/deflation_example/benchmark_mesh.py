@@ -58,6 +58,9 @@ class MeshStudyConfig:
     amgx_factor: float = 0.1
     residual_policy: str = "terminal"
     matrix_free_inner: bool = False
+    # "spgemm" forms each inactive restriction by a sparse product (the v1 finals);
+    # "submatrix" slices the reduced Hessian assembled once per sequence.
+    hessian_restriction: str = "spgemm"
     monitor_memory: bool = False
     save_fields: bool = True
     timeout_seconds: float = 7200.0
@@ -130,6 +133,10 @@ def controls(config):
         raise ValueError("AmgX requires CUDA")
     if "direct" in c["methods"] and (c["device"] != "cpu" or c["matrix_free_inner"]):
         raise ValueError("The direct validation solver requires assembled CPU restrictions")
+    if c["hessian_restriction"] not in {"spgemm", "submatrix"} or (
+        c["hessian_restriction"] == "submatrix" and c["matrix_free_inner"]
+    ):
+        raise ValueError("Choose spgemm or submatrix restriction of an assembled Hessian")
     if c["matrix_free_inner"] and c["device"] != "cpu":
         raise ValueError("Matrix-free inner solves currently support CPU execution")
     if c["phase"] == "final" and (c["repeats"] < 5 or c["targets"] < 16):
@@ -154,6 +161,12 @@ def build_model(c, *, transport_form="advective"):
         initial=initial,
         assembled_restriction=not c["matrix_free_inner"],
     )
+    if c.get("hessian_restriction", "spgemm") == "submatrix":
+        from dataclasses import replace
+
+        from .sparse_restriction import PreassembledRestriction
+
+        model = replace(model, H=PreassembledRestriction(model.H))
     return showcase, model
 
 
