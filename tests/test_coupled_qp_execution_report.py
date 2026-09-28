@@ -18,6 +18,9 @@ def test_failed_runs_have_no_completed_solve_speedup():
     assert rows[1]["construction_inclusive_seconds"] == 24
     # Synthetic base fixtures describe nonconverged quadratics.
     assert all(r["speedup"] is None for r in rows)
+    missing = summarize([matched_record("cpu", 0), None])["rows"]
+    assert missing[-1]["status"] == "missing"
+    assert missing[-1]["speedup"] is None
 
 
 @pytest.mark.parametrize(

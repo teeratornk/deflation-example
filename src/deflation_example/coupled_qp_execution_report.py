@@ -14,6 +14,9 @@ def summarize(records):
         raise ValueError("Supply at least one execution record")
     rows, identity = [], None
     for record in records:
+        if record is None:
+            rows.append({"status": "missing", "quadratic_verified": False, "speedup": None})
+            continue
         checked = validate([record], [record["linear_tolerance"]])
         key = {
             k: v
@@ -51,7 +54,7 @@ def summarize(records):
         # No ratio is assigned to a capped or failed computation.
         row["speedup"] = None
         rows.append(row)
-    baselines = [r for r in rows if r["device"] == "cpu" and r["rank"] == 0]
+    baselines = [r for r in rows if r.get("device") == "cpu" and r.get("rank") == 0]
     if len(baselines) == 1 and baselines[0].get("quadratic_verified"):
         base = baselines[0]["construction_inclusive_seconds"]
         for row in rows:
@@ -70,12 +73,12 @@ def main():
     parser.add_argument("--records", type=Path, nargs="+", required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    records = [json.loads(path.read_text()) for path in args.records]
+    records = [json.loads(path.read_text()) if path.exists() else None for path in args.records]
     report = summarize(records)
     args.output.mkdir(parents=True, exist_ok=False)
     write_report(
         args.output / "summary.json",
-        {**report, "record_sha256": [file_sha256(p) for p in args.records]},
+        {**report, "record_sha256": [file_sha256(p) if p.exists() else None for p in args.records]},
     )
 
 
