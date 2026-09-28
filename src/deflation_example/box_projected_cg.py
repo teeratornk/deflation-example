@@ -6,6 +6,8 @@ the package's independent residual acceptance rather than that paper's
 objective-decrease stopping rule. Existing PDAS and nonlinear runners are unchanged.
 """
 
+import time
+
 import numpy as np
 from scipy.sparse.linalg import LinearOperator
 
@@ -133,11 +135,18 @@ def box_projected_cg(
 
         B = LinearOperator((len(indices),) * 2, matvec=action, rmatvec=action, dtype=float)
         B.diagonal = lambda: d[indices].copy()
+        setup_start = time.perf_counter()
+        rebuilt = False
         if preconditioner_factory is not None:
             if cached_indices is None or not np.array_equal(cached_indices, indices):
                 cached_preconditioner = preconditioner_factory(indices)
                 cached_indices = indices.copy()
+                rebuilt = True
             B.preconditioner = cached_preconditioner
+        row.update(
+            preconditioner_rebuilt=rebuilt,
+            preconditioner_seconds=time.perf_counter() - setup_start,
+        )
         rhs = -derivative[indices]
         result, timing = solver.solve(B, rhs, indices, initial=np.zeros_like(rhs))
         residual = independent_residual(B, result.x, rhs)

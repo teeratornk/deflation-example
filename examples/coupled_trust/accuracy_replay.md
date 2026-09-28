@@ -74,3 +74,27 @@ same seeded residuals check preconditioner-action agreement. These component
 measurements identify potential setup savings; they cannot establish a change
 in complete optimization time. Tests cover changing masks, damping, consistent
 source weighting, invalid indices and the timing sums.
+# Globalization of one recorded quadratic
+
+If matched high-accuracy inner solves leave active-set instability, the separate
+`coupled_qp_globalization` diagnostic compares PDAS with gradient projection and
+reduced CG on the saved quadratic. It keeps its derivative, bounds, diagonal,
+initial zero step, and recorded quadratic tolerance fixed. Both methods use
+independent original-residual checks and fresh weighted KKT checks.
+
+```sh
+python -m deflation_example.coupled_qp_globalization \
+  --trace INPUT/inactive-trace-00 --baseline BASELINE --quadratic 2 \
+  --method projected --rtol 1e-8 --output OUTPUT/projected
+python -m deflation_example.coupled_qp_globalization \
+  --trace INPUT/inactive-trace-00 --baseline BASELINE --quadratic 2 \
+  --method pdas --rtol 1e-8 --output OUTPUT/pdas
+```
+
+The projected method follows the two-stage searches in Section 3 of
+[Benson, McInnes and Moré, *GPCG: A Case Study in the Performance and Scalability
+of Optimization Algorithms*](https://ftp.mcs.anl.gov/pub/tech_reports/reports/P768.pdf).
+It uses residual-based CG stopping rather than that paper's objective-decrease
+test. This diagnostic is separate from the published optimization algorithm.
+Its timers include the projected searches and independent checks. A completed
+quadratic at an intermediate tolerance does not establish nonlinear optimality.
