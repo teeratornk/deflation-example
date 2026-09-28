@@ -57,3 +57,11 @@ requirements remain unchanged. The output preserves every attempt and contains
 components, and named device-storage and allocator measurements. Those memory
 values are not total process peak memory. This diagnostic alone establishes
 neither nonlinear optimality nor a complete-optimization speedup.
+
+Retain both outcomes in the comparison, including a missing or failed attempt:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_qp_cuda_report \
+  --records OUTPUT/cuda-frozen/record.json OUTPUT/cuda-reference/record.json \
+  --ranks 0 16 --output OUTPUT/cuda-summary
+```
