@@ -44,3 +44,25 @@ solver statuses:
 ```sh
 uv run --no-sync pytest tests/test_coupled_qp_accuracy.py tests/test_coupled_qp_diagnostic.py
 ```
+
+## Sparse preconditioner construction
+
+The optional `restriction="submatrix"` factory uses the committed slicing
+implementation from the neighboring prescribed-flow study (`4631927`). It
+assembles the sparse frozen normal operator once and slices that matrix for
+each inactive set. The true consistent-source and coupled operators remain
+matrix-free. `restriction="product"` remains the default.
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_preconditioner_setup \
+  --trace FAILED_ATTEMPT/inactive-trace-00 --baseline BASELINE \
+  --output frozen-setup
+```
+
+This comparison uses five evenly spaced saved masks from the final quadratic
+and three alternating-order repetitions. Timings include first use. It charges
+full-matrix construction as well as each restriction and factorization. The
+same seeded residuals check preconditioner-action agreement. These component
+measurements identify potential setup savings; they cannot establish a change
+in complete optimization time. Tests cover changing masks, damping, consistent
+source weighting, invalid indices and the timing sums.

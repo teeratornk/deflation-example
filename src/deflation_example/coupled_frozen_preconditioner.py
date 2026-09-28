@@ -16,15 +16,11 @@ enough to need one. The preconditioner never defines the direction: the outer
 iteration applies the exact operator and accepts on its residual, so this changes
 what a solve costs and not what it computes.
 
-Use an odd number of sweeps. ``k`` sweeps apply the map whose eigenvalues are
-``1 - (1 - x)**k`` over the spectrum of the block-Jacobi iteration, so an even
-``k`` turns negative as soon as an eigenvalue passes two, the preconditioner stops
-being positive definite, and the conjugate gradient recurrence breaks down with an
-error that names neither. That eigenvalue grows with the slab count on this
-problem -- 1.281 at two slabs, 1.961 at sixteen, 1.9975 at the sixty-four the
-study runs -- so an even count sits a fraction of a per cent from the cliff. An
-odd count is positive for any spectrum, and the ablation measured one, three and
-five sweeps within a per cent of two in cost, so nothing is paid for the safety.
+Without an additional coarse correction, the SPD block-tridiagonal temporal
+operator has block-Jacobi eigenvalues in (0, 2). Exact block solves therefore give
+an SPD sweep preconditioner for every positive sweep count. This property applies
+to the declared temporal operator; an arbitrary supplied matrix or additional
+correction needs its own justification. The default remains three sweeps.
 """
 
 import numpy as np
@@ -93,14 +89,25 @@ def frozen_normal_operator(problem, evaluation, damping=0.0):
     )
 
 
-def frozen_preconditioner_factory(problem, evaluation, damping=0.0, sweeps=3, correction=None):
+def frozen_preconditioner_factory(
+    problem, evaluation, damping=0.0, sweeps=3, correction=None, *, restriction="product"
+):
     """Build the per-active-set factory the quadratic subproblem attaches.
 
     The restriction is assembled once per active set, which the frozen operator
     can afford: it is sparse and thermal, unlike the exact operator, which is
     matrix-free precisely because assembling it would mean momentum solves.
+    ``restriction="submatrix"`` assembles the full frozen normal matrix once per
+    factory and slices it thereafter. Its construction and storage must be charged
+    to the comparison. The default retains the measured sparse-product path.
     """
+    if restriction not in {"product", "submatrix"}:
+        raise ValueError("Choose product or submatrix frozen restriction")
     operator, damped = frozen_normal_operator(problem, evaluation, damping)
+    if restriction == "submatrix":
+        from .sparse_restriction import PreassembledRestriction
+
+        operator = PreassembledRestriction(operator)
     spatial_size = problem.spatial_size
 
     def factory(indices):
