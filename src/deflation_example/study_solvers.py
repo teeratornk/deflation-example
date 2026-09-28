@@ -55,6 +55,8 @@ class StudySolver:
         api=None,
         resident_recycling=False,
         residual_policy="terminal",
+        progress_callback=None,
+        stop_requested=None,
     ):
         if method not in METHODS or device not in {"cpu", "cuda"}:
             raise ValueError("Unknown study solver or device")
@@ -62,6 +64,13 @@ class StudySolver:
             raise ValueError("AmgX requires its native binding and a CUDA device")
         if method == "reference" and reference is None:
             raise ValueError("Reference deflation requires a declared full-domain reference")
+        for callback in (progress_callback, stop_requested):
+            if callback is not None and not callable(callback):
+                raise ValueError("Progress and stop callbacks must be callable")
+        if device != "cpu" and (progress_callback is not None or stop_requested is not None):
+            raise ValueError("Iteration monitoring and cooperative stops require the CPU kernel")
+        self.progress_callback, self.stop_requested = progress_callback, stop_requested
+        self.kernel_calls = 0
         self.rank = integer(rank, "Rank")
         self.window = integer(window, "Direction window", 1)
         self.rtol = positive_real(rtol, "Final relative tolerance")
@@ -86,6 +95,8 @@ class StudySolver:
         )
         self.session = None
         self.previous = None
+        # Backends may supply the coarse space of the host CG recurrence.
+        self.coarse_factory = None
         if method == "amgx":
             self.session = AmgxSession(api, rtol * amgx_factor, maxiter, True).open()
 
@@ -93,6 +104,41 @@ class StudySolver:
         if self.history is not None:
             self.history.clear()
         self.previous = None
+
+    def export_history(self):
+        """Host copies of the recycling space and last inactive set, or None."""
+        if self.history is None:
+            return None
+
+        def host(array):
+            return np.asarray(array.get() if hasattr(array, "get") else array)
+
+        return {
+            "indices": host(self.history.indices).astype(np.int64, copy=True),
+            "basis": host(self.history.basis).astype(float, copy=True),
+            "previous": None
+            if self.previous is None
+            else np.asarray(self.previous, dtype=np.int64),
+        }
+
+    def import_history(self, payload):
+        """Restore an exported recycling space; other methods ignore the payload."""
+        if self.history is None or payload is None:
+            return
+        indices = np.asarray(payload["indices"], dtype=np.int64)
+        basis = np.asarray(payload["basis"], dtype=float)
+        if indices.ndim != 1 or basis.ndim != 2 or basis.shape[0] != len(indices):
+            raise ValueError("A recycling history pairs one inactive index with each basis row")
+        if not np.isfinite(basis).all() or len(np.unique(indices)) != len(indices):
+            raise ValueError("A recycling history must be finite with distinct inactive indices")
+        if basis.shape[1] > self.rank:
+            raise ValueError("A recycling history must not exceed the retained rank")
+        if self.history.resident:
+            raise ValueError("Resident recycling histories are not restorable")
+        self.history.clear()
+        self.history.indices, self.history.basis = indices, basis
+        previous = payload.get("previous")
+        self.previous = None if previous is None else np.asarray(previous, dtype=np.int64)
 
     def close(self):
         if self.session is not None:
@@ -185,6 +231,14 @@ class StudySolver:
             else None
         )
         diagonal = B.diagonal()
+        # The quadratic subproblem attaches an operator preconditioner when one is
+        # configured; the diagonal stays for the coarse space and the fallbacks.
+        preconditioner = getattr(B, "preconditioner", None)
+        if preconditioner is not None and (self.method == "amgx" or self.device == "cuda"):
+            raise ValueError(
+                "An operator preconditioner is supported by the host kernel only; "
+                "the AmgX and resident-CUDA kernels carry their own"
+            )
         if device_basis:
             self.torch.cuda.synchronize()
         preparation = time.perf_counter() - start
@@ -224,6 +278,17 @@ class StudySolver:
             )
         else:
             tick = time.perf_counter()
+            self.kernel_calls += 1
+
+            def progress(event):
+                self.progress_callback(
+                    {
+                        **event,
+                        "kernel_call": self.kernel_calls,
+                        "kernel_rtol": target * self.cg_factor,
+                    }
+                )
+
             result = deflated_cg(
                 B,
                 b,
@@ -235,6 +300,10 @@ class StudySolver:
                 refresh=self.refresh,
                 cache_operator_product=self.cache_operator_product,
                 direction_callback=None if self.history is None else self.history.capture,
+                coarse_factory=self.coarse_factory,
+                preconditioner=preconditioner,
+                progress_callback=None if self.progress_callback is None else progress,
+                stop_requested=self.stop_requested,
             )
             kernel_seconds = time.perf_counter() - tick
             if result.status in {"maxiter", "residual_failed"} and result.residual <= target:
