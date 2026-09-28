@@ -46,7 +46,10 @@ def summarize(records, tolerances):
             for k in ("git_head", "source_sha256", "cpu_model", "python", "numpy", "scipy", "blas")
         }
         key.update(
-            device=record.get("device", "cpu"), reference_rank=record.get("reference_rank", 0)
+            device=record.get("device", "cpu"),
+            reference_rank=record.get("reference_rank", 0),
+            reference_initial=record.get("reference_initial", "clipped_zero"),
+            frozen_layout=record.get("frozen_layout", "serial"),
         )
         if identity is not None and key != identity:
             raise ValueError(

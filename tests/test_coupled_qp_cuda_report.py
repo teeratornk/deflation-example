@@ -33,6 +33,8 @@ def test_missing_and_failed_arms_and_cost_boundary():
         ("quadratic_sha256", "different"),
         ("quadratic_tolerance", 0.1),
         ("gpu", {"model": "other"}),
+        ("reference_initial", "optimizer"),
+        ("frozen_layout", "block_diagonal"),
     ],
 )
 def test_unmatched_gpu_comparisons_rejected(key, value):

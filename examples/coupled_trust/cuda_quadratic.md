@@ -42,13 +42,18 @@ uv run --no-sync python -m deflation_example.coupled_qp_globalization \
 ```
 
 Repeat the same commands with `--device cpu` for a matched-source control. The
-reference is constructed from the declared initial temperature, over the full
+reference in these original commands is constructed from the clipped-zero temperature, over the full
 domain, using 48 energy-Krylov steps and alternating low/high Ritz selection.
 It uses no inactive masks or solved quadratic directions. Construction remains
 on the CPU and is reported separately, alongside the reconstruction and complete
 quadratic time; it belongs in any construction-inclusive comparison. The saved
 reference and its checksum identify the actual basis. Numerical rank loss adds
 no replacement directions.
+
+The [projected repair and profiling example](projected_repair.md) adds explicit
+initialization from the optimizer's declared snapshot, grouped independent GPU
+solves, and CPU-sparse/GPU-coarse execution. These options identify separate
+procedures; they do not relabel the earlier timing records.
 
 The direction target is distinct from the unchanged weighted quadratic KKT
 criterion stored in the trace. Original complete nonlinear residual and KKT
