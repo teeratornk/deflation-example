@@ -26,6 +26,20 @@ from .study_solvers import StudySolver
 from .validation import integer, positive_real
 
 
+# Runner methods and the inner solver each one uses; the block methods add the
+# block-in-time preconditioner to that solver's CG recurrence.
+METHOD_SOLVERS = {
+    "jacobi": "jacobi",
+    "reference": "reference",
+    "recycling": "recycling",
+    "amgx": "amgx",
+    "direct": "direct",
+    "block": "jacobi",
+    "block_reference": "reference",
+}
+BLOCK_METHODS = {"block", "block_reference"}
+
+
 @dataclass
 class MeshStudyConfig:
     geometry: str = "engine_3d"
@@ -47,6 +61,9 @@ class MeshStudyConfig:
     # temporal_modes K lowest temporal factors (K defaults to slabs); rank = S * K.
     spatial_modes: int | None = None
     temporal_modes: int | None = None
+    # Sweeps of the block-in-time preconditioner used by the block and
+    # block_reference methods (host CG only).
+    block_sweeps: int = 3
     reference_device: str = "cpu"
     methods: list[str] = field(default_factory=lambda: ["jacobi", "reference", "recycling"])
     device: str = "cpu"
@@ -147,8 +164,13 @@ def controls(config):
         raise ValueError("Choose matched outer_inner or cold starts")
     if not c["methods"] or len(set(c["methods"])) != len(c["methods"]):
         raise ValueError("Methods must form a nonempty list without duplicates")
-    if any(m not in {"jacobi", "reference", "recycling", "amgx", "direct"} for m in c["methods"]):
+    if any(m not in METHOD_SOLVERS for m in c["methods"]):
         raise ValueError("Unknown solver")
+    integer(c["block_sweeps"], "Block sweeps", 1)
+    if any(m in BLOCK_METHODS for m in c["methods"]) and (
+        c["device"] != "cpu" or not c["transient"] or c["matrix_free_inner"]
+    ):
+        raise ValueError("Block-in-time preconditioning runs host CG on assembled trajectories")
     if "amgx" in c["methods"] and c["device"] != "cuda":
         raise ValueError("AmgX requires CUDA")
     if "direct" in c["methods"] and (c["device"] != "cpu" or c["matrix_free_inner"]):
@@ -225,12 +247,27 @@ def sequence(c, method, torch=None, api=None):
     initial_setup_seconds = None
     try:
         showcase, problem = build_model(c)
+        if method in BLOCK_METHODS:
+            from dataclasses import replace
+
+            from .block_time import BlockTimeRestriction
+
+            problem = replace(
+                problem,
+                H=BlockTimeRestriction(problem.H, problem.spatial_size, c["block_sweeps"]),
+            )
+            storage["block_preconditioner"] = {
+                "sweeps": c["block_sweeps"],
+                "slab_blocks": "factored at every inactive restriction (SuperLU)",
+                "kernel": "host CG",
+            }
         components["assembly"] = time.perf_counter() - tick
         storage["state_operator_bytes"] = sum(
             a.nbytes for a in (problem.A.data, problem.A.indices, problem.A.indptr)
         )
         tick = time.perf_counter()
-        if method == "reference":
+        solver = METHOD_SOLVERS[method]
+        if solver == "reference":
             reference = build_mesh_reference(
                 problem,
                 showcase.coarse_assembly,
@@ -250,9 +287,9 @@ def sequence(c, method, torch=None, api=None):
         components["reference_construction"] = time.perf_counter() - tick
         tick = time.perf_counter()
         if method != "direct":
-            retained_rank = c["recycle_rank"] if method == "recycling" else c["rank"]
+            retained_rank = c["recycle_rank"] if solver == "recycling" else c["rank"]
             adapter = StudySolver(
-                method,
+                solver,
                 device=c["device"],
                 rank=retained_rank,
                 window=retained_rank,
