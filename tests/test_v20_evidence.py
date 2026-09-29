@@ -214,5 +214,29 @@ def test_table_rows_state_the_reading(tree):
     )
     assert values == [pytest.approx(50.5 / 25.5)]
     assert text == r"Bore & level 4 & 1{,}000 & 25.5 & Jacobi-CG 50.5 & 1.98 & 1.00 \\" + "\n"
-    with pytest.raises(ValueError, match="No reading"):
+    with pytest.raises(ValueError, match="No population"):
         evidence.table_rows(summary, [("x", "y", "wave1/missing", "reference")])
+    with pytest.raises(ValueError, match="No reading"):
+        evidence.table_rows(summary, [("x", "y", "wave1/C", "block_reference")])
+
+
+def test_a_population_without_a_completed_method_is_stated(tmp_path):
+    runs = tmp_path / "runs"
+    write_cht(
+        runs / "wave6/F",
+        {
+            ("reference", 0): cht_record(1.0, 1, success=False, status="sequence_failed"),
+            ("jacobi", 0): cht_record(1.0, 1, success=False, status="sequence_failed"),
+        },
+        1,
+        ["jacobi", "reference"],
+    )
+    evidence.bundle(runs, campaign(tmp_path), tmp_path / "evidence")
+    summary = evidence.summarize(tmp_path / "evidence")
+    text, values = evidence.table_rows(summary, [("T", "a", "wave6/F", None)])
+    assert values == [] and "no method completes" in text
+    with pytest.raises(ValueError, match="A method completes"):
+        evidence.table_rows(
+            {"wave6/F": {**summary["wave6/F"], "methods": {"jacobi": {"accepted": 1}}}},
+            [("T", "a", "wave6/F", None)],
+        )

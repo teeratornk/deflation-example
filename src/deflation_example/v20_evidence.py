@@ -365,6 +365,7 @@ def summarize(root):
             "readings": readings,
             "unknowns": max(sizes) if sizes else None,
             "phase": population["controls"].get("phase"),
+            "timeout_seconds": population["controls"].get("timeout_seconds"),
         }
     return out
 
@@ -412,6 +413,62 @@ OPERATION_ROWS = [
     ("Shuffled order", "bore level 2", "wave9/O5-shuffled-engine-L2-steady", "reference"),
     ("Shuffled order", "bore level 2, 4 slabs", "wave9/O5-shuffled-engine-L2-x4", "reference"),
 ]
+# Supplementary confirmations: tolerance, regularization, cold starts, long sequences,
+# rank and coarse level, global-rank Cartesian transients and the level-0 bore L3 row.
+SI_ROWS = [
+    (
+        "Transformer steady",
+        r"rtol $10^{-8}$",
+        "wave6/A-tol-transformer-steady-rtol1e-8",
+        "reference",
+    ),
+    (
+        "Transformer steady",
+        r"rtol $10^{-6}$",
+        "wave6/A-tol-transformer-steady-rtol1e-6",
+        "reference",
+    ),
+    ("Bore L2 steady", r"rtol $10^{-8}$", "wave6/A-tol-engine-L2-steady-rtol1e-8", "reference"),
+    ("Bore L2 steady", r"rtol $10^{-6}$", "wave6/A-tol-engine-L2-steady-rtol1e-6", "reference"),
+    ("Bore L3 steady", r"rtol $10^{-8}$", "wave6/A-tol-engine-L3-steady-rtol1e-8", "reference"),
+    ("Bore L3 steady", r"rtol $10^{-6}$", "wave6/A-tol-engine-L3-steady-rtol1e-6", "reference"),
+    ("Bore L2 steady", r"$\alpha=10^{-5}$", "wave6/A-alpha-engine-L2-steady-1e-5", "reference"),
+    ("Bore L2 steady", r"$\alpha=10^{-4}$", "wave6/A-alpha-engine-L2-steady-1e-4", "reference"),
+    ("Transformer steady", r"$\alpha=10^{-13}$", "wave6/A-alpha-transformer-steady-1e-13", None),
+    ("Transformer steady", r"$\alpha=10^{-12}$", "wave6/A-alpha-transformer-steady-1e-12", None),
+    ("Bore L2 steady", "cold start", "wave6/A-cold-engine-L2-steady", "reference"),
+    ("Bore L3 steady", "cold start", "wave6/A-cold-engine-L3-steady", "reference"),
+    ("Transformer steady", "64 targets", "wave3/C-S3a-transformer-steady-q64", "reference"),
+    ("Transformer, 8 slabs", "64 targets", "wave3/C-S3a-transformer-x8-q64", "reference"),
+    ("Bore L2 steady", "64 targets", "wave3/C-S3a-engine-L2-steady-q64", "reference"),
+    ("Bore L2, 4 slabs", "64 targets", "wave3/C-S3a-engine-L2-x4-q64", "reference"),
+    ("Transformer steady", "256 targets", "wave6/A-q256-transformer-steady", "reference"),
+    ("Bore L2 steady", "256 targets", "wave6/A-q256-engine-L2-steady", "reference"),
+    ("Transformer steady", "4 loads x 4 bounds", "wave3/C-S3b-rating-steady", "reference"),
+    ("Transformer, 8 slabs", "4 loads x 4 bounds", "wave3/C-S3b-rating-x8", "reference"),
+    ("Bore L3 steady", "level 0, rank 50", "wave11/R-engine-L3-steady-ref0-r50", "reference"),
+    ("Bore L3 steady", "level 0, rank 100", "wave11/R-engine-L3-steady-ref0-r100", "reference"),
+    ("Bore L3 steady", "level 0, rank 200", "wave11/R-engine-L3-steady-ref0-r200", "reference"),
+    ("Bore L3 steady", "level 0, rank 300", "wave11/R-engine-L3-steady-ref0-r300", "reference"),
+    ("Bore L3 steady", "level 1, rank 50", "wave11/R-engine-L3-steady-ref1-r50", "reference"),
+    ("Bore L3 steady", "level 1, rank 100", "wave11/R-engine-L3-steady-ref1-r100", "reference"),
+    ("Bore L3 steady", "level 1, rank 400", "wave7/F-engine-L3-steady-ref1-r400", "reference"),
+    ("Bore L3 steady", "level 2, rank 200", "wave8/G-engine-L3-steady-ref2-r200", "reference"),
+    ("Bore L3 steady", "level 0, four methods", "wave3/C-S1a-engine-L3-steady", "reference"),
+    ("Bore L4 steady", "level 3, rank 200", "wave8/G-engine-L4-steady-o400", "reference-ref3"),
+    ("Cartesian", r"$12^3$, 8 slabs, global", "wave3/C-S4a-transient12-global", "reference"),
+    ("Cartesian", r"$16^3$, 8 slabs, global", "wave3/C-S4a-transient16-global", "reference"),
+    ("Cartesian", r"$24^3$, 8 slabs, global", "wave3/C-S4a-transient24-global", "reference"),
+    ("Cartesian", r"$32^3$, 8 slabs, global", "wave3/C-S4a-transient32-global", "reference"),
+]
+# (label, CPU population, GPU population of the same problem and query plan).
+DIRECT_ROWS = [
+    ("Transformer steady", "wave12/D-transformer-steady", "wave9/O5-sorted-transformer-steady"),
+    ("Bore L1 steady", "wave12/D-engine-L1-steady", "wave12/D-gpu-engine-L1-steady"),
+    ("Bore L2 steady", "wave12/D-engine-L2-steady", "wave14/E-engine-L2-steady-ref1-r200"),
+    ("Transformer, 8 slabs", "wave12/D-transformer-x8", "wave3/C-S4b-transformer-x8"),
+    ("Bore L1, 8 slabs", "wave12/D-engine-L1-x8", "wave3/C-S4b-engine-L1-x8"),
+]
 NAMES = {
     "jacobi": "Jacobi-CG",
     "reference": "reference",
@@ -437,11 +494,24 @@ def _count(value):
 
 
 def table_rows(summary, spec):
-    """LaTeX rows: label, detail, unknowns, reference s, alternative (s), ratio, iterations."""
+    """LaTeX rows: label, detail, unknowns, reference s, alternative (s), ratio, iterations.
+
+    A row with arm None states a population in which no method completes.
+    """
     lines, values = [], []
     for label, detail, key, arm in spec:
         population = summary.get(key)
-        if population is None or arm not in population["readings"]:
+        if population is None:
+            raise ValueError(f"No population {key}")
+        if arm is None:
+            if any(row["accepted"] for row in population["methods"].values()):
+                raise ValueError(f"A method completes in {key}")
+            lines.append(
+                " & ".join([label, detail, _count(population["unknowns"])])
+                + r" & \multicolumn{4}{l}{no method completes} \\"
+            )
+            continue
+        if arm not in population["readings"]:
             raise ValueError(f"No reading for {key} ({arm})")
         reading = population["readings"][arm]
         alternative = NAMES.get(reading["fastest_alternative"], reading["fastest_alternative"])
@@ -463,12 +533,60 @@ def table_rows(summary, spec):
     return "\n".join(lines) + "\n", values
 
 
+def direct_rows(summary):
+    """CPU direct and block medians beside the GPU reference and fastest GPU alternative."""
+    lines, values = [], {}
+    for label, cpu, gpu in DIRECT_ROWS:
+        cpu_rows = summary[cpu]["methods"]
+        reading = summary[gpu]["readings"]["reference"]
+        for method, row in cpu_rows.items():
+            if row["accepted"] != row["declared"]:
+                raise ValueError(f"{cpu} {method} has unaccepted repetitions")
+        alternative = NAMES.get(reading["fastest_alternative"], reading["fastest_alternative"])
+        lines.append(
+            " & ".join(
+                [
+                    label,
+                    _seconds(cpu_rows.get("direct", {}).get("median_seconds")),
+                    _seconds(cpu_rows.get("block", {}).get("median_seconds")),
+                    _seconds(reading["reference_seconds"]),
+                    f"{alternative} {_seconds(reading['alternative_seconds'])}",
+                ]
+            )
+            + r" \\"
+        )
+        values[label] = {
+            "direct": cpu_rows.get("direct", {}).get("median_seconds"),
+            "block": cpu_rows.get("block", {}).get("median_seconds"),
+            "reference": reading["reference_seconds"],
+        }
+    return "\n".join(lines) + "\n", values
+
+
+def campaign_counts(runs, keys):
+    """Populations of the manuscript tables, their accepted sequences and target solves."""
+    populations_used = sorted(set(keys))
+    sequences = solves = 0
+    for key in populations_used:
+        for method_runs in runs[key].values():
+            for run in method_runs:
+                if run["accepted"]:
+                    sequences += 1
+                    solves += len(run.get("cases") or [])
+    return len(populations_used), sequences, solves
+
+
 CARTESIAN_TRANSIENT = 8  # the first rows of TRANSIENT_ROWS are Cartesian
 
 
-def macros(summary, scale, transient, operation):
+def macros(summary, scale, transient, operation, counts, direct):
     def reading(key, arm="reference"):
         return summary[key]["readings"][arm]
+
+    pilot_block = summary["wave5/W5-engine-L2-x4"]["methods"]["block"]
+    pilot_direct = summary["wave5/W5-engine-L3-steady"]["methods"]["direct"]
+    if pilot_direct["accepted"] or pilot_direct["failures"] != ["timeout"]:
+        raise ValueError("The engine L3 direct pilot is cited as a timeout")
 
     cartesian_transient = transient[:CARTESIAN_TRANSIENT]
     body_transient = transient[CARTESIAN_TRANSIENT:]
@@ -491,6 +609,17 @@ def macros(summary, scale, transient, operation):
         "psTightAmgxRatio": _ratio(reading("wave8/G-steady96")["ratio"]),
         "psLFourReferenceMaxInner": _count(l4["reference-ref2"]["max_inner_per_solve"]),
         "psLFourJacobiInnerCap": _count(l4["jacobi"]["max_inner_per_solve"]),
+        "psPopulations": _count(counts[0]),
+        "psSequences": _count(counts[1]),
+        "psTargetSolves": _count(counts[2]),
+        "psDirectTransformer": _seconds(direct["Transformer steady"]["direct"]),
+        "psReferenceTransformer": _seconds(direct["Transformer steady"]["reference"]),
+        "psDirectBoreTwo": _seconds(direct["Bore L2 steady"]["direct"]),
+        "psReferenceBoreTwo": _seconds(direct["Bore L2 steady"]["reference"]),
+        "psPilotBlockBoreTwoSlabs": _seconds(pilot_block["median_seconds"]),
+        "psPilotDirectBoreThreeTimeout": _count(
+            summary["wave5/W5-engine-L3-steady"]["timeout_seconds"]
+        ),
     }
     return "".join(f"\\newcommand{{\\{k}}}{{{v}}}\n" for k, v in values.items()), values
 
@@ -564,10 +693,23 @@ def export(root, output):
     scale_text, scale = table_rows(summary, SCALE_ROWS)
     transient_text, transient = table_rows(summary, TRANSIENT_ROWS)
     operation_text, operation = table_rows(summary, OPERATION_ROWS)
-    (output / "generated/scale_rows.tex").write_text(scale_text)
-    (output / "generated/transient_rows.tex").write_text(transient_text)
-    (output / "generated/operation_rows.tex").write_text(operation_text)
-    text, values = macros(summary, scale, transient, operation)
+    si_text, _ = table_rows(summary, SI_ROWS)
+    direct_text, direct = direct_rows(summary)
+    for name, text in (
+        ("scale_rows", scale_text),
+        ("transient_rows", transient_text),
+        ("operation_rows", operation_text),
+        ("si_rows", si_text),
+        ("direct_rows", direct_text),
+    ):
+        (output / f"generated/{name}.tex").write_text(text)
+    keys = [
+        k for spec in (SCALE_ROWS, TRANSIENT_ROWS, OPERATION_ROWS, SI_ROWS) for _, _, k, _ in spec
+    ]
+    keys += [k for _, cpu, gpu in DIRECT_ROWS for k in (cpu, gpu)]
+    keys += [extra for extras in AUGMENT.values() for extra in extras if extra in runs]
+    counts = campaign_counts(runs, keys)
+    text, values = macros(summary, scale, transient, operation, counts, direct)
     (output / "generated/macros.tex").write_text(text)
     (output / "populations.md").write_text(listing(summary))
     figure(summary, runs, output / "figures/speedup_scale.pdf")
