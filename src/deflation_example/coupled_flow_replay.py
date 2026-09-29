@@ -52,6 +52,7 @@ def main():
     parser.add_argument("--trial", type=int, default=0)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--budget-seconds", type=float, default=7200)
+    parser.add_argument("--polish-load", action="store_true")
     args = parser.parse_args()
     if not np.isfinite(args.budget_seconds) or args.budget_seconds <= 0:
         parser.error("Use a positive finite budget per policy")
@@ -71,6 +72,7 @@ def main():
         "trace_manifest_sha256": file_sha256(args.trace / "manifest.json"),
         "quadratic": metadata,
         "mode": args.mode,
+        "polish_load": args.polish_load,
         "cases": [],
         "scope": "Diagnostic evaluation, without optimization or performance-speedup claims.",
     }
@@ -112,6 +114,7 @@ def main():
         for continuation in (False, True) if args.mode == "trial" else (False,):
             began = time.perf_counter()
             problem.flow_continuation = continuation
+            problem.flow_continuation_polish = args.polish_load
             problem.stop_requested = lambda: time.perf_counter() - began >= args.budget_seconds
             problem.evaluation_callback = lambda row: write_report(
                 args.output / "progress.json", row

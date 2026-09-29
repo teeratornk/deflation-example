@@ -22,6 +22,7 @@ def solve_momentum(
     continuation=False,
     max_stages=80,
     stop_requested=None,
+    polish_load=False,
 ):
     """Try Newton, then optionally continue an artificial residual load to zero.
 
@@ -32,6 +33,8 @@ def solve_momentum(
     remains in the returned history. Viscosity and boundary data stay fixed.
     """
     tolerance = positive_real(tolerance, "Flow tolerance")
+    if not isinstance(polish_load, bool):
+        raise ValueError("Load polishing must be Boolean")
     max_stages = integer(max_stages, "Load continuation stage cap", 1)
     arguments = dict(
         previous=previous,
@@ -75,11 +78,43 @@ def solve_momentum(
         {"load_fraction": 1.0, "status": direct.status, "history": direct.history},
         {"load_fraction": 0.0, "status": "initial_load_check", "metrics": base},
     ]
+    current = initial
+    if polish_load and np.isfinite(list(base.values())).all() and max(base.values()) > tolerance:
+        current = flow.solve(
+            acceleration + lift, boundary_indices, boundary_values, initial=initial, **arguments
+        )
+        base = flow.verify(
+            current,
+            acceleration + lift,
+            boundary_indices,
+            boundary_values,
+            previous=previous,
+            time_step=time_step,
+            pressure_gauge=pressure_gauge,
+        )
+        history.append(
+            {
+                "load_fraction": 0.0,
+                "status": "initial_load_polish",
+                "solver_status": current.status,
+                "history": current.history,
+                "metrics": base,
+            }
+        )
+        if current.status != "converged":
+            return FlowResult(
+                current.velocity.copy(),
+                current.pressure.copy(),
+                "budget_exhausted"
+                if current.status == "budget_exhausted"
+                else "load_initialization_failed",
+                history,
+            )
     if not np.isfinite(list(base.values())).all() or max(base.values()) > tolerance:
         return FlowResult(
-            initial.velocity.copy(), initial.pressure.copy(), "load_initialization_failed", history
+            current.velocity.copy(), current.pressure.copy(), "load_initialization_failed", history
         )
-    current, fraction, increment = initial, 0.0, 0.25
+    fraction, increment = 0.0, 0.25
     status = "load_continuation_cap"
     for _ in range(max_stages):
         if stop_requested is not None and stop_requested():
@@ -112,7 +147,10 @@ def solve_momentum(
                     pressure_gauge=pressure_gauge,
                 )
                 status = (
-                    "converged" if max(checks.values()) <= tolerance else "final_residual_failed"
+                    "converged"
+                    if np.isfinite(list(checks.values())).all()
+                    and max(checks.values()) <= tolerance
+                    else "final_residual_failed"
                 )
                 break
             increment = min(0.25, increment * 1.5)

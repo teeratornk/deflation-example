@@ -161,3 +161,90 @@ def test_deadline_stops_continuation_without_accepting_artificial_load(monkeypat
     assert result.status == "budget_exhausted"
     assert len(calls) == 2
     assert result.history[-1]["load_fraction"] == 0.25
+
+
+@pytest.mark.parametrize("polish", [False, True])
+def test_optional_load_polish_keeps_original_tolerance(monkeypatch, polish):
+    problem = small_coupled_problem()
+    flow, tolerance = problem.flow, 1e-10
+    real_solve, real_verify = flow.solve, flow.verify
+    calls, checks = [], []
+
+    def solve(*args, **kwargs):
+        assert kwargs["tolerance"] == tolerance
+        result = real_solve(*args, **kwargs)
+        calls.append(result)
+        if len(calls) == 1:
+            result.status = "iteration_cap"
+        return result
+
+    def verify(*args, **kwargs):
+        result = real_verify(*args, **kwargs)
+        checks.append(result)
+        if len(checks) == 1:
+            return {**result, "momentum_relative_residual": 1.24 * tolerance}
+        return result
+
+    monkeypatch.setattr(flow, "solve", solve)
+    monkeypatch.setattr(flow, "verify", verify)
+    result = solve_momentum(
+        flow,
+        problem.acceleration,
+        problem.boundary_indices,
+        problem.boundary_values,
+        initial=problem.initial_flow,
+        pressure_gauge=problem.pressure_gauge,
+        continuation=True,
+        tolerance=tolerance,
+        polish_load=polish,
+    )
+    assert result.status == ("converged" if polish else "load_initialization_failed")
+    if polish:
+        assert result.history[2]["status"] == "initial_load_polish"
+        assert result.history[-1]["load_fraction"] == 1.0
+        assert (
+            max(
+                real_verify(
+                    result,
+                    problem.acceleration,
+                    problem.boundary_indices,
+                    problem.boundary_values,
+                    pressure_gauge=problem.pressure_gauge,
+                ).values()
+            )
+            <= tolerance
+        )
+
+
+def test_nonfinite_final_continuation_check_is_never_accepted(monkeypatch):
+    problem = small_coupled_problem()
+    flow = problem.flow
+    real_solve, real_verify = flow.solve, flow.verify
+    calls, checks = [], []
+
+    def solve(*args, **kwargs):
+        result = real_solve(*args, **kwargs)
+        calls.append(1)
+        if len(calls) == 1:
+            result.status = "iteration_cap"
+        return result
+
+    def verify(*args, **kwargs):
+        result = real_verify(*args, **kwargs)
+        checks.append(1)
+        if len(checks) > 1:
+            result["continuity_relative_residual"] = float("nan")
+        return result
+
+    monkeypatch.setattr(flow, "solve", solve)
+    monkeypatch.setattr(flow, "verify", verify)
+    result = solve_momentum(
+        flow,
+        problem.acceleration,
+        problem.boundary_indices,
+        problem.boundary_values,
+        initial=problem.initial_flow,
+        pressure_gauge=problem.pressure_gauge,
+        continuation=True,
+    )
+    assert result.status == "final_residual_failed"

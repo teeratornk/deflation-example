@@ -99,3 +99,10 @@ Direct Newton and residual-load continuation receive identical inputs and final
 equation tolerances. Continuation must remove its artificial load completely.
 All unsuccessful stages remain in the output. Its use in optimization is opt-in
 through `--continuation` and requires a matching initial verification record.
+
+The separate replay option `--polish-load` solves the zero-fraction artificial
+load problem when its initial residual exceeds the unchanged flow tolerance.
+This tests a failure observed before continuation could advance. It does not
+relax the initialization or final physical-equation criteria, and it is disabled
+in the frozen direct-Newton optimization study. Its additional Newton solve and
+all continuation stages are included in the replay time.
