@@ -1,0 +1,218 @@
+"""Digests, readings and manuscript rows of the prescribed-speedup-v20 evidence."""
+
+import json
+
+import pytest
+
+from deflation_example import v20_evidence as evidence
+
+
+def mesh_record(seconds, inner, success=True, statuses=("converged", "converged"), level=0):
+    cases = [
+        {
+            "status": status,
+            "inner_iterations": inner // len(statuses),
+            "outer_iterations": 3,
+            "cumulative_seconds": seconds * (k + 1) / len(statuses),
+            "inner": [{"iterations": inner // len(statuses)}],
+        }
+        for k, status in enumerate(statuses)
+    ]
+    return {
+        "success": success,
+        "seconds": seconds,
+        "cases": cases,
+        "memory": {"peak_gpu_process_bytes": 2**30},
+        "problem_size": 1000,
+        "mesh": {"reference_level": level},
+    }
+
+
+def write_mesh(path, runs, repeats, methods, reference_level=0, attempts=None):
+    path.mkdir(parents=True)
+    controls = {
+        "methods": methods,
+        "repeats": repeats,
+        "phase": "final",
+        "reference_level": reference_level,
+    }
+    (path / "protocol.json").write_text(json.dumps(controls))
+    for (method, repetition), record in runs.items():
+        (path / f"{method}-{repetition}").mkdir()
+        (path / f"{method}-{repetition}/record.json").write_text(json.dumps(record))
+    rows = attempts or [{"method": m, "repetition": r, "status": "completed"} for (m, r) in runs]
+    (path / "attempts.json").write_text(json.dumps(rows))
+
+
+def cht_record(seconds, inner, success=True, status="complete"):
+    return {
+        "success": success,
+        "status": status if not success else "complete",
+        "total_seconds": seconds,
+        "inner_iterations": inner,
+        "outer_iterations": 10,
+        "memory": {"peak_gpu_process_bytes": 2**31},
+        "cases": [{"status": "converged", "cumulative_seconds": seconds, "inner": []}],
+    }
+
+
+def write_cht(path, runs, repeats, methods, n=4, problem="steady"):
+    path.mkdir(parents=True)
+    controls = {
+        "methods": methods,
+        "repeats": repeats,
+        "phase": "final",
+        "n": n,
+        "slabs": 8,
+        "problem": problem,
+    }
+    (path / "declared_protocol.json").write_text(json.dumps({"controls": controls}))
+    for (method, repetition), record in runs.items():
+        name = f"sequence-{repetition}-outer_inner-{method}.json"
+        (path / name).write_text(json.dumps(record))
+
+
+def campaign(tmp_path):
+    directory = tmp_path / "campaign"
+    directory.mkdir()
+    for name in evidence.CAMPAIGN_FILES:
+        (directory / name).write_text("{}\n")
+    return directory
+
+
+@pytest.fixture
+def tree(tmp_path):
+    runs = tmp_path / "runs"
+    # Body-fitted: reference 10/12/14 s, Jacobi 20/24/22 s, recycling 30 s once and
+    # one failed repetition, AmgX never recorded for repetition 2.
+    write_mesh(
+        runs / "wave1/M",
+        {
+            ("reference", 0): mesh_record(10.0, 100),
+            ("reference", 1): mesh_record(12.0, 120),
+            ("reference", 2): mesh_record(14.0, 140),
+            ("jacobi", 0): mesh_record(20.0, 400),
+            ("jacobi", 1): mesh_record(24.0, 480),
+            ("jacobi", 2): mesh_record(22.0, 440),
+            ("recycling", 0): mesh_record(30.0, 300),
+            ("recycling", 1): mesh_record(
+                9.0, 90, success=False, statuses=("converged", "maxiter")
+            ),
+            ("amgx", 0): mesh_record(40.0, 10),
+            ("amgx", 1): mesh_record(41.0, 10),
+        },
+        3,
+        ["jacobi", "reference", "recycling", "amgx"],
+        attempts=[
+            {"method": "amgx", "repetition": 2, "status": "timeout"},
+        ],
+    )
+    # Cartesian: reference 5 s, Jacobi 8 s, AmgX cycling (not accepted).
+    write_cht(
+        runs / "wave1/C",
+        {
+            ("reference", 0): cht_record(5.0, 50),
+            ("jacobi", 0): cht_record(8.0, 200),
+            ("amgx", 0): cht_record(3.0, 5, success=False, status="sequence_failed"),
+        },
+        1,
+        ["jacobi", "reference", "amgx"],
+    )
+    # A split population: one method and one repetition per directory.
+    for arm, method, level, seconds in (
+        ("jacobi", "jacobi", 0, 50.0),
+        ("ref2", "reference", 2, 25.0),
+        ("ref3", "reference", 3, 80.0),
+    ):
+        for repetition in range(2):
+            write_mesh(
+                runs / f"wave8/G-engine-L4-steady-o400-{arm}-rep{repetition}",
+                {(method, 0): mesh_record(seconds + repetition, 1000, level=level)},
+                1,
+                [method],
+                reference_level=level,
+            )
+    # A tightened AmgX population augmenting wave8/G-steady96.
+    write_cht(
+        runs / "wave8/G-steady96",
+        {("reference", 0): cht_record(10.0, 100), ("jacobi", 0): cht_record(18.0, 400)},
+        1,
+        ["jacobi", "reference"],
+    )
+    write_cht(runs / "wave10/H-amgx001-steady96", {("amgx", 0): cht_record(14.0, 20)}, 1, ["amgx"])
+    out = tmp_path / "evidence"
+    evidence.bundle(runs, campaign(tmp_path), out)
+    return out
+
+
+def test_body_fitted_readings_use_accepted_repetitions_only(tree):
+    summary = evidence.summarize(tree)["wave1/M"]
+    rows, reading = summary["methods"], summary["readings"]["reference"]
+    assert rows["reference"]["median_seconds"] == 12.0
+    assert rows["jacobi"]["median_seconds"] == 22.0
+    assert rows["recycling"] == {**rows["recycling"], "accepted": 1, "declared": 3}
+    assert rows["recycling"]["median_seconds"] == 30.0
+    assert rows["amgx"]["accepted"] == 2 and "timeout" in rows["amgx"]["failures"]
+    assert reading["fastest_alternative"] == "jacobi"
+    assert reading["ratio"] == pytest.approx(22.0 / 12.0)
+    assert reading["jacobi_iteration_ratio"] == pytest.approx(440 / 120)
+
+
+def test_a_failed_alternative_is_not_the_fastest(tree):
+    reading = evidence.summarize(tree)["wave1/C"]["readings"]["reference"]
+    assert reading["fastest_alternative"] == "jacobi"
+    assert reading["ratio"] == pytest.approx(8.0 / 5.0)
+
+
+def test_split_populations_are_read_together_by_reference_level(tree):
+    summary = evidence.summarize(tree)["wave8/G-engine-L4-steady-o400"]
+    assert set(summary["methods"]) == {"jacobi", "reference-ref2", "reference-ref3"}
+    assert summary["methods"]["reference-ref2"]["declared"] == 2
+    assert summary["methods"]["reference-ref2"]["median_seconds"] == 25.5
+    assert summary["readings"]["reference-ref2"]["ratio"] == pytest.approx(50.5 / 25.5)
+    assert summary["readings"]["reference-ref3"]["ratio"] == pytest.approx(50.5 / 80.5)
+
+
+def test_a_tightened_amgx_is_an_added_alternative(tree):
+    summary = evidence.summarize(tree)["wave8/G-steady96"]
+    assert summary["methods"]["amgx001"]["median_seconds"] == 14.0
+    reading = summary["readings"]["reference"]
+    assert reading["fastest_alternative"] == "amgx001"
+    assert reading["ratio"] == pytest.approx(1.4)
+
+
+def test_digests_carry_the_source_hash(tree, tmp_path):
+    digest = json.loads((tree / "populations/wave1/M/runs/reference-1.json").read_text())
+    source = (tmp_path / "runs/wave1/M/reference-1/record.json").read_bytes()
+    assert digest["source_sha256"] == evidence._sha(source)
+    missing = json.loads((tree / "populations/wave1/M/runs/amgx-2.json").read_text())
+    assert missing["accepted"] is False and missing["source"] is None
+
+
+def test_a_changed_evidence_file_is_refused(tree):
+    path = tree / "populations/wave1/M/runs/reference-0.json"
+    path.write_text(path.read_text().replace('"seconds": 10.0', '"seconds": 1.0'))
+    with pytest.raises(ValueError, match="hash mismatch"):
+        evidence.summarize(tree)
+
+
+def test_an_unlisted_evidence_file_is_refused(tree):
+    (tree / "populations/extra.json").write_text("{}")
+    with pytest.raises(ValueError, match="different files"):
+        evidence.verify(tree)
+
+
+def test_the_bundle_destination_must_be_new(tree, tmp_path):
+    with pytest.raises(ValueError, match="must be new"):
+        evidence.bundle(tmp_path / "runs", tmp_path / "campaign", tree)
+
+
+def test_table_rows_state_the_reading(tree):
+    summary = evidence.summarize(tree)
+    text, values = evidence.table_rows(
+        summary, [("Bore", "level 4", "wave8/G-engine-L4-steady-o400", "reference-ref2")]
+    )
+    assert values == [pytest.approx(50.5 / 25.5)]
+    assert text == r"Bore & level 4 & 1{,}000 & 25.5 & Jacobi-CG 50.5 & 1.98 & 1.00 \\" + "\n"
+    with pytest.raises(ValueError, match="No reading"):
+        evidence.table_rows(summary, [("x", "y", "wave1/missing", "reference")])
