@@ -161,6 +161,7 @@ def replay(optimization, baseline_directory, output, *, budget_seconds=14400):
         "expected_systems": len(manifest["systems"]),
         "final_original_residual_target": 1e-10,
         "error_equation_target": 1e-12,
+        "reconstruction_policy": "Reassemble at checksum-bound saved state and flow fields; independently verify momentum and continuity without another flow update.",
         "rows": [],
         "scope": "CPU matched-system diagnostic with unchanged saved starts, loads and initial reference; excludes reconstruction and independent energy diagnostics from solver timers. No complete-optimization speedup claim.",
     }
@@ -212,13 +213,20 @@ def replay(optimization, baseline_directory, output, *, budget_seconds=14400):
             B.diagonal = lambda I=I: diagonal[I].copy()
             if system["status"] == "converged":
                 saved = read_arrays(trace, system["solution_file"], system["solution_sha256"])
-                if independent_residual(B, saved["x"], rhs) > q["linear_tolerance"]:
-                    raise ValueError("Reconstructed operator fails the saved solution criterion")
+                reconstructed_residual = independent_residual(B, saved["x"], rhs)
+                if reconstructed_residual > q["linear_tolerance"]:
+                    raise ValueError(
+                        f"Reconstructed system {index} has saved-solution residual "
+                        f"{reconstructed_residual:.17g}, above {q['linear_tolerance']:.17g}"
+                    )
             entry = {
                 "system": index,
                 "system_sha256": system["sha256"],
                 "quadratic": number,
                 "recorded_linear_tolerance": q["linear_tolerance"],
+                "reconstructed_saved_solution_residual": reconstructed_residual
+                if system["status"] == "converged"
+                else None,
                 **transfer_counts(previous, I, problem.size),
                 "methods": {},
             }

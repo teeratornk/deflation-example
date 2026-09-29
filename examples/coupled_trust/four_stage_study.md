@@ -72,7 +72,12 @@ uv run --no-sync python -m deflation_example.coupled_matched_transfer \
 
 The replay reads the saved initial basis and checks its checksum. Both policies
 receive each recorded inactive operator, right-hand side and initial guess in
-chronological order. Sequential transfer zero-extends the previous restricted
+chronological order. Operator reassembly retains the saved temperature and flow
+fields and independently verifies their momentum and continuity residuals.
+It does not run an additional momentum update: changing an already converged
+flow can alter a late secant-corrected system enough to invalidate its saved
+linear residual. The saved solution must still satisfy its original tolerance
+under the reconstructed operator. Sequential transfer zero-extends the previous restricted
 basis without replacing lost directions. All masks advance its history,
 including systems that already satisfy accuracy at their initial guess.
 An independently recomputed relative residual of `1e-10` applies to both

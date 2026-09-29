@@ -231,6 +231,31 @@ class CoupledControlProblem:
         return full
 
     def evaluate(self, state, initial=None):
+        return self._evaluate(state, initial=initial)
+
+    def reassemble(self, state, flows):
+        """Rebuild a diagnostic operator at saved temperatures and flow fields.
+
+        Every saved flow must satisfy the momentum and continuity criteria at
+        the supplied temperature and preceding time level. Keeping these fields
+        fixed preserves the finite-precision operator in a captured inner solve;
+        another converged momentum update can change a tight residual through
+        the secant corrections. Optimization continues to use ``evaluate``.
+        """
+        flows = tuple(flows)
+        if len(flows) != self.slabs:
+            raise ValueError("Saved flows must cover every time slab")
+        for flow in flows:
+            if (
+                flow.velocity.shape != (self.flow.nv, 2)
+                or flow.pressure.shape != (self.flow.np,)
+                or not np.isfinite(flow.velocity).all()
+                or not np.isfinite(flow.pressure).all()
+            ):
+                raise ValueError("Saved flow fields must have finite matching dimensions")
+        return self._evaluate(state, saved_flows=flows)
+
+    def _evaluate(self, state, initial=None, saved_flows=None):
         start = time.perf_counter()
         self.evaluation_count += 1
         if self.evaluation_callback is not None:
@@ -259,20 +284,24 @@ class CoupledControlProblem:
                 self.expansion,
             )
             dt = float(self.physical_steps[n]) if len(self.physical_steps) else None
-            result = solve_momentum(
-                self.flow,
-                acceleration,
-                self.boundary_indices,
-                self.boundary_values,
-                initial=previous_flow if initial is None else initial.flows[n],
-                previous=previous_flow.velocity if dt is not None else None,
-                time_step=dt,
-                pressure_gauge=self.pressure_gauge,
-                tolerance=self.flow_tolerance,
-                max_iterations=self.flow_cap,
-                continuation=self.flow_continuation,
-                stop_requested=self.stop_requested,
-                polish_load=self.flow_continuation_polish,
+            result = (
+                saved_flows[n]
+                if saved_flows is not None
+                else solve_momentum(
+                    self.flow,
+                    acceleration,
+                    self.boundary_indices,
+                    self.boundary_values,
+                    initial=previous_flow if initial is None else initial.flows[n],
+                    previous=previous_flow.velocity if dt is not None else None,
+                    time_step=dt,
+                    pressure_gauge=self.pressure_gauge,
+                    tolerance=self.flow_tolerance,
+                    max_iterations=self.flow_cap,
+                    continuation=self.flow_continuation,
+                    stop_requested=self.stop_requested,
+                    polish_load=self.flow_continuation_polish,
+                )
             )
             checks = self.flow.verify(
                 result,

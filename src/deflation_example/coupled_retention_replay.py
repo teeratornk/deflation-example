@@ -88,7 +88,7 @@ class ReplayPreconditioner:
 
 def rebuild(problem, arrays, row, *, use_secants=True):
     guess = RestoredEvaluation(arrays["state"], arrays["velocity"], arrays["pressure"])
-    evaluation = problem.evaluate(arrays["state"], initial=guess)
+    evaluation = problem.reassemble(arrays["state"], guess.flows)
     H = GaussNewtonOperator(evaluation.jacobian, problem.weights, problem.alpha, row["damping"])
     pairs = list(zip(arrays["secant_steps"], arrays["secant_gradients"], strict=True))
     if use_secants and pairs:
