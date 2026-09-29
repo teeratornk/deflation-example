@@ -293,6 +293,7 @@ class AxisymmetricFlow:
         relaxation=1.0,
         method="picard",
         callback=None,
+        stop_requested=None,
     ):
         """Picard or damped Newton iteration with independent equation checks.
 
@@ -352,6 +353,9 @@ class AxisymmetricFlow:
         # between them changes the velocity. Carrying it halves the assemblies.
         carried = None
         for iteration in range(1, max_iterations + 1):
+            if stop_requested is not None and stop_requested():
+                status = "budget_exhausted"
+                break
             velocity = np.column_stack((x[: self.nv], x[self.nv : 2 * self.nv]))
             A = self.operator(velocity, time_step, convection) if carried is None else carried
             carried = None
@@ -362,6 +366,9 @@ class AxisymmetricFlow:
                 linear_operator = A
                 linear_rhs = rhs[free] - A[free][:, constrained] @ prescribed
             try:
+                if stop_requested is not None and stop_requested():
+                    status = "budget_exhausted"
+                    break
                 with warnings.catch_warnings():
                     warnings.simplefilter("error", MatrixRankWarning)
                     proposal = spsolve(linear_operator[free][:, free], linear_rhs)
@@ -389,6 +396,10 @@ class AxisymmetricFlow:
                 nonlinear = self.nonlinear_force(step_velocity)
                 quadratic_change = np.r_[nonlinear[:, 0], nonlinear[:, 1], np.zeros(self.np)][free]
                 for backtrack in range(24):
+                    if stop_requested is not None and stop_requested():
+                        x = original
+                        status = "budget_exhausted"
+                        break
                     x[free] = original[free] + damping * proposal
                     # The Navier-Stokes residual is quadratic in velocity.
                     # Reassemble it independently after choosing the step.
@@ -421,6 +432,8 @@ class AxisymmetricFlow:
                     status = (
                         "converged" if max(metrics.values()) <= tolerance else "line_search_failed"
                     )
+                    break
+                if status == "budget_exhausted":
                     break
             else:
                 x[free] = damping * proposal + (1 - damping) * x[free]

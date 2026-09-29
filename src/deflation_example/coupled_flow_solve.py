@@ -21,6 +21,7 @@ def solve_momentum(
     max_iterations=100,
     continuation=False,
     max_stages=80,
+    stop_requested=None,
 ):
     """Try Newton, then optionally continue an artificial residual load to zero.
 
@@ -40,11 +41,17 @@ def solve_momentum(
         max_iterations=max_iterations,
         method="newton",
     )
+    if stop_requested is not None:
+        arguments["stop_requested"] = stop_requested
     direct = flow.solve(
         acceleration, boundary_indices, boundary_values, initial=initial, **arguments
     )
-    if direct.status == "converged" or not continuation:
+    if direct.status in {"converged", "budget_exhausted"} or not continuation:
         return direct
+    if stop_requested is not None and stop_requested():
+        return FlowResult(
+            direct.velocity.copy(), direct.pressure.copy(), "budget_exhausted", direct.history
+        )
     original = np.r_[initial.velocity[:, 0], initial.velocity[:, 1], initial.pressure]
     force = flow.load(acceleration)
     if time_step is not None:
@@ -75,6 +82,9 @@ def solve_momentum(
     current, fraction, increment = initial, 0.0, 0.25
     status = "load_continuation_cap"
     for _ in range(max_stages):
+        if stop_requested is not None and stop_requested():
+            status = "budget_exhausted"
+            break
         target = min(1.0, fraction + increment)
         candidate = flow.solve(
             acceleration + (1 - target) * lift,
@@ -86,6 +96,9 @@ def solve_momentum(
         history.append(
             {"load_fraction": target, "status": candidate.status, "history": candidate.history}
         )
+        if candidate.status == "budget_exhausted":
+            status = "budget_exhausted"
+            break
         if candidate.status == "converged":
             current, fraction = candidate, target
             if target == 1.0:

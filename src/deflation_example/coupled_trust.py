@@ -388,6 +388,8 @@ def minimize_trust(
                             radius = new_radius
                     except FlowEvaluationError as failure:
                         failed_flow = failure.result
+                        if failed_flow.status == "budget_exhausted":
+                            status, exhausted = "budget_exhausted", True
                         outcome = {
                             "status": "flow_" + failure.result.status,
                             "slab": failure.slab,
@@ -407,7 +409,7 @@ def minimize_trust(
                     trial_callback(
                         {**trial_row, "phase": "finished"}, evaluation, candidate, failed_flow
                     )
-                if accepted:
+                if accepted or exhausted:
                     break
             if exhausted:
                 save()

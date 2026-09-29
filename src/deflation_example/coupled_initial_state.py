@@ -7,7 +7,39 @@ import numpy as np
 
 from .coupled_bounds import temperature_bounds
 from .reporting import file_sha256
-from .validation import positive_real
+from .validation import integer, positive_real
+
+
+def temporal_indices(original, cfg, problem):
+    """Transfer uniform source endpoints only under an explicit nested-grid policy."""
+    policy = cfg.get("initial_state_time_policy", "identical")
+    if policy not in {"identical", "nested_endpoints"}:
+        raise ValueError("Choose identical or nested_endpoints initial-state time policy")
+    source = integer(original["slabs"], "Snapshot slabs", 1)
+    target = integer(cfg["slabs"], "Optimization slabs", 1)
+    if policy == "identical":
+        if source != target:
+            raise ValueError("Initial-state snapshot differs in slabs")
+        return np.arange(source), {"policy": policy, "source_slabs": source, "target_slabs": target}
+    if not original["transient"] or not cfg["transient"] or source % target:
+        raise ValueError("Nested endpoints require transient grids with divisible slab counts")
+    horizon = positive_real(cfg["horizon_s"], "Physical horizon")
+    if original["horizon_s"] != horizon:
+        raise ValueError("Initial-state snapshot differs in horizon_s")
+    if problem.slabs != target or not np.allclose(
+        problem.physical_steps, horizon / target, rtol=1e-13, atol=0
+    ):
+        raise ValueError("Nested endpoints require the declared uniform physical time grid")
+    indices = np.arange(source // target - 1, source, source // target)
+    return indices, {
+        "policy": policy,
+        "source_slabs": source,
+        "target_slabs": target,
+        "source_endpoint_indices": indices.tolist(),
+        "target_times_s": ((indices + 1) * horizon / source).tolist(),
+        "interpolation": "none; coincident endpoints of uniform backward-Euler grids",
+        "assessment_scope": "The source assessment does not certify the transferred discretization.",
+    }
 
 
 def snapshot_initial_guess(cfg, problem, baseline, position):
@@ -45,7 +77,7 @@ def snapshot_initial_guess(cfg, problem, baseline, position):
         raise ValueError("Initial-state snapshot differs in alpha")
     if problem.alpha != current_alpha:
         raise ValueError("Loaded problem differs from the declared alpha")
-    for key in ("transient", "slabs", "horizon_s", "target_count", "lower_K"):
+    for key in ("transient", "horizon_s", "target_count", "lower_K"):
         if key not in original or original[key] != cfg[key]:
             raise ValueError(f"Initial-state snapshot differs in {key}")
     for key, default in (
@@ -58,14 +90,21 @@ def snapshot_initial_guess(cfg, problem, baseline, position):
             raise ValueError(f"Initial-state snapshot differs in {key}")
     if original["queries"][meta["position"]] != cfg["queries"][position]:
         raise ValueError("Initial-state snapshot must share the selected target and bound")
+    indices, time_transfer = temporal_indices(original, cfg, problem)
+    source_slabs = time_transfer["source_slabs"]
     expected = {
-        "state": (problem.size,),
-        "velocity": (problem.slabs, problem.flow.nv, 2),
-        "pressure": (problem.slabs, problem.flow.np),
+        "state": (source_slabs * problem.spatial_size,),
+        "velocity": (source_slabs, problem.flow.nv, 2),
+        "pressure": (source_slabs, problem.flow.np),
     }
     for name, shape in expected.items():
         if np.shape(arrays[name]) != shape or not np.isfinite(arrays[name]).all():
             raise ValueError(f"Initial-state {name} must match the full finite trajectory")
+    arrays = {
+        "state": arrays["state"].reshape(source_slabs, problem.spatial_size)[indices].ravel(),
+        "velocity": arrays["velocity"][indices].copy(),
+        "pressure": arrays["pressure"][indices].copy(),
+    }
     bounds = temperature_bounds(cfg, upper_K=cfg["queries"][position]["upper_K"])
     lower = (
         bounds["optimization_lower_K"] - problem.temperature_offset
@@ -85,6 +124,7 @@ def snapshot_initial_guess(cfg, problem, baseline, position):
         "alpha_policy": alpha_policy,
         "source_alpha": source_alpha,
         "optimization_alpha": current_alpha,
+        "time_transfer": time_transfer,
         "retained_secant_pairs": 0,
         "retained_recycling_directions": 0,
         "scope": "Complete trajectory reevaluation; saved flows are initial guesses. No old controls, gradients, damping, iteration counts or solver histories are imported. Prior optimization cost is excluded.",

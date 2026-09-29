@@ -88,6 +88,27 @@ def test_only_temperature_and_flow_guesses_are_loaded(assessed):
     np.testing.assert_array_equal(again.state, arrays["state"])
 
 
+def test_explicit_nested_transfer_selects_only_coincident_endpoints(assessed, monkeypatch):
+    from deflation_example import coupled_review
+
+    cfg, problem, baseline, _ = assessed
+    record, meta, arrays, manifest = coupled_review.read_snapshot(cfg["initial_state_snapshot"])
+    record["configuration"]["slabs"] = 4
+    original_state = np.arange(4)[:, None] * 0.01 + np.full((4, problem.spatial_size), 0.02)
+    arrays["state"] = original_state.ravel()
+    arrays["velocity"] = np.repeat(arrays["velocity"][:1], 4, axis=0)
+    arrays["pressure"] = np.repeat(arrays["pressure"][:1], 4, axis=0)
+    problem.physical_steps[:] = 0.275
+    monkeypatch.setattr(
+        coupled_review, "read_snapshot", lambda path: (record, meta, arrays, manifest)
+    )
+    cfg["initial_state_time_policy"] = "nested_endpoints"
+    guess, metadata = snapshot_initial_guess(cfg, problem, baseline, 0)
+    np.testing.assert_array_equal(guess.state, original_state[[1, 3]].ravel())
+    assert metadata["time_transfer"]["source_endpoint_indices"] == [1, 3]
+    assert set(vars(guess)) == {"state", "flows"}
+
+
 @pytest.mark.parametrize(
     "key,value",
     [

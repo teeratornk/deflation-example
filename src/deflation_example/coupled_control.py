@@ -138,6 +138,7 @@ class CoupledControlProblem:
         if not isinstance(flow_continuation, bool):
             raise ValueError("Flow continuation must be Boolean")
         self.flow_continuation = flow_continuation
+        self.stop_requested = None
         if momentum_factor_policy not in {"retained", "recompute"}:
             raise ValueError("Choose retained or recompute momentum-factor storage")
         self.momentum_factor_policy = momentum_factor_policy
@@ -269,6 +270,7 @@ class CoupledControlProblem:
                 tolerance=self.flow_tolerance,
                 max_iterations=self.flow_cap,
                 continuation=self.flow_continuation,
+                stop_requested=self.stop_requested,
             )
             checks = self.flow.verify(
                 result,

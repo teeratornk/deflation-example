@@ -64,6 +64,8 @@ def run(
         raise ValueError("Unknown quadratic correction policy")
     if any(not isinstance(cfg[k], bool) for k in ("capture_trials", "capture_linear_systems")):
         raise ValueError("Diagnostic capture settings must be Boolean")
+    if cfg.get("optimization_only_budget", False) and resume_from is not None:
+        raise ValueError("Optimization-only budgets require an uninterrupted fresh run")
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     env = environment()
@@ -124,6 +126,10 @@ def run(
         with threadpool_limits(cfg["threads"]):
             tick = time.perf_counter()
             problem, baseline = problem_loader(cfg)
+            if cfg.get("cooperative_flow_deadline", False):
+                problem.stop_requested = (
+                    lambda: prior_total + time.perf_counter() - start >= budget_seconds
+                )
             record.update(
                 baseline_sha256=baseline["baseline_sha256"],
                 calibration_seconds=baseline["seconds"],
@@ -163,6 +169,14 @@ def run(
                     reference_description=reference.description,
                 )
             components["reference_construction_or_restore"] = time.perf_counter() - tick
+            if cfg.get("optimization_only_budget", False):
+                record["optimization_budget_seconds"] = budget_seconds
+                record["budget_preparation_seconds"] = time.perf_counter() - start
+                budget_seconds += record["budget_preparation_seconds"]
+                record["budget_scope"] = (
+                    "Optimization has its own budget; preparation and reference construction "
+                    "remain included in attempt_seconds. Preparation has an equal separate cap."
+                )
             solver_type, options = StudySolver, {}
             if cfg["device"] == "cuda":
                 from .coupled_cuda_solver import CudaCoupledSolver

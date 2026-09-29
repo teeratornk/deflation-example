@@ -108,3 +108,56 @@ def test_incomplete_continuation_does_not_claim_a_physical_solution(monkeypatch)
         )["momentum_relative_residual"]
         > 1e-4
     )
+
+
+def test_expired_deadline_returns_initial_flow_without_linear_solve(monkeypatch):
+    from deflation_example import axisymmetric_flow
+
+    problem = small_coupled_problem()
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("An expired solve must not factor a matrix")
+
+    monkeypatch.setattr(axisymmetric_flow, "spsolve", forbidden)
+    result = solve_momentum(
+        problem.flow,
+        problem.acceleration,
+        problem.boundary_indices,
+        problem.boundary_values,
+        initial=problem.initial_flow,
+        pressure_gauge=problem.pressure_gauge,
+        continuation=True,
+        stop_requested=lambda: True,
+    )
+    assert result.status == "budget_exhausted"
+    np.testing.assert_array_equal(result.velocity, problem.initial_flow.velocity)
+    np.testing.assert_array_equal(result.pressure, problem.initial_flow.pressure)
+    assert result.history == []
+
+
+def test_deadline_stops_continuation_without_accepting_artificial_load(monkeypatch):
+    problem = small_coupled_problem()
+    real_solve = problem.flow.solve
+    calls = []
+
+    def solve(*args, **kwargs):
+        result = real_solve(*args, **kwargs)
+        calls.append(result)
+        if len(calls) == 1:
+            result.status = "iteration_cap"
+        return result
+
+    monkeypatch.setattr(problem.flow, "solve", solve)
+    result = solve_momentum(
+        problem.flow,
+        problem.acceleration,
+        problem.boundary_indices,
+        problem.boundary_values,
+        initial=problem.initial_flow,
+        pressure_gauge=problem.pressure_gauge,
+        continuation=True,
+        stop_requested=lambda: len(calls) >= 2,
+    )
+    assert result.status == "budget_exhausted"
+    assert len(calls) == 2
+    assert result.history[-1]["load_fraction"] == 0.25

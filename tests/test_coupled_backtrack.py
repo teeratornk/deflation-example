@@ -142,6 +142,26 @@ def test_budget_between_trials_retains_previous_nonlinear_state():
     assert linear.rtol == original_rtol
 
 
+def test_budget_inside_flow_retains_state_and_stops_without_further_trials():
+    problem = QuadraticProblem(maximum_step=0)
+    problem.failed_flow.status = "budget_exhausted"
+    result = minimize_trust(
+        problem,
+        np.ones(4),
+        -0.2,
+        0.3,
+        solver(),
+        inner_preconditioner="jacobi",
+        trial_policy="backtrack",
+    )
+    assert result.status == "budget_exhausted"
+    assert len(result.history[0]["attempts"][0]["trials"]) == 1
+    np.testing.assert_array_equal(result.evaluation.state, np.zeros(4))
+    objective, gradient = problem.objective_gradient(result.evaluation, np.ones(4))
+    assert result.objective == objective
+    np.testing.assert_array_equal(result.gradient, gradient)
+
+
 def test_shortened_steps_converge_to_independent_quadratic_optimum():
     problem, desired = QuadraticProblem(maximum_step=0.05), np.array([0.4, -0.3, 0.15, -0.1])
     result = minimize_trust(

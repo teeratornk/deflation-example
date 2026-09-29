@@ -15,7 +15,7 @@ from .coupled_targets import desired_temperature
 from .reporting import environment, write_report
 
 
-def check(problem, state, flow_guess, desired, *, seed=20260925):
+def check(problem, state, flow_guess, desired, *, seed=20260925, bounds=None):
     start = time.perf_counter()
     evaluation = problem.evaluate(state, initial=flow_guess)
     value, gradient = problem.objective_gradient(evaluation, desired)
@@ -45,7 +45,7 @@ def check(problem, state, flow_guess, desired, *, seed=20260925):
                 / max(abs(slope), abs(exact_slope), 1e-14),
             }
         )
-    return {
+    result = {
         "objective": value,
         "rows": rows,
         "transpose_relative_error": dot_error,
@@ -58,6 +58,14 @@ def check(problem, state, flow_guess, desired, *, seed=20260925):
             for key in ("control_jacobian_relative_error", "objective_directional_relative_error")
         ),
     }
+    if bounds is not None:
+        from .coupled_trust import optimality
+
+        kkt, scale = optimality(problem, evaluation, desired, gradient, *bounds)
+        result.update(
+            kkt=kkt, stationarity_scale=scale, stationarity_numerator=kkt["stationarity"] * scale
+        )
+    return result
 
 
 def main():
