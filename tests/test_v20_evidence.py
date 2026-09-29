@@ -351,3 +351,23 @@ def test_a_missing_difference_to_an_unverified_finest_grid_prints_a_dash(tmp_pat
     text, values = evidence.temporal_rows(tmp_path)
     assert text.splitlines()[0] == r"600 s & advective & 3/5 & -- & $1.0\times10^{152}$ & 0.50 \\"
     assert values[("600 s", "advective")]["difference"] is None
+
+
+def test_a_per_slab_run_reads_against_its_global_twin(tmp_path, monkeypatch):
+    runs = tmp_path / "runs"
+    write_cht(
+        runs / "wave2/G",
+        {("reference", 0): cht_record(48.8, 100), ("jacobi", 0): cht_record(37.6, 300)},
+        1,
+        ["jacobi", "reference"],
+        problem="transient",
+    )
+    write_cht(runs / "wave2/P", {("reference", 0): cht_record(48.2, 90)}, 1, ["reference"])
+    evidence.bundle(runs, campaign(tmp_path), tmp_path / "evidence")
+    monkeypatch.setattr(
+        evidence, "PAIRED", {"wave2/G": [("wave2/P", "reference", "reference-perslab6")]}
+    )
+    readings = evidence.summarize(tmp_path / "evidence")["wave2/G"]["readings"]
+    assert readings["reference"]["ratio"] == pytest.approx(37.6 / 48.8)
+    assert readings["reference-perslab6"]["fastest_alternative"] == "jacobi"
+    assert readings["reference-perslab6"]["ratio"] == pytest.approx(37.6 / 48.2)

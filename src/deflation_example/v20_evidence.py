@@ -52,6 +52,19 @@ AUGMENT = {
 }
 
 
+# Per-slab reference runs that timed only reference deflation, read against the
+# alternatives of their global-rank twin: base -> [(population, method, label)].
+PAIRED = {
+    "wave1/S2a-gpu-transformer-x16-global": [
+        ("wave1/S2a-gpu-transformer-x16-perslab4", "reference", "reference-perslab4")
+    ],
+    "wave1/S2a-gpu-transformer-x32-global": [
+        ("wave1/S2a-gpu-transformer-x32-perslab4", "reference", "reference-perslab4")
+    ],
+    "wave2/S2b-n16-x64-global": [("wave2/S2b-n16-x64-perslab6", "reference", "reference-perslab6")],
+}
+
+
 def _sha(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -362,6 +375,12 @@ def populations(root):
             if extra in found:
                 label = extra.split("/")[1].split("-")[1]
                 found[key]["methods"][label] = found[extra]["methods"].get("amgx", [])
+    for key, arms in PAIRED.items():
+        if key not in found:
+            continue
+        for extra, method, label in arms:
+            if extra in found:
+                found[key]["methods"][label] = found[extra]["methods"].get(method, [])
     return found
 
 
@@ -437,6 +456,9 @@ OPERATION_ROWS = [
 # Supplementary confirmations: tolerance, regularization, cold starts, long sequences,
 # rank and coarse level, global-rank Cartesian transients and the level-0 bore L3 row.
 SI_ROWS = [
+    ("Sorted order", "transformer", "wave9/O5-sorted-transformer-steady", "reference"),
+    ("Sorted order", "bore level 2", "wave9/O5-sorted-engine-L2-steady", "reference"),
+    ("Sorted order", "bore level 2, 4 slabs", "wave9/O5-sorted-engine-L2-x4", "reference"),
     ("Transformer day", "advective transport", "wave9/O1-transformer-day-x8", "reference"),
     ("Overloads", "advective transport", "wave9/O4-transformer-overload-x8", "reference"),
     (
@@ -483,6 +505,28 @@ SI_ROWS = [
     ("Cartesian", r"$16^3$, 8 slabs, global", "wave3/C-S4a-transient16-global", "reference"),
     ("Cartesian", r"$24^3$, 8 slabs, global", "wave3/C-S4a-transient24-global", "reference"),
     ("Cartesian", r"$32^3$, 8 slabs, global", "wave3/C-S4a-transient32-global", "reference"),
+]
+# Single-repetition comparisons at the longest horizons and the declared boundaries.
+SINGLE_ROWS = [
+    ("Transformer", "16 slabs, global", "wave1/S2a-gpu-transformer-x16-global", "reference"),
+    (
+        "Transformer",
+        "16 slabs, $S=4$",
+        "wave1/S2a-gpu-transformer-x16-global",
+        "reference-perslab4",
+    ),
+    ("Transformer", "32 slabs, global", "wave1/S2a-gpu-transformer-x32-global", "reference"),
+    (
+        "Transformer",
+        "32 slabs, $S=4$",
+        "wave1/S2a-gpu-transformer-x32-global",
+        "reference-perslab4",
+    ),
+    ("Cartesian", r"$16^3$, 64 slabs, global", "wave2/S2b-n16-x64-global", "reference"),
+    ("Cartesian", r"$16^3$, 64 slabs, $S=6$", "wave2/S2b-n16-x64-global", "reference-perslab6"),
+    ("Transformer level 2", "steady", "wave4/S1d-transformer-L2-steady", None),
+    ("Transformer level 2", "4 slabs", "wave4/S1d-transformer-L2-x4", None),
+    ("Bore level 4", "outer cap 100", "wave4/S1c-engine-L4-steady", None),
 ]
 # (label, CPU population, GPU population of the same problem and query plan).
 DIRECT_ROWS = [
@@ -680,7 +724,7 @@ def temporal_rows(root):
     return "\n".join(lines) + "\n", values
 
 
-def macros(summary, runs, controls, scale, transient, operation, counts, direct, temporal):
+def macros(summary, runs, controls, scale, transient, operation, counts, direct, temporal, single):
     def reading(key, arm="reference"):
         return summary[key]["readings"][arm]
 
@@ -758,6 +802,11 @@ def macros(summary, runs, controls, scale, transient, operation, counts, direct,
         "psHourAdvectiveModulus": f"{hour_advective['modulus']:.2f}",
         "psHourAdvectiveVerified": _count(hour_advective["verified"]),
         "psHourSkewVerified": _count(hour_skew["verified"]),
+        # Single-repetition rows: the four transformer horizons, then the 64-slab pair.
+        "psLongHorizonMin": _ratio(min(r["ratio"] for r in single[:4])),
+        "psLongHorizonMax": _ratio(max(r["ratio"] for r in single[:4])),
+        "psSixtyFourGlobal": _ratio(single[4]["ratio"]),
+        "psSixtyFourSlab": _ratio(single[5]["ratio"]),
     }
     return "".join(f"\\newcommand{{\\{k}}}{{{v}}}\n" for k, v in values.items()), values
 
@@ -838,6 +887,7 @@ def export(root, output):
     transient_text, transient = table_rows(summary, TRANSIENT_ROWS)
     operation_text, operation = table_rows(summary, OPERATION_ROWS)
     si_text, _ = table_rows(summary, SI_ROWS)
+    single_text, single = table_rows(summary, SINGLE_ROWS)
     direct_text, direct = direct_rows(summary)
     temporal_text, temporal = temporal_rows(root)
     for name, text in (
@@ -845,6 +895,7 @@ def export(root, output):
         ("transient_rows", transient_text),
         ("operation_rows", operation_text),
         ("si_rows", si_text),
+        ("single_rows", single_text),
         ("direct_rows", direct_text),
         ("temporal_rows", temporal_text),
     ):
@@ -859,6 +910,7 @@ def export(root, output):
             ("transient_rows", TRANSIENT_ROWS),
             ("operation_rows", OPERATION_ROWS),
             ("si_rows", SI_ROWS),
+            ("single_rows", SINGLE_ROWS),
         )
     }
     index["direct_rows"] = [
@@ -869,14 +921,15 @@ def export(root, output):
     ]
     index["merged"] = MERGED
     index["augment"] = AUGMENT
+    index["paired"] = {k: [list(arm) for arm in v] for k, v in PAIRED.items()}
     (output / "rows.json").write_text(json.dumps(index, indent=2) + "\n")
     # Augmented AmgX runs belong to their paired populations and count once there.
     main_keys = [k for spec in (SCALE_ROWS, TRANSIENT_ROWS, OPERATION_ROWS) for _, _, k, _ in spec]
-    all_keys = main_keys + [k for _, _, k, _ in SI_ROWS]
+    all_keys = main_keys + [k for spec in (SI_ROWS, SINGLE_ROWS) for _, _, k, _ in spec]
     all_keys += [k for _, cpu, gpu in DIRECT_ROWS for k in (cpu, gpu)]
     counts = {"main": campaign_counts(runs, main_keys), "all": campaign_counts(runs, all_keys)}
     text, values = macros(
-        summary, runs, controls, scale, transient, operation, counts, direct, temporal
+        summary, runs, controls, scale, transient, operation, counts, direct, temporal, single
     )
     (output / "generated/macros.tex").write_text(text)
     (output / "populations.md").write_text(listing(summary))
