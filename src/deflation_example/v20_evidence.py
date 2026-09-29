@@ -703,6 +703,24 @@ def export(root, output):
         ("direct_rows", direct_text),
     ):
         (output / f"generated/{name}.tex").write_text(text)
+    index = {
+        name: [
+            {"label": label, "detail": detail, "population": key, "arm": arm}
+            for label, detail, key, arm in spec
+        ]
+        for name, spec in (
+            ("scale_rows", SCALE_ROWS),
+            ("transient_rows", TRANSIENT_ROWS),
+            ("operation_rows", OPERATION_ROWS),
+            ("si_rows", SI_ROWS),
+        )
+    }
+    index["direct_rows"] = [
+        {"label": label, "cpu": cpu, "gpu": gpu} for label, cpu, gpu in DIRECT_ROWS
+    ]
+    index["merged"] = MERGED
+    index["augment"] = AUGMENT
+    (output / "rows.json").write_text(json.dumps(index, indent=2) + "\n")
     keys = [
         k for spec in (SCALE_ROWS, TRANSIENT_ROWS, OPERATION_ROWS, SI_ROWS) for _, _, k, _ in spec
     ]
