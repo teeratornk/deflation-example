@@ -84,6 +84,9 @@ fallbacks, solver work and coarse energy removal. A separate error equation
 uses a `1e-12` residual target. Its cost and the coarse diagnostics are excluded
 from the matched solve timers. These measurements describe the captured
 initial guesses; they do not describe the errors of another optimization path.
+The captured inactive sets belong to the quadratic subproblems, whose bounds
+include the trust region as well as the physical temperature limits. Their
+transition counts alone do not identify release from a physical temperature bound.
 
 ## 3. Compare the GPU implementations
 
@@ -128,3 +131,20 @@ boundary and repetition. Five timing repetitions still represent three distinct
 physical targets. Memory values are sampled process allocations, not enforced
 memory budgets. These discrete optimization comparisons do not establish
 thermal mesh or time resolution.
+
+## Figures
+
+Generate figures directly from the retained summaries and records:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_followup_figures \
+  --transfer RUNS/matched-transfer/record.json \
+  --confirmation RUNS/confirmation-summary/summary.json \
+  --backend-records HYBRID_BASELINE HYBRID_REFERENCE HYBRID_RECYCLING \
+                    CUDA_BASELINE CUDA_REFERENCE CUDA_RECYCLING \
+  --output RUNS/figures
+```
+
+The figures show both transfer policies, all three methods on each backend,
+all five confirmation repetitions, termination statuses and sampled memory.
+The recorded input hashes bind each plot to its numerical evidence.

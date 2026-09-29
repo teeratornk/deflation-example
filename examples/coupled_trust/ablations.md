@@ -95,7 +95,9 @@ guesses. `--capture-trace` saves checksum-bound inner systems for that diagnosti
 keep capture runs separate because they include additional I/O. The existing
 [replay tools](../coupled_retention_v8.md) provide equation and warm-start error
 diagnostics, but their older reference-bank presets do not constitute a matched
-replay of the new rank-8 space. Such a replay remains a separate required step.
+replay of the new rank-8 space. The [four-stage follow-up](four_stage_study.md)
+provides the saved-basis matched replay; complete optimizer comparisons remain
+separate evidence.
 
 The backend, temporal-size and target-sequence controls are staged after verified
 development runs. GPU modes require both the `gpu` and `coupled-gpu` extras and an allocated GPU.
