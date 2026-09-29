@@ -382,7 +382,7 @@ def test_progress_reports_retained_objective_and_stationarity_scale():
     assert retained["stationarity_numerator"] == pytest.approx(kkt["stationarity"] * scale)
 
 
-@pytest.mark.parametrize("method", ["jacobi", "reference", "recycling"])
+@pytest.mark.parametrize("method", ["jacobi", "reference", "recycling", "sequential"])
 @pytest.mark.parametrize("interrupt", [False, True])
 @pytest.mark.parametrize("accuracy", ["strict", "adaptive_projected"])
 def test_recovery_runner_verifies_complete_small_sequence(
@@ -406,7 +406,8 @@ def test_recovery_runner_verifies_complete_small_sequence(
 
     monkeypatch.setattr(runner, "configured_krylov_reference", construct)
     cfg = dict(
-        method=method,
+        method="reference" if method == "sequential" else method,
+        reference_transfer="sequential" if method == "sequential" else "full",
         rank=2 if method != "jacobi" else 0,
         recycle_window=3,
         threads=1,
@@ -431,6 +432,16 @@ def test_recovery_runner_verifies_complete_small_sequence(
         conservation_tolerance=1e-6,
     )
     directory = tmp_path / method
+    if method == "sequential" and interrupt:
+        with pytest.raises(ValueError, match="Sequential-transfer"):
+            runner.run(
+                cfg,
+                directory,
+                resume_from=tmp_path / "prior",
+                problem_loader=lambda cfg: (problem, baseline),
+            )
+        assert not directory.exists()
+        return
     if interrupt:
 
         class Interrupted(Exception):
@@ -462,7 +473,13 @@ def test_recovery_runner_verifies_complete_small_sequence(
     assert result["attempt_seconds"] == pytest.approx(sum(result["components_seconds"].values()))
     assert result["verified_problems"] == 2
     assert (tmp_path / method / "recovery/latest.json").is_file()
-    assert len(constructions) == (1 if method == "reference" else 0)
+    assert len(constructions) == (1 if method in {"reference", "sequential"} else 0)
+    if method == "sequential":
+        assert result["reference_description"]["transfer_policy"] == (
+            "sequential_zero_extension_without_learning"
+        )
+        with np.load(directory / "reference.npz", allow_pickle=False) as data:
+            np.testing.assert_array_equal(data["basis"], np.eye(problem.size)[:, :2])
     from deflation_example.coupled_trust_report import summarize
 
     result_directory = tmp_path / (method + "-resumed") if interrupt else directory

@@ -26,7 +26,19 @@ def test_complete_cost_includes_construction_and_all_intervals():
 
 
 @pytest.mark.parametrize(
-    "defect", ["failed", "source", "initial", "duplicate", "targets", "device"]
+    "defect",
+    [
+        "failed",
+        "source",
+        "initial",
+        "duplicate",
+        "targets",
+        "device",
+        "repetition",
+        "capture",
+        "hardware",
+        "boundary",
+    ],
 )
 def test_unmatched_or_failed_comparison_has_no_ratio(defect):
     baseline, reference = paired()
@@ -41,6 +53,27 @@ def test_unmatched_or_failed_comparison_has_no_ratio(defect):
         records.append(baseline)
     elif defect == "device":
         reference["configuration"]["device"] = "cuda"
+    elif defect == "repetition":
+        reference["configuration"]["repetition"] = 1
+    elif defect == "capture":
+        reference["configuration"]["capture_linear_systems"] = True
+    elif defect == "hardware":
+        reference["environment"]["cpu_model"] = "different"
+    elif defect == "boundary":
+        reference["timing_boundary"] = "excludes construction"
     else:
         reference["configuration"]["queries"] = [{"target": 8}]
     assert summarize(records)["runs"][1]["speedup"] is None
+
+
+def test_variants_remain_named_and_repetitions_pair_separately():
+    import copy
+
+    baseline, reference = paired()
+    reference["configuration"].update(method="recycling", study_variant="recycling")
+    second_base, second_ref = copy.deepcopy(baseline), copy.deepcopy(reference)
+    for r in (second_base, second_ref):
+        r["configuration"]["repetition"] = 1
+    rows = summarize([baseline, reference, second_base, second_ref])["runs"]
+    assert rows[1]["method"] == rows[1]["variant"] == "recycling"
+    assert rows[1]["speedup"] == rows[3]["speedup"] == pytest.approx(29 / 17)

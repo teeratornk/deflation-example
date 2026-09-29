@@ -14,6 +14,9 @@ steps at the common initial temperature. Their construction is charged to each
 complete run. A positive complete-time result requires verified optimization,
 not only fewer inner iterations.
 
+The [ablation protocol](ablations.md) gives matched retention, recycling and
+spectral-selection controls, together with staged backend and temporal studies.
+
 ## Inputs and verification
 
 Use the checksum-bound initial snapshot, its derivative assessment, physical

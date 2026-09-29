@@ -64,8 +64,15 @@ def run(
         raise ValueError("Unknown quadratic correction policy")
     if any(not isinstance(cfg[k], bool) for k in ("capture_trials", "capture_linear_systems")):
         raise ValueError("Diagnostic capture settings must be Boolean")
+    transfer = cfg.get("reference_transfer", "full")
+    if transfer not in {"full", "sequential"} or (
+        transfer == "sequential" and cfg["method"] != "reference"
+    ):
+        raise ValueError("Sequential transfer applies only to a reference method")
     if cfg.get("optimization_only_budget", False) and resume_from is not None:
         raise ValueError("Optimization-only budgets require an uninterrupted fresh run")
+    if cfg.get("reference_transfer", "full") == "sequential" and resume_from is not None:
+        raise ValueError("Sequential-transfer comparisons require an uninterrupted fresh run")
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     env = environment()
@@ -149,7 +156,7 @@ def run(
                 if saved is None:
                     reference = configured_krylov_reference(
                         problem,
-                        {**cfg, "device": "cpu"},
+                        {**cfg, "device": "cpu", "reference_transfer": "full"},
                         initial_guess=guess,
                         verification_callback=lambda rows: write_report(
                             output / "reference-equations.json", {"equations": rows}
@@ -164,6 +171,13 @@ def run(
                             data["basis"].copy(), saved["reference_description"]
                         )
                 write_arrays(output / "reference.npz", basis=reference.basis)
+                if cfg.get("reference_transfer", "full") == "sequential":
+                    from .coupled_reference import SequentialReference
+
+                    # Archive the same initial full basis, then release its in-memory
+                    # values after the first restriction. Never serialize None as an
+                    # object array or restore lost entries during a later solve.
+                    reference = SequentialReference(reference, problem.size)
                 record.update(
                     reference_sha256=file_sha256(output / "reference.npz"),
                     reference_description=reference.description,

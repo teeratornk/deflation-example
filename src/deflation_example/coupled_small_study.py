@@ -20,9 +20,22 @@ from .reporting import environment, file_sha256, write_report
 ALPHAS = (1e-14, 1e-12, 1e-11)
 RANKS = (0, 8, 16, 32)
 SEQUENCES = {"development": (7,), "nearby": (7, 8, 9), "stress": (7, 15, 14)}
+VARIANTS = ("standard", "sequential", "recycling", "lowest")
 
 
-def configuration(original, *, slabs, alpha, rank, sequence, device, continuation):
+def configuration(
+    original,
+    *,
+    slabs,
+    alpha,
+    rank,
+    sequence,
+    device,
+    continuation,
+    variant="standard",
+    repetition=0,
+    capture_trace=False,
+):
     """Preserve physical data and accuracy; vary only the declared study axes."""
     if slabs not in (16, 32, 64) or alpha not in ALPHAS or rank not in RANKS:
         raise ValueError("Use the predeclared slabs, alpha and rank grid")
@@ -30,6 +43,12 @@ def configuration(original, *, slabs, alpha, rank, sequence, device, continuatio
         raise ValueError("Unknown sequence or execution backend")
     if not isinstance(continuation, bool):
         raise ValueError("Continuation must be Boolean")
+    if variant not in VARIANTS or (rank == 0 and variant != "standard"):
+        raise ValueError("A reference-policy ablation requires a positive declared rank")
+    if isinstance(repetition, bool) or not isinstance(repetition, int) or repetition < 0:
+        raise ValueError("Repetition must be a nonnegative integer")
+    if not isinstance(capture_trace, bool):
+        raise ValueError("Trace capture must be Boolean")
     if (
         original.get("transient") is not True
         or original.get("horizon_s") != 600.0
@@ -57,7 +76,7 @@ def configuration(original, *, slabs, alpha, rank, sequence, device, continuatio
         cooperative_flow_deadline=True,
         optimization_only_budget=True,
         capture_trials=False,
-        capture_linear_systems=False,
+        capture_linear_systems=capture_trace,
         inner_preconditioner="frozen",
         frozen_sweeps=3,
         qp_solver="projected",
@@ -76,11 +95,20 @@ def configuration(original, *, slabs, alpha, rank, sequence, device, continuatio
         reference_krylov_selection="alternating_low_high",
         reference_construction="initial_trajectory_energy_krylov",
         reference_selection="alternating_low_high",
+        reference_transfer="full",
         recycle_window=max(1, 2 * rank),
         warm_start=True,
         study_sequence=sequence,
         study_protocol="coupled-small-to-large-v1",
+        study_variant=variant,
+        repetition=repetition,
     )
+    if variant == "recycling":
+        cfg["method"] = "recycling"
+    elif variant == "sequential":
+        cfg["reference_transfer"] = "sequential"
+    elif variant == "lowest":
+        cfg["reference_krylov_selection"] = cfg["reference_selection"] = "lowest"
     return cfg
 
 
@@ -97,6 +125,11 @@ def verification_identity(cfg):
         "study_sequence",
         "repetition",
         "verification_gate_sha256",
+        "study_variant",
+        "reference_transfer",
+        "reference_selection",
+        "reference_krylov_selection",
+        "capture_linear_systems",
     }
     settings = {k: v for k, v in cfg.items() if k not in excluded}
     return hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()
@@ -172,6 +205,13 @@ def main():
     parser.add_argument("--sequence", choices=tuple(SEQUENCES), default="development")
     parser.add_argument("--device", choices=("cpu", "cuda", "hybrid"), default="cpu")
     parser.add_argument("--continuation", action="store_true")
+    parser.add_argument("--variant", choices=VARIANTS, default="standard")
+    parser.add_argument("--repetition", type=int, default=0)
+    parser.add_argument(
+        "--capture-trace",
+        action="store_true",
+        help="Save diagnostic inner systems; do not pool with timing runs",
+    )
     parser.add_argument("--verification", type=Path)
     parser.add_argument("--budget-seconds", type=float, default=14400)
     args = parser.parse_args()
@@ -186,6 +226,9 @@ def main():
         sequence=args.sequence,
         device=args.device,
         continuation=args.continuation,
+        variant=args.variant,
+        repetition=args.repetition,
+        capture_trace=args.capture_trace,
     )
     cfg.update(
         baseline_directory=str(args.baseline.resolve()),

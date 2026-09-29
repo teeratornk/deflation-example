@@ -24,6 +24,7 @@ class SequentialReference:
         self.description = {
             **reference.description,
             "transfer_policy": "sequential_zero_extension_without_learning",
+            "lifetime": "Previous restricted space, transferred by zero extension at every inactive solve; no learned or replacement directions",
         }
         self.reference = reference
         self.indices = None

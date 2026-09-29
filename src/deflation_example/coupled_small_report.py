@@ -22,6 +22,9 @@ def summarize(records):
                 **result,
                 "alpha": cfg["alpha"],
                 "rank": cfg["rank"],
+                "method": cfg.get("method", "jacobi" if cfg["rank"] == 0 else "reference"),
+                "variant": cfg.get("study_variant", "standard"),
+                "repetition": cfg.get("repetition", 0),
                 "device": cfg["device"],
                 "slabs": cfg["slabs"],
                 "targets": cfg["queries"],
@@ -34,6 +37,13 @@ def summarize(records):
                     record.get("environment", {}).get("source_sha256"),
                     record.get("baseline_sha256"),
                     record.get("initial_state"),
+                    cfg.get("repetition", 0),
+                    cfg.get("capture_linear_systems", False),
+                    record.get("timing_boundary"),
+                    [
+                        record.get("environment", {}).get(k)
+                        for k in ("cpu_model", "numpy", "scipy", "blas")
+                    ],
                 ],
                 "speedup": None,
             }
@@ -101,7 +111,7 @@ def main():
                     range(len(values)),
                     values,
                     marker=".",
-                    label=f"rank {row['rank']}: {row['status']}",
+                    label=f"{row['variant']}, rank {row['rank']}, repeat {row['repetition']}: {row['status']}",
                 )
             axis.axhline(1e-8, color="black", linestyle=":", linewidth=1)
             axis.set(

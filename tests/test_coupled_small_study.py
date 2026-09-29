@@ -41,6 +41,51 @@ def test_matched_arms_keep_physics_accuracy_and_initial_verification():
     assert [q["target"] for q in settings(sequence="stress")["queries"]] == [7, 15, 14]
 
 
+@pytest.mark.parametrize("variant", ["standard", "sequential", "recycling", "lowest"])
+def test_policy_ablations_change_only_declared_solver_settings(variant):
+    base = settings(rank=8)
+    cfg = settings(rank=8, variant=variant, repetition=2)
+    assert verification_identity(cfg) == verification_identity(base)
+    allowed = {
+        "study_variant",
+        "repetition",
+        "method",
+        "reference_transfer",
+        "reference_selection",
+        "reference_krylov_selection",
+    }
+    assert {k for k in cfg if cfg[k] != base[k]} <= allowed
+    assert cfg["method"] == ("recycling" if variant == "recycling" else "reference")
+    assert cfg["reference_transfer"] == ("sequential" if variant == "sequential" else "full")
+    assert cfg["reference_krylov_selection"] == (
+        "lowest" if variant == "lowest" else "alternating_low_high"
+    )
+    assert cfg["recycle_window"] == 16
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"variant": "recycling"},
+        {"variant": "sequential"},
+        {"variant": "lowest"},
+        {"variant": "unknown"},
+        {"repetition": -1},
+        {"repetition": True},
+        {"repetition": 1.5},
+        {"capture_trace": 1},
+    ],
+)
+def test_invalid_ablation_arguments_fail_before_running(changes):
+    with pytest.raises(ValueError):
+        settings(**changes)
+
+
+def test_trace_capture_has_same_equation_gate_but_explicit_cost_scope():
+    assert settings(capture_trace=True)["capture_linear_systems"] is True
+    assert verification_identity(settings(capture_trace=True)) == verification_identity(settings())
+
+
 @pytest.mark.parametrize("updates", [{"slabs": 8}, {"alpha": 1e-8}, {"rank": 100}])
 def test_undeclared_study_axis_is_rejected(updates):
     with pytest.raises(ValueError):
