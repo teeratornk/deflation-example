@@ -65,6 +65,20 @@ Development uses target 7. After choosing and freezing a verified setting,
 Stress cases remain separate from the primary sequence. The scale-up grids use
 32 and 64 slabs at the same horizon and require their own verification.
 
+Retain all expected output paths when generating the development summary:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_small_report \
+  --records OUTPUT/rank-zero/record.json OUTPUT/rank-eight/record.json \
+  OUTPUT/rank-sixteen/record.json OUTPUT/rank-thirty-two/record.json \
+  --plot --output OUTPUT/summary
+```
+
+Missing, failed and capped records remain visible. Ratios require verified
+paired solves with matching physical settings, source, initialization and
+backend. The initial single-run ratios guide the next experiment; they do not
+replace independent complete-sequence timing repetitions.
+
 ## Momentum and derivative diagnostics
 
 ```sh
