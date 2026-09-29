@@ -56,17 +56,33 @@ def transfer_figure(report, output):
     )
     axes[0, 0].set_ylabel("Degrees of freedom")
     axes[0, 0].legend()
-    for policy, label, color in (
-        ("full", "Direct restriction", "#0072b2"),
-        ("sequential", "Sequential zero extension", "#d55e00"),
+    for policy, label, color, marker, linestyle in (
+        ("full", "Direct restriction", "#0072b2", "o", "-"),
+        ("sequential", "Sequential zero extension", "#d55e00", "s", "--"),
     ):
         methods = [r["methods"][policy] for r in rows]
-        axes[0, 1].plot(x, [m["deployed_rank"] for m in methods], ".-", color=color, label=label)
-        axes[1, 0].plot(x, np.cumsum([m["iterations"] for m in methods]), ".-", color=color)
+        style = dict(
+            color=color,
+            marker=marker,
+            linestyle=linestyle,
+            markersize=5,
+            markerfacecolor="none" if policy == "sequential" else color,
+        )
+        axes[0, 1].plot(x, [m["deployed_rank"] for m in methods], label=label, **style)
+        cumulative = np.cumsum([m["iterations"] for m in methods])
+        axes[1, 0].plot(x, cumulative, **style)
+        axes[1, 0].annotate(
+            str(cumulative[-1]),
+            (x[-1], cumulative[-1]),
+            xytext=(-4, -15 if policy == "full" else 9),
+            textcoords="offset points",
+            ha="right",
+            color=color,
+        )
         energies = [
             m.get("coarse_error", {}).get("energy_fraction_removed", np.nan) for m in methods
         ]
-        axes[1, 1].plot(x, energies, ".-", color=color)
+        axes[1, 1].plot(x, energies, **style)
         for i, m in enumerate(methods):
             if not m["verified"]:
                 axes[1, 0].plot(
@@ -77,6 +93,8 @@ def transfer_figure(report, output):
                     markersize=8,
                 )
     axes[0, 1].set_ylabel("Deployed rank")
+    axes[0, 1].set_ylim(0, 1 + max(m["deployed_rank"] for r in rows for m in r["methods"].values()))
+    axes[0, 1].yaxis.set_major_locator(MaxNLocator(integer=True))
     axes[0, 1].legend()
     axes[1, 0].set_ylabel("Cumulative CG iterations")
     axes[1, 1].set_ylabel("Initial error energy removed")
@@ -84,6 +102,7 @@ def transfer_figure(report, output):
     for axis in axes.flat:
         axis.set_xlabel("Captured inactive system")
         axis.xaxis.set_major_locator(MaxNLocator(integer=True))
+        axis.set_xlim(0.5, len(rows) + 0.5)
     fig.suptitle(
         "Matched quadratic inactive systems\nPhysical and trust-region bounds; recorded initial guesses"
     )

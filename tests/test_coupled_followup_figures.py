@@ -82,6 +82,34 @@ def test_transfer_plot_includes_rank_loss_and_missing_energy_diagnostic(tmp_path
     assert (tmp_path / "matched_transfer.pdf").stat().st_size > 1000
 
 
+def test_transfer_plot_distinguishes_identical_curves_and_uses_integer_ranks(tmp_path, monkeypatch):
+    pytest.importorskip("matplotlib")
+    methods = {
+        policy: {"verified": True, "deployed_rank": 8, "iterations": 12}
+        for policy in ("full", "sequential")
+    }
+    row = {"newly_active": 0, "newly_inactive": 0, "methods": methods}
+    report = {
+        "schema": "coupled-matched-transfer-v1",
+        "status": "complete",
+        "expected_systems": 2,
+        "rows": [row, row],
+    }
+    captured = []
+    monkeypatch.setattr(
+        "deflation_example.coupled_followup_figures.save",
+        lambda fig, *_: captured.append(fig),
+    )
+    transfer_figure(report, tmp_path)
+    rank_axis = captured[0].axes[1]
+    assert rank_axis.get_ylim() == (0, 9)
+    assert all(float(tick).is_integer() for tick in rank_axis.get_yticks())
+    assert [line.get_marker() for line in rank_axis.lines] == ["o", "s"]
+    assert [line.get_linestyle() for line in rank_axis.lines] == ["-", "--"]
+    assert rank_axis.lines[1].get_markerfacecolor() == "none"
+    assert [text.get_text() for text in captured[0].axes[2].texts] == ["24", "24"]
+
+
 def device_profile():
     return {
         "status": "verified",
