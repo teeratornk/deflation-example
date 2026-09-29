@@ -205,18 +205,69 @@ def backend_figure(records, output):
     plt.close(fig)
 
 
+def device_profile_figure(report, output):
+    """Show independent operator costs without treating them as sequence costs."""
+    if report.get("status") != "verified":
+        raise ValueError("Use a verified CPU/GPU operator comparison")
+    groups = (
+        ("tangent", "Tangent action", ("cpu", "cuda")),
+        ("transpose", "Transpose action", ("cpu", "cuda")),
+        ("restricted_normal", "Inactive operator", ("cpu", "cuda")),
+        ("frozen_inverse", "Frozen preconditioner", ("cpu", "cuda_serial", "cuda_block_diagonal")),
+    )
+    entries = {}
+    for entry in report["components"]:
+        key = (entry["action"], entry["backend"])
+        if key in entries or not entry.get("verified", True):
+            raise ValueError("Use unique, verified operator measurements")
+        values = np.asarray([v["wall_seconds"] for v in entry["timings"]])
+        if values.size != report["repetitions"] or not np.all(np.isfinite(values) & (values > 0)):
+            raise ValueError("Every operator requires all positive, finite repeated timings")
+        entries[key] = values
+    required = {(action, backend) for action, _, backends in groups for backend in backends}
+    if set(entries) != required:
+        raise ValueError("Keep every declared CPU/GPU operator and preconditioner layout")
+    plt = plotting()
+    fig, axes = plt.subplots(1, 4, figsize=(12, 3.9), layout="constrained")
+    names = {
+        "cpu": "CPU",
+        "cuda": "GPU",
+        "cuda_serial": "GPU\nserial",
+        "cuda_block_diagonal": "GPU\nblock",
+    }
+    for axis, (action, title, backends) in zip(axes, groups, strict=True):
+        for x, backend in enumerate(backends):
+            values = entries[action, backend]
+            axis.bar(x, np.median(values), color="#5b6573" if backend == "cpu" else "#0072b2")
+            axis.plot(x + np.linspace(-0.08, 0.08, len(values)), values, ".", color="black")
+        axis.set_xticks(range(len(backends)), [names[b] for b in backends])
+        axis.set_title(title)
+        axis.set_ylabel("Wall time per action (s)")
+        axis.set_ylim(bottom=0)
+    fig.suptitle(
+        f"Matched operator actions: medians and all {report['repetitions']} repetitions\nSeparate diagnostics; setup excluded"
+    )
+    save(fig, output, "operator_costs")
+    plt.close(fig)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--transfer", type=Path)
     parser.add_argument("--confirmation", type=Path)
     parser.add_argument("--backend-records", type=Path, nargs="+")
+    parser.add_argument("--device-profile", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    if not any((args.transfer, args.confirmation, args.backend_records)):
+    if not any((args.transfer, args.confirmation, args.backend_records, args.device_profile)):
         parser.error("Supply at least one declared evidence group")
     args.output.mkdir(parents=True, exist_ok=False)
     sources = []
-    for path, plot in ((args.transfer, transfer_figure), (args.confirmation, confirmation_figure)):
+    for path, plot in (
+        (args.transfer, transfer_figure),
+        (args.confirmation, confirmation_figure),
+        (args.device_profile, device_profile_figure),
+    ):
         if path is not None:
             plot(json.loads(path.read_text()), args.output)
             sources.append({"file": path.name, "sha256": file_sha256(path)})

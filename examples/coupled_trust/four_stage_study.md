@@ -99,6 +99,19 @@ verification and cleanup. The hybrid implementation retains host sparse
 operations; the resident implementation moves the inner operator to the GPU.
 The coupled nonlinear forward evaluations remain part of complete cost.
 
+Measure matched operator actions separately from complete optimization:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_device_profile \
+  --trace RUNS/reference-capture/inactive-trace-00 --baseline BASELINE \
+  --quadratic 2 --output RUNS/device-profile
+```
+
+This checks CPU/GPU action agreement and measures five warmed applications of
+the tangent, transpose, inactive operator and frozen preconditioner. The serial
+and block-diagonal GPU preconditioner layouts remain separate. These intervals
+are diagnostic costs; they are not additive components of sequence time.
+
 The confirmation backend is the fastest full-reference GPU backend for which
 all three methods pass the declared accuracy checks. If neither GPU backend
 qualifies, retain its failures and use the verified CPU implementation for
@@ -140,6 +153,7 @@ Generate figures directly from the retained summaries and records:
 uv run --no-sync python -m deflation_example.coupled_followup_figures \
   --transfer RUNS/matched-transfer/record.json \
   --confirmation RUNS/confirmation-summary/summary.json \
+  --device-profile RUNS/device-profile/record.json \
   --backend-records HYBRID_BASELINE HYBRID_REFERENCE HYBRID_RECYCLING \
                     CUDA_BASELINE CUDA_REFERENCE CUDA_RECYCLING \
   --output RUNS/figures

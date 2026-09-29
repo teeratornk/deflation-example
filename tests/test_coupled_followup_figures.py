@@ -6,6 +6,7 @@ from deflation_example.coupled_cost_report import confirmation
 from deflation_example.coupled_followup_figures import (
     backend_figure,
     confirmation_figure,
+    device_profile_figure,
     transfer_figure,
 )
 from test_coupled_cost_report import population
@@ -56,3 +57,46 @@ def test_transfer_plot_includes_rank_loss_and_missing_energy_diagnostic(tmp_path
     }
     transfer_figure(report, tmp_path)
     assert (tmp_path / "matched_transfer.pdf").stat().st_size > 1000
+
+
+def device_profile():
+    return {
+        "status": "verified",
+        "repetitions": 5,
+        "components": [
+            {
+                "action": action,
+                "backend": backend,
+                "verified": True,
+                "timings": [{"wall_seconds": 0.1 + 0.001 * i} for i in range(5)],
+            }
+            for action, backends in (
+                ("tangent", ("cpu", "cuda")),
+                ("transpose", ("cpu", "cuda")),
+                ("restricted_normal", ("cpu", "cuda")),
+                ("frozen_inverse", ("cpu", "cuda_serial", "cuda_block_diagonal")),
+            )
+            for backend in backends
+        ],
+    }
+
+
+def test_device_profile_keeps_all_actions_and_layouts(tmp_path):
+    pytest.importorskip("matplotlib")
+    device_profile_figure(device_profile(), tmp_path)
+    assert (tmp_path / "operator_costs.pdf").stat().st_size > 1000
+
+
+@pytest.mark.parametrize("change", ["failed", "missing", "partial", "nonfinite"])
+def test_device_profile_rejects_unverified_or_partial_inputs(tmp_path, change):
+    report = device_profile()
+    if change == "failed":
+        report["components"][0]["verified"] = False
+    elif change == "missing":
+        report["components"].pop()
+    elif change == "partial":
+        report["components"][0]["timings"].pop()
+    else:
+        report["components"][0]["timings"][0]["wall_seconds"] = float("nan")
+    with pytest.raises(ValueError):
+        device_profile_figure(report, tmp_path)
