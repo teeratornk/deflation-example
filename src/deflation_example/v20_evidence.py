@@ -421,11 +421,11 @@ TRANSIENT_ROWS = [
 OPERATION_ROWS = [
     (
         "Transformer day",
-        "24 chained hourly windows",
+        "24 hourly windows",
         "wave15/O1s-transformer-day-x8-skew",
         "reference",
     ),
-    ("Drive cycle", "16 chained windows", "wave9/O2-engine-L2-cycle-x4", "reference"),
+    ("Drive cycle", "16 windows", "wave9/O2-engine-L2-cycle-x4", "reference"),
     ("Off-design flow", "transformer", "wave9/O3-transformer-steady-flows", "reference"),
     ("Off-design flow", "bore level 2", "wave9/O3-engine-L2-steady-flows", "reference"),
     ("Off-design flow", "bore level 3", "wave9/O3-engine-L3-steady-ref1-flows", "reference"),
