@@ -76,6 +76,18 @@ def test_positive_outcome_is_not_required_and_iteration_counts_do_not_define_spe
     assert result["median_time_ratios"]["baseline_over_reference"] == pytest.approx(0.5)
 
 
+def test_failed_attempt_time_is_retained_without_becoming_complete_solve_time():
+    records = population()
+    records[3]["status"] = "trust_radius_exhausted"
+    result = confirmation(records)
+    baseline = result["methods"]["baseline"]
+    assert baseline["attempt_seconds_by_repetition"][1] == records[3]["attempt_seconds"]
+    assert baseline["complete_seconds_by_repetition"][1] is None
+    assert baseline["complete_seconds_by_repetition"][0] == records[0]["attempt_seconds"]
+    assert baseline["median_complete_seconds"] is None
+    assert result["median_time_ratios"] is None
+
+
 def test_profile_uses_exclusive_times_and_strips_machine_paths():
     stats = {
         ("/private/machine/solvers.py", 1, "solve"): (1, 1, 2.0, 50.0, {}),

@@ -138,8 +138,12 @@ def confirmation(records, repetitions=5):
             "verified_sequences": len(times),
             "declared_sequences": repetitions,
             "statuses": ["missing" if v is None else v["status"] for v in values],
-            "complete_seconds_by_repetition": [
+            "attempt_seconds_by_repetition": [
                 None if v is None else v.get("cumulative_attempt_seconds") for v in values
+            ],
+            "complete_seconds_by_repetition": [
+                None if v is None or not v["verified"] else v["cumulative_attempt_seconds"]
+                for v in values
             ],
             "median_complete_seconds": statistics.median(times) if complete else None,
             "observed_range_seconds": [min(times), max(times)] if complete else None,

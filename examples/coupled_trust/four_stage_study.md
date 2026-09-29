@@ -150,6 +150,11 @@ physical targets. Memory values are sampled process allocations, not enforced
 memory budgets. These discrete optimization comparisons do not establish
 thermal mesh or time resolution.
 
+Failed-attempt durations remain in `attempt_seconds_by_repetition`. Their
+`complete_seconds_by_repetition` entries are null: termination time is not time
+to an accurate solution. The plots use elapsed-attempt labels when failures
+occur, without reporting a complete-sequence speedup for that population.
+
 ## Figures
 
 Generate figures directly from the retained summaries and records:
