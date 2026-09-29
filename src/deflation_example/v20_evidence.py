@@ -70,12 +70,21 @@ def _write_json(path, value):
 
 def _case(case):
     inner = case.get("inner") or []
+    history = case.get("outer_history") or case.get("history") or []
+    last = history[-1] if history else {}
+    residuals = [
+        row["original_residual"] for row in inner if row.get("original_residual") is not None
+    ]
     return {
         "status": case.get("status"),
         "inner_iterations": case.get("inner_iterations"),
         "outer_iterations": case.get("outer_iterations"),
         "cumulative_seconds": case.get("cumulative_seconds"),
         "max_inner_per_solve": max((row.get("iterations", 0) for row in inner), default=0),
+        "max_residual": max(residuals) if residuals else None,
+        "final_stationarity": last.get("stationarity"),
+        # The last outer iteration changed no constraint (the active set settled).
+        "settled": bool(history) and last.get("entered") == 0 and last.get("left") == 0,
     }
 
 
@@ -137,6 +146,8 @@ def _mesh_runs(path, controls):
                     "peak_gpu_bytes": (record.get("memory") or {}).get("peak_gpu_process_bytes"),
                     "problem_size": record.get("problem_size"),
                     "cases": [_case(c) for c in cases],
+                    "git_head": (record.get("environment") or {}).get("git_head"),
+                    "source_tree_clean": (record.get("environment") or {}).get("source_tree_clean"),
                 },
             )
 
@@ -166,6 +177,8 @@ def _cht_runs(path, controls):
                     "peak_gpu_bytes": (record.get("memory") or {}).get("peak_gpu_process_bytes"),
                     "problem_size": size,
                     "cases": [_case(c) for c in record.get("cases") or []],
+                    "git_head": (record.get("environment") or {}).get("git_head"),
+                    "source_tree_clean": (record.get("environment") or {}).get("source_tree_clean"),
                 },
             )
 
@@ -265,7 +278,7 @@ def read_population(path, label_levels=False):
     for run_path in sorted((path / "runs").glob("*.json")):
         run = json.loads(run_path.read_text())
         name = run["method"]
-        if label_levels and _is_reference(name) and level:
+        if label_levels and _is_reference(name) and level is not None:
             name = f"{name}-ref{level}"
         methods.setdefault(name, []).append(run)
     for runs in methods.values():
@@ -332,7 +345,10 @@ def populations(root):
             key = f"{wave.name}/{MERGED[prefix]}"
             methods, controls = read_population(path, label_levels=True)
             repetition = re.search(r"-rep(\d+)$", path.name)
-            group = groups.setdefault(key, {"methods": {}, "controls": controls, "parts": []})
+            phase = "pilot" if "pilot" in MERGED[prefix] else "final"
+            group = groups.setdefault(
+                key, {"methods": {}, "controls": {**controls, "phase": phase}, "parts": []}
+            )
             group["parts"].append(path.name)
             for method, runs in methods.items():
                 if repetition:
@@ -403,12 +419,17 @@ TRANSIENT_ROWS = [
     ("Bore level 3", "4 slabs", "wave8/G-engine-L3-x4-ref1-perslab50", "reference"),
 ]
 OPERATION_ROWS = [
-    ("Transformer day", "24 chained hourly windows", "wave9/O1-transformer-day-x8", "reference"),
+    (
+        "Transformer day",
+        "24 chained hourly windows",
+        "wave15/O1s-transformer-day-x8-skew",
+        "reference",
+    ),
     ("Drive cycle", "16 chained windows", "wave9/O2-engine-L2-cycle-x4", "reference"),
     ("Off-design flow", "transformer", "wave9/O3-transformer-steady-flows", "reference"),
     ("Off-design flow", "bore level 2", "wave9/O3-engine-L2-steady-flows", "reference"),
     ("Off-design flow", "bore level 3", "wave9/O3-engine-L3-steady-ref1-flows", "reference"),
-    ("Overloads", "transformer, 8 slabs", "wave9/O4-transformer-overload-x8", "reference"),
+    ("Overloads", "transformer, 8 slabs", "wave15/O4s-transformer-overload-x8-skew", "reference"),
     ("Shuffled order", "transformer", "wave9/O5-shuffled-transformer-steady", "reference"),
     ("Shuffled order", "bore level 2", "wave9/O5-shuffled-engine-L2-steady", "reference"),
     ("Shuffled order", "bore level 2, 4 slabs", "wave9/O5-shuffled-engine-L2-x4", "reference"),
@@ -416,6 +437,8 @@ OPERATION_ROWS = [
 # Supplementary confirmations: tolerance, regularization, cold starts, long sequences,
 # rank and coarse level, global-rank Cartesian transients and the level-0 bore L3 row.
 SI_ROWS = [
+    ("Transformer day", "advective transport", "wave9/O1-transformer-day-x8", "reference"),
+    ("Overloads", "advective transport", "wave9/O4-transformer-overload-x8", "reference"),
     (
         "Transformer steady",
         r"rtol $10^{-8}$",
@@ -465,7 +488,7 @@ SI_ROWS = [
 DIRECT_ROWS = [
     ("Transformer steady", "wave12/D-transformer-steady", "wave9/O5-sorted-transformer-steady"),
     ("Bore L1 steady", "wave12/D-engine-L1-steady", "wave12/D-gpu-engine-L1-steady"),
-    ("Bore L2 steady", "wave12/D-engine-L2-steady", "wave14/E-engine-L2-steady-ref1-r200"),
+    ("Bore L2 steady", "wave12/D-engine-L2-steady", "wave9/O5-sorted-engine-L2-steady"),
     ("Transformer, 8 slabs", "wave12/D-transformer-x8", "wave3/C-S4b-transformer-x8"),
     ("Bore L1, 8 slabs", "wave12/D-engine-L1-x8", "wave3/C-S4b-engine-L1-x8"),
 ]
@@ -543,7 +566,7 @@ def table_rows(summary, spec):
             )
             + r" \\"
         )
-        values.append(reading["ratio"])
+        values.append(reading)
     return "\n".join(lines) + "\n", values
 
 
@@ -591,9 +614,68 @@ def campaign_counts(runs, keys):
 
 
 CARTESIAN_TRANSIENT = 8  # the first rows of TRANSIENT_ROWS are Cartesian
+TEMPORAL = [
+    ("600 s", "advective", "temporal/published-600s-advective"),
+    ("600 s", "skew", "temporal/published-600s-skew"),
+    ("1 h", "advective", "temporal/hour-advective"),
+    ("1 h", "skew", "temporal/hour-skew"),
+]
+STABILITY = {"600 s": "temporal/published-600s-stability", "1 h": "temporal/hour-stability"}
 
 
-def macros(summary, scale, transient, operation, counts, direct):
+def _sci(value):
+    """A positive number as LaTeX math, for example 1.0\\times10^{-8}."""
+    mantissa, exponent = f"{value:.1e}".split("e")
+    return rf"{mantissa}\times10^{{{int(exponent)}}}"
+
+
+def temporal_rows(root):
+    """Time-refinement checks: verified cases, differences and amplification moduli."""
+    root = Path(root)
+    lines, values = [], {}
+    for horizon, form, folder in TEMPORAL:
+        summary = json.loads((root / folder / "summary.json").read_text())
+        stability = json.loads((root / STABILITY[horizon] / "stability.json").read_text())
+        rows = summary["rows"]
+        finest = max(r["slabs"] for r in rows)
+        verified = sum(bool(r.get("verified")) for r in rows)
+        differences = [
+            r["temperature_max_difference_K"]
+            for r in rows
+            if r.get("verified") and r["slabs"] < finest
+        ]
+        changes = [
+            r["replay"]["temperature_change_max_K"]
+            for r in rows
+            if r.get("verified") and r.get("replay")
+        ]
+        moduli = [
+            row["largest_computed_amplification_modulus"]
+            for row in stability["rows"]
+            if row["transport_form"] == form and row.get("status") == "eigenpair_verified"
+        ]
+        cells = [
+            horizon,
+            form,
+            f"{verified}/{len(rows)}",
+            f"{max(differences):.2f}" if differences else "--",
+            f"${_sci(max(changes))}$"
+            if changes and max(changes) >= 1e3
+            else (f"{max(changes):.2f}" if changes else "--"),
+            f"{max(moduli):.2f}" if moduli else "--",
+        ]
+        lines.append(" & ".join(cells) + r" \\")
+        values[(horizon, form)] = {
+            "verified": verified,
+            "cases": len(rows),
+            "difference": max(differences) if differences else None,
+            "change": max(changes) if changes else None,
+            "modulus": max(moduli) if moduli else None,
+        }
+    return "\n".join(lines) + "\n", values
+
+
+def macros(summary, runs, controls, scale, transient, operation, counts, direct, temporal):
     def reading(key, arm="reference"):
         return summary[key]["readings"][arm]
 
@@ -601,31 +683,62 @@ def macros(summary, scale, transient, operation, counts, direct):
     pilot_direct = summary["wave5/W5-engine-L3-steady"]["methods"]["direct"]
     if pilot_direct["accepted"] or pilot_direct["failures"] != ["timeout"]:
         raise ValueError("The engine L3 direct pilot is cited as a timeout")
-
-    cartesian_transient = transient[:CARTESIAN_TRANSIENT]
-    body_transient = transient[CARTESIAN_TRANSIENT:]
+    # AmgX with its declared stopping factor on the 96^3 grid: every failed query
+    # stops at a settled active set; report the final stationarity range.
+    stops = [
+        case
+        for run in runs["wave8/G-steady96"]["amgx"]
+        for case in run["cases"]
+        if case["status"] != "converged"
+    ]
+    if not stops or any(not c["settled"] or c["status"] != "cycle" for c in stops):
+        raise ValueError("The 96^3 AmgX stops are stated as settled active sets")
+    stationarity = [c["final_stationarity"] for c in stops]
+    # Jacobi-CG on Bore 4: every recorded repetition reaches the declared inner cap.
+    cap = controls["wave8/G-engine-L4-steady-o400"]["inner_cap"]
+    jacobi = [r for r in runs["wave8/G-engine-L4-steady-o400"]["jacobi"] if r.get("source")]
+    capped = [
+        r
+        for r in jacobi
+        if not r["accepted"] and any(c["max_inner_per_solve"] >= cap for c in r["cases"])
+    ]
     l4 = summary["wave8/G-engine-L4-steady-o400"]["methods"]
+    iterations = [r["jacobi_iteration_ratio"] for r in scale if r["jacobi_iteration_ratio"]]
+    ratios = {
+        name: [r["ratio"] for r in rows]
+        for name, rows in (("scale", scale), ("transient", transient), ("operation", operation))
+    }
+    hour_skew, hour_advective = temporal[("1 h", "skew")], temporal[("1 h", "advective")]
     values = {
-        "psScaleMin": _ratio(min(scale)),
-        "psScaleMax": _ratio(max(scale)),
-        "psCartesianTransientMin": _ratio(min(cartesian_transient)),
-        "psCartesianTransientMax": _ratio(max(cartesian_transient)),
-        "psBodyTransientMin": _ratio(min(body_transient)),
-        "psBodyTransientMax": _ratio(max(body_transient)),
-        "psOperationMin": _ratio(min(operation)),
-        "psOperationMax": _ratio(max(operation)),
-        "psMaxUnknowns": _count(max(p["unknowns"] or 0 for p in summary.values())),
-        "psDayRatio": _ratio(reading("wave9/O1-transformer-day-x8")["ratio"]),
+        "psScaleMin": _ratio(min(ratios["scale"])),
+        "psScaleMax": _ratio(max(ratios["scale"])),
+        "psIterationMin": _ratio(min(iterations)),
+        "psIterationMax": _ratio(max(iterations)),
+        "psCartesianTransientMin": _ratio(min(ratios["transient"][:CARTESIAN_TRANSIENT])),
+        "psCartesianTransientMax": _ratio(max(ratios["transient"][:CARTESIAN_TRANSIENT])),
+        "psBodyTransientMin": _ratio(min(ratios["transient"][CARTESIAN_TRANSIENT:])),
+        "psBodyTransientMax": _ratio(max(ratios["transient"][CARTESIAN_TRANSIENT:])),
+        "psOperationMin": _ratio(min(ratios["operation"])),
+        "psOperationMax": _ratio(max(ratios["operation"])),
+        "psMaxUnknowns": _count(max(summary[k]["unknowns"] for _, _, k, _ in SCALE_ROWS)),
+        "psDayRatio": _ratio(reading("wave15/O1s-transformer-day-x8-skew")["ratio"]),
         "psCycleRatio": _ratio(reading("wave9/O2-engine-L2-cycle-x4")["ratio"]),
         "psOffDesignTransformerRatio": _ratio(
             reading("wave9/O3-transformer-steady-flows")["ratio"]
         ),
         "psTightAmgxRatio": _ratio(reading("wave8/G-steady96")["ratio"]),
+        "psAmgxStopMin": _sci(min(stationarity)),
+        "psAmgxStopMax": _sci(max(stationarity)),
         "psLFourReferenceMaxInner": _count(l4["reference-ref2"]["max_inner_per_solve"]),
-        "psLFourJacobiInnerCap": _count(l4["jacobi"]["max_inner_per_solve"]),
-        "psPopulations": _count(counts[0]),
-        "psSequences": _count(counts[1]),
-        "psTargetSolves": _count(counts[2]),
+        "psLFourJacobiInnerCap": _count(cap),
+        "psLFourJacobiCapped": _count(len(capped)),
+        "psLFourJacobiDeclared": _count(l4["jacobi"]["declared"]),
+        "psPopulations": _count(counts["main"][0]),
+        "psSequences": _count(counts["main"][1]),
+        "psTargetSolves": _count(counts["main"][2]),
+        "psAllPopulations": _count(counts["all"][0]),
+        "psAllSequences": _count(counts["all"][1]),
+        "psAllTargetSolves": _count(counts["all"][2]),
         "psDirectTransformer": _seconds(direct["Transformer steady"]["direct"]),
         "psReferenceTransformer": _seconds(direct["Transformer steady"]["reference"]),
         "psDirectBoreTwo": _seconds(direct["Bore L2 steady"]["direct"]),
@@ -634,6 +747,11 @@ def macros(summary, scale, transient, operation, counts, direct):
         "psPilotDirectBoreThreeTimeout": _count(
             summary["wave5/W5-engine-L3-steady"]["timeout_seconds"]
         ),
+        "psHourSkewChange": f"{hour_skew['change']:.2f}",
+        "psHourSkewModulus": f"{hour_skew['modulus']:.2f}",
+        "psHourAdvectiveModulus": f"{hour_advective['modulus']:.2f}",
+        "psHourAdvectiveVerified": _count(hour_advective["verified"]),
+        "psHourSkewVerified": _count(hour_skew["verified"]),
     }
     return "".join(f"\\newcommand{{\\{k}}}{{{v}}}\n" for k, v in values.items()), values
 
@@ -701,7 +819,13 @@ def export(root, output):
     if output.exists():
         raise ValueError("The artifact destination must be new")
     summary = summarize(root)
-    runs = {key: population["methods"] for key, population in populations(root).items()}
+    found = populations(root)
+    runs = {key: population["methods"] for key, population in found.items()}
+    controls = {key: population["controls"] for key, population in found.items()}
+    for base, extras in AUGMENT.items():
+        for extra in extras:
+            if extra not in runs or "amgx" not in runs[extra]:
+                raise ValueError(f"The added alternative {extra} of {base} is missing")
     (output / "generated").mkdir(parents=True)
     (output / "figures").mkdir()
     scale_text, scale = table_rows(summary, SCALE_ROWS)
@@ -709,12 +833,14 @@ def export(root, output):
     operation_text, operation = table_rows(summary, OPERATION_ROWS)
     si_text, _ = table_rows(summary, SI_ROWS)
     direct_text, direct = direct_rows(summary)
+    temporal_text, temporal = temporal_rows(root)
     for name, text in (
         ("scale_rows", scale_text),
         ("transient_rows", transient_text),
         ("operation_rows", operation_text),
         ("si_rows", si_text),
         ("direct_rows", direct_text),
+        ("temporal_rows", temporal_text),
     ):
         (output / f"generated/{name}.tex").write_text(text)
     index = {
@@ -732,16 +858,20 @@ def export(root, output):
     index["direct_rows"] = [
         {"label": label, "cpu": cpu, "gpu": gpu} for label, cpu, gpu in DIRECT_ROWS
     ]
+    index["temporal_rows"] = [
+        {"horizon": h, "form": f, "folder": folder} for h, f, folder in TEMPORAL
+    ]
     index["merged"] = MERGED
     index["augment"] = AUGMENT
     (output / "rows.json").write_text(json.dumps(index, indent=2) + "\n")
-    keys = [
-        k for spec in (SCALE_ROWS, TRANSIENT_ROWS, OPERATION_ROWS, SI_ROWS) for _, _, k, _ in spec
-    ]
-    # Augmented AmgX runs are already part of their paired populations.
-    keys += [k for _, cpu, gpu in DIRECT_ROWS for k in (cpu, gpu)]
-    counts = campaign_counts(runs, keys)
-    text, values = macros(summary, scale, transient, operation, counts, direct)
+    # Augmented AmgX runs belong to their paired populations and count once there.
+    main_keys = [k for spec in (SCALE_ROWS, TRANSIENT_ROWS, OPERATION_ROWS) for _, _, k, _ in spec]
+    all_keys = main_keys + [k for _, _, k, _ in SI_ROWS]
+    all_keys += [k for _, cpu, gpu in DIRECT_ROWS for k in (cpu, gpu)]
+    counts = {"main": campaign_counts(runs, main_keys), "all": campaign_counts(runs, all_keys)}
+    text, values = macros(
+        summary, runs, controls, scale, transient, operation, counts, direct, temporal
+    )
     (output / "generated/macros.tex").write_text(text)
     (output / "populations.md").write_text(listing(summary))
     figure(summary, runs, output / "figures/speedup_scale.pdf")
@@ -756,12 +886,24 @@ def main():
     b.add_argument("--runs", required=True)
     b.add_argument("--campaign", required=True)
     b.add_argument("--output", required=True)
+    b.add_argument(
+        "--extra",
+        nargs="*",
+        default=[],
+        help="bundle-path=source-file pairs copied as they are (temporal summaries)",
+    )
     e = commands.add_parser("export")
     e.add_argument("--evidence", required=True)
     e.add_argument("--output", required=True)
     args = parser.parse_args()
     if args.command == "bundle":
-        manifest = bundle(args.runs, args.campaign, args.output)
+        extra = []
+        for item in args.extra:
+            target, separator, source = item.partition("=")
+            if not separator or PurePosixPath(target).is_absolute() or ".." in target:
+                raise ValueError("Each extra file needs a relative bundle-path=source-file")
+            extra.append((target, source))
+        manifest = bundle(args.runs, args.campaign, args.output, extra)
         print(f"Bundled {manifest['populations']} populations, {len(manifest['files'])} files")
     else:
         print(json.dumps(export(args.evidence, args.output), indent=2))

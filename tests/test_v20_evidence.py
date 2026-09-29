@@ -14,7 +14,11 @@ def mesh_record(seconds, inner, success=True, statuses=("converged", "converged"
             "inner_iterations": inner // len(statuses),
             "outer_iterations": 3,
             "cumulative_seconds": seconds * (k + 1) / len(statuses),
-            "inner": [{"iterations": inner // len(statuses)}],
+            "inner": [{"iterations": inner // len(statuses), "original_residual": 1e-11}],
+            "outer_history": [
+                {"stationarity": 1e-9, "entered": 2, "left": 1},
+                {"stationarity": 3e-9, "entered": 0, "left": 0},
+            ],
         }
         for k, status in enumerate(statuses)
     ]
@@ -25,6 +29,7 @@ def mesh_record(seconds, inner, success=True, statuses=("converged", "converged"
         "memory": {"peak_gpu_process_bytes": 2**30},
         "problem_size": 1000,
         "mesh": {"reference_level": level},
+        "environment": {"git_head": "abc", "source_tree_clean": True},
     }
 
 
@@ -212,7 +217,7 @@ def test_table_rows_state_the_reading(tree):
     text, values = evidence.table_rows(
         summary, [("Bore", "level 4", "wave8/G-engine-L4-steady-o400", "reference-ref2")]
     )
-    assert values == [pytest.approx(50.5 / 25.5)]
+    assert [v["ratio"] for v in values] == [pytest.approx(50.5 / 25.5)]
     assert text == r"Bore & level 4 & 1{,}000 & 25.5 & Jacobi-CG 50.5 & 1.98 & 1.00 & -- \\" + "\n"
     with pytest.raises(ValueError, match="No population"):
         evidence.table_rows(summary, [("x", "y", "wave1/missing", "reference")])
@@ -263,3 +268,60 @@ def test_campaign_counts_do_not_repeat_augmented_runs(tree):
     runs = {k: p["methods"] for k, p in evidence.populations(tree).items()}
     populations, sequences, solves = evidence.campaign_counts(runs, ["wave8/G-steady96"])
     assert (populations, sequences, solves) == (1, 3, 3)
+
+
+def test_digests_carry_the_final_outer_state_and_source(tree):
+    digest = json.loads((tree / "populations/wave1/M/runs/reference-0.json").read_text())
+    case = digest["cases"][0]
+    assert case["settled"] is True
+    assert case["final_stationarity"] == 3e-9
+    assert case["max_residual"] == 1e-11
+    assert (digest["git_head"], digest["source_tree_clean"]) == ("abc", True)
+
+
+def test_scientific_values_are_latex_math():
+    assert evidence._sci(1.04e-8) == r"1.0\times10^{-8}"
+    assert evidence._sci(9.4e-8) == r"9.4\times10^{-8}"
+
+
+def test_temporal_rows_read_verified_cases_and_moduli(tmp_path):
+    def summary(verified, change):
+        rows = [
+            {
+                "slabs": n,
+                "verified": verified,
+                "temperature_max_difference_K": 0.1 * (64 // n) if n < 64 else 0.0,
+                "replay": {"temperature_change_max_K": change},
+            }
+            for n in (4, 8, 16, 32, 64)
+        ]
+        return {"rows": rows}
+
+    def stability(moduli):
+        return {
+            "rows": [
+                {
+                    "transport_form": form,
+                    "largest_computed_amplification_modulus": m,
+                    "status": "eigenpair_verified",
+                }
+                for form, values in moduli.items()
+                for m in values
+            ]
+        }
+
+    for _, form, folder in evidence.TEMPORAL:
+        (tmp_path / folder).mkdir(parents=True)
+        (tmp_path / folder / "summary.json").write_text(
+            json.dumps(summary(form == "skew", 0.4 if form == "skew" else 2e150))
+        )
+    for folder in evidence.STABILITY.values():
+        (tmp_path / folder).mkdir(parents=True)
+        (tmp_path / folder / "stability.json").write_text(
+            json.dumps(stability({"skew": [0.5, 0.8], "advective": [0.6, 15.2]}))
+        )
+    text, values = evidence.temporal_rows(tmp_path)
+    lines = text.splitlines()
+    assert lines[1] == r"600 s & skew & 5/5 & 1.60 & 0.40 & 0.80 \\"
+    assert lines[0] == r"600 s & advective & 0/5 & -- & -- & 15.20 \\"
+    assert values[("1 h", "skew")]["change"] == 0.4
