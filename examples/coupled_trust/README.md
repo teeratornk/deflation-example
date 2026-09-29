@@ -5,6 +5,10 @@ very short nonlinear steps. It is separate from the measured line-search
 comparisons. The physical model, control regularization, targets and final
 accuracy are unchanged. No coupled speedup is asserted by this example.
 
+The subsequent [nested-time-grid study](small_to_large.md) provides the
+predeclared smaller-case verification and complete-comparison commands. The
+earlier commands below retain their original numerical procedures.
+
 ## Procedure
 
 The quadratic increment lies within both the physical temperature bounds and

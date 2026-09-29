@@ -74,6 +74,8 @@ def configuration(original, *, slabs, alpha, rank, sequence, device, continuatio
         reference_krylov_steps=48,
         reference_krylov_seed=20260923,
         reference_krylov_selection="alternating_low_high",
+        reference_construction="initial_trajectory_energy_krylov",
+        reference_selection="alternating_low_high",
         recycle_window=max(1, 2 * rank),
         warm_start=True,
         study_sequence=sequence,
