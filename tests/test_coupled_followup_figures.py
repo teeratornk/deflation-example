@@ -37,6 +37,29 @@ def test_backend_figure_keeps_failures_and_both_execution_backends(tmp_path):
     assert (tmp_path / "backend_development.pdf").stat().st_size > 1000
 
 
+def test_hybrid_confirmation_reports_host_and_gpu_memory(tmp_path, monkeypatch):
+    pytest.importorskip("matplotlib")
+    records = population()
+    for record in records:
+        record["configuration"]["device"] = "hybrid"
+        record["memory"] = {
+            "complete": True,
+            "peak_host_rss_bytes": 8 * 2**30,
+            "peak_gpu_process_bytes": 2**30,
+        }
+    captured = []
+    monkeypatch.setattr(
+        "deflation_example.coupled_followup_figures.save",
+        lambda fig, *_: captured.extend(axis.get_ylabel() for axis in fig.axes),
+    )
+    confirmation_figure(confirmation(records), tmp_path)
+    assert captured == [
+        "Complete sequence time (min)",
+        "Sampled host process RSS (GiB)",
+        "Sampled GPU process allocation (GiB)",
+    ]
+
+
 def test_transfer_plot_refuses_partial_chronological_history(tmp_path):
     with pytest.raises(ValueError):
         transfer_figure({"schema": "coupled-matched-transfer-v1", "status": "running"}, tmp_path)

@@ -84,7 +84,9 @@ def transfer_figure(report, output):
     for axis in axes.flat:
         axis.set_xlabel("Captured inactive system")
         axis.xaxis.set_major_locator(MaxNLocator(integer=True))
-    fig.suptitle("Matched systems and recorded initial guesses")
+    fig.suptitle(
+        "Matched quadratic inactive systems\nPhysical and trust-region bounds; recorded initial guesses"
+    )
     save(fig, output, "matched_transfer")
     plt.close(fig)
 
@@ -93,10 +95,12 @@ def confirmation_figure(report, output):
     if report.get("schema") != "coupled-complete-confirmation-v1":
         raise ValueError("Use the all-outcome confirmation summary")
     plt = plotting()
-    fig, axes = plt.subplots(1, 2, figsize=(10.5, 4.5), layout="constrained")
     rows = report["runs"]
     gpu = any(r.get("device") in {"hybrid", "cuda"} for r in rows)
-    memory_key = "peak_gpu_process_bytes" if gpu else "peak_host_rss_bytes"
+    memory_keys = ["peak_host_rss_bytes"] + (["peak_gpu_process_bytes"] if gpu else [])
+    fig, axes = plt.subplots(
+        1, 1 + len(memory_keys), figsize=(14 if gpu else 10.5, 4.5), layout="constrained"
+    )
     for position, method in enumerate(("baseline", "reference", "recycling")):
         selected = [
             r
@@ -121,7 +125,8 @@ def confirmation_figure(report, output):
             axes[0].plot(x, elapsed / 60, symbol, color=COLORS[method])
             memory = row.get("memory") or {}
             if memory.get("complete"):
-                axes[1].plot(x, memory[memory_key] / 2**30, symbol, color=COLORS[method])
+                for axis, key in zip(axes[1:], memory_keys, strict=True):
+                    axis.plot(x, memory[key] / 2**30, symbol, color=COLORS[method])
             if not row["verified"]:
                 axes[0].annotate(
                     row["status"].replace("_", " "),
@@ -144,9 +149,9 @@ def confirmation_figure(report, output):
         axis.set_xticks(range(3), labels)
         axis.set_ylim(bottom=0)
     axes[0].set_ylabel("Complete sequence time (min)")
-    axes[1].set_ylabel(
-        "Sampled GPU process allocation (GiB)" if gpu else "Sampled host process RSS (GiB)"
-    )
+    axes[1].set_ylabel("Sampled host process RSS (GiB)")
+    if gpu:
+        axes[2].set_ylabel("Sampled GPU process allocation (GiB)")
     fig.suptitle(
         "Three-target sequences: all five repetitions\nCircles: verified; crosses: unsuccessful; bars: complete-population medians"
     )
