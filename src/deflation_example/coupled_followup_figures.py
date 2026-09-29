@@ -167,12 +167,13 @@ def confirmation_figure(report, output):
     for axis in axes:
         axis.set_xticks(range(3), labels)
         axis.set_ylim(bottom=0)
-    axes[0].set_ylabel("Complete sequence time (min)")
+    failed = any(not row["verified"] for row in rows)
+    axes[0].set_ylabel("Elapsed attempt time (min)" if failed else "Complete sequence time (min)")
     axes[1].set_ylabel("Sampled host process RSS (GiB)")
     if gpu:
         axes[2].set_ylabel("Sampled GPU process allocation (GiB)")
     fig.suptitle(
-        "Three-target sequences: all five repetitions\nCircles: verified; crosses: unsuccessful; bars: complete-population medians"
+        "Three-target sequence attempts: all five repetitions\nCircles: verified; crosses: unsuccessful; bars: complete-population medians"
     )
     save(fig, output, "complete_confirmation")
     plt.close(fig)

@@ -27,6 +27,19 @@ def test_confirmation_plots_all_outcomes_with_host_memory(tmp_path):
     assert (tmp_path / "complete_confirmation.png").stat().st_size > 1000
 
 
+def test_unsuccessful_sequence_duration_is_labeled_as_attempt_time(tmp_path, monkeypatch):
+    pytest.importorskip("matplotlib")
+    records = population()
+    records[4]["status"] = "trust_radius_exhausted"
+    labels = []
+    monkeypatch.setattr(
+        "deflation_example.coupled_followup_figures.save",
+        lambda fig, *_: labels.append(fig.axes[0].get_ylabel()),
+    )
+    confirmation_figure(confirmation(records), tmp_path)
+    assert labels == ["Elapsed attempt time (min)"]
+
+
 def test_backend_figure_keeps_failures_and_both_execution_backends(tmp_path):
     pytest.importorskip("matplotlib")
     records = population()[:6]
