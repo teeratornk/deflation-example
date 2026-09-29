@@ -174,3 +174,16 @@ def test_summaries_accept_repeated_targets_under_distinct_loads(tmp_path):
     assert study.run(config)
     summary = summarize(tmp_path / "run")
     assert summary["methods"][0]["accepted"] == 1
+
+
+def test_the_skew_transport_form_is_declared_for_the_transformer_only():
+    with pytest.raises(ValueError):
+        controls(transport_form="skew")
+    with pytest.raises(ValueError):
+        controls(geometry="transformer_2d", transport_form="upwind")
+    advective = controls(geometry="transformer_2d")
+    skew = controls(geometry="transformer_2d", transport_form="skew")
+    _, a = study.build_model(advective)
+    _, b = study.build_model(skew)
+    assert (a.A != b.A).nnz > 0
+    assert np.array_equal(a.spatial_forcing, b.spatial_forcing)

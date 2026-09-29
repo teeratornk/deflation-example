@@ -18,6 +18,7 @@ query_bounds: null
 load_profile: null
 query_flows: null
 chain_initial: false
+transport_form: advective
 rank: 20
 recycle_rank: null
 construction: mode_dependent

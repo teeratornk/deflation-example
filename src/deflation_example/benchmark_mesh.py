@@ -66,6 +66,9 @@ class MeshStudyConfig:
     load_profile: list[float] | None = None
     query_flows: list[float] | None = None
     chain_initial: bool = False
+    # Thermal transport discretization: advective (the primary studies) or the
+    # skew-symmetric transformer form, which is stable under time refinement.
+    transport_form: str = "advective"
     rank: int = 20
     recycle_rank: int | None = None
     construction: str = "mode_dependent"
@@ -148,6 +151,10 @@ def controls(config):
         raise ValueError("Internal tolerance factors must not exceed one")
     if c["residual_policy"] not in {"terminal", "refine"}:
         raise ValueError("Residual policy must be terminal or refine")
+    if c["transport_form"] not in {"advective", "skew"} or (
+        c["transport_form"] == "skew" and c["geometry"] != "transformer_2d"
+    ):
+        raise ValueError("The skew transport form applies to the transformer geometry")
     if c["geometry"] not in {"transformer_2d", "engine_3d"}:
         raise ValueError("Unknown geometry")
     if c["phase"] not in {"pilot", "final"} or c["device"] not in {"cpu", "cuda"}:
@@ -287,11 +294,11 @@ def _hash(array):
     return hashlib.sha256(np.ascontiguousarray(array).tobytes()).hexdigest()
 
 
-def build_model(c, *, transport_form="advective"):
+def build_model(c, *, transport_form=None):
     showcase = build_showcase(
         c["geometry"],
         c["level"],
-        transport_form=transport_form,
+        transport_form=transport_form or c.get("transport_form", "advective"),
         reference_level=c.get("reference_level", 0),
     )
     return showcase, control_model(c, showcase.assembly)
