@@ -322,6 +322,32 @@ def test_temporal_rows_read_verified_cases_and_moduli(tmp_path):
         )
     text, values = evidence.temporal_rows(tmp_path)
     lines = text.splitlines()
-    assert lines[1] == r"600 s & skew & 5/5 & 1.60 & 0.40 & 0.80 \\"
+    assert lines[1] == r"600 s & skew & 5/5 & 0.80 & 0.40 & 0.80 \\"
     assert lines[0] == r"600 s & advective & 0/5 & -- & -- & 15.20 \\"
     assert values[("1 h", "skew")]["change"] == 0.4
+
+
+def test_a_missing_difference_to_an_unverified_finest_grid_prints_a_dash(tmp_path):
+    rows = [
+        {"slabs": n, "verified": n < 32, "replay": {"temperature_change_max_K": 1e152}}
+        for n in (4, 8, 16, 32, 64)
+    ]
+    stability = {
+        "rows": [
+            {
+                "transport_form": form,
+                "largest_computed_amplification_modulus": 0.5,
+                "status": "eigenpair_verified",
+            }
+            for form in ("advective", "skew")
+        ]
+    }
+    for _, _, folder in evidence.TEMPORAL:
+        (tmp_path / folder).mkdir(parents=True)
+        (tmp_path / folder / "summary.json").write_text(json.dumps({"rows": rows}))
+    for folder in evidence.STABILITY.values():
+        (tmp_path / folder).mkdir(parents=True)
+        (tmp_path / folder / "stability.json").write_text(json.dumps(stability))
+    text, values = evidence.temporal_rows(tmp_path)
+    assert text.splitlines()[0] == r"600 s & advective & 3/5 & -- & $1.0\times10^{152}$ & 0.50 \\"
+    assert values[("600 s", "advective")]["difference"] is None

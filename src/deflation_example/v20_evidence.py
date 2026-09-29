@@ -621,6 +621,8 @@ TEMPORAL = [
     ("1 h", "skew", "temporal/hour-skew"),
 ]
 STABILITY = {"600 s": "temporal/published-600s-stability", "1 h": "temporal/hour-stability"}
+# The operating trajectories use eight slabs per window.
+TEMPORAL_SLABS = 8
 
 
 def _sci(value):
@@ -637,12 +639,15 @@ def temporal_rows(root):
         summary = json.loads((root / folder / "summary.json").read_text())
         stability = json.loads((root / STABILITY[horizon] / "stability.json").read_text())
         rows = summary["rows"]
-        finest = max(r["slabs"] for r in rows)
         verified = sum(bool(r.get("verified")) for r in rows)
+        # Difference of the eight-slab optimum from the finest verified optimum; the
+        # summary omits it when the finest grid is unverified.
         differences = [
             r["temperature_max_difference_K"]
             for r in rows
-            if r.get("verified") and r["slabs"] < finest
+            if r.get("verified")
+            and r["slabs"] == TEMPORAL_SLABS
+            and r.get("temperature_max_difference_K") is not None
         ]
         changes = [
             r["replay"]["temperature_change_max_K"]
@@ -748,6 +753,7 @@ def macros(summary, runs, controls, scale, transient, operation, counts, direct,
             summary["wave5/W5-engine-L3-steady"]["timeout_seconds"]
         ),
         "psHourSkewChange": f"{hour_skew['change']:.2f}",
+        "psHourSkewDifference": f"{hour_skew['difference']:.2f}",
         "psHourSkewModulus": f"{hour_skew['modulus']:.2f}",
         "psHourAdvectiveModulus": f"{hour_advective['modulus']:.2f}",
         "psHourAdvectiveVerified": _count(hour_advective["verified"]),
