@@ -12,6 +12,7 @@ import time
 import numpy as np
 
 from .coupled_cuda import CudaControlJacobian, CudaGaussNewton
+from .coupled_preconditioned_reference import end_indices
 from .recycling import inactive_indices
 from .solvers import LinearResult, independent_residual, validate_linear_inputs
 from .study_solvers import StudySolver
@@ -25,6 +26,45 @@ def _orthogonalize(cp, basis, tolerance=1e-12):
     U, singular, _ = cp.linalg.svd(R, full_matrices=False)
     keep = singular > tolerance * singular[0]
     return Q if bool(cp.all(keep)) else Q @ U[:, keep]
+
+
+def preconditioned_ritz(cp, apply, inverse, candidates, rank, tolerance=1e-12, chunk=20):
+    """Match the host energy-metric Ritz selection for a fixed SPD inverse."""
+    norms = cp.linalg.norm(candidates, axis=0)
+    nonzero = norms > 0
+    raw = candidates[:, nonzero] / norms[nonzero]
+    if not raw.shape[1] or not rank:
+        return raw[:, :0], {"candidate_rank": 0, "ritz_values": []}
+    Q, R = cp.linalg.qr(raw, mode="reduced")
+    U, singular, _ = cp.linalg.svd(R, full_matrices=False)
+    keep = singular > tolerance * singular[0]
+    V = Q @ U[:, keep]
+    HV = cp.empty_like(V)
+    for first in range(0, V.shape[1], chunk):
+        HV[:, first : first + chunk] = apply(V[:, first : first + chunk])
+    metric = V.T @ HV
+    projected = cp.empty_like(metric)
+    for first in range(0, V.shape[1], chunk):
+        projected[:, first : first + chunk] = HV.T @ inverse(HV[:, first : first + chunk])
+    for form in (metric, projected):
+        skew = float(cp.linalg.norm(form - form.T) / cp.maximum(cp.linalg.norm(form), 1e-300))
+        if not np.isfinite(skew) or skew > 1e-9:
+            raise ValueError("The GPU preconditioned Ritz pencil fails symmetry verification")
+    metric, projected = (metric + metric.T) / 2, (projected + projected.T) / 2
+    L = cp.linalg.cholesky(metric)
+    reduced = cp.linalg.solve(L, projected)
+    reduced = cp.linalg.solve(L, reduced.T).T
+    values, vectors = cp.linalg.eigh((reduced + reduced.T) / 2)
+    if not bool(cp.all(cp.isfinite(values))) or float(values[0]) <= 0:
+        raise ValueError("The GPU preconditioned Ritz pencil must be positive definite")
+    chosen = cp.asarray(end_indices(len(values))[: min(rank, len(values))])
+    selected = V @ cp.linalg.solve(L.T, vectors[:, chosen])
+    return selected, {
+        "candidate_rank": V.shape[1],
+        "ritz_values": cp.asnumpy(values[chosen]).tolist(),
+        "rank_threshold": tolerance,
+        "ritz_selection": "alternating_low_high",
+    }
 
 
 class CudaRecycleSpace:
@@ -58,33 +98,39 @@ class CudaRecycleSpace:
         if self.rank:
             self.directions.append(direction.copy())
 
-    def finish(self, apply, diagonal, deployed, status):
+    def finish(self, apply, diagonal, deployed, status, inverse=None):
         if status != "converged":
             self.clear()
             return {"status": "discarded_after_failed_solve", "selected_rank": 0}
         cp = self.cp
         blocks = ([deployed] if deployed.shape[1] else []) + list(self.directions)
         candidates = cp.column_stack(blocks) if blocks else cp.empty((len(diagonal), 0))
-        sqrt_d = cp.sqrt(diagonal)
-        scaled = sqrt_d[:, None] * candidates
-        if scaled.shape[1]:
-            norms = cp.linalg.norm(scaled, axis=0)
-            nonzero = norms > 0
-            scaled = scaled[:, nonzero] / norms[nonzero]
-        Q = _orthogonalize(cp, scaled)
-        physical = Q / sqrt_d[:, None]
-        if physical.shape[1] and self.rank:
-            projected = physical.T @ apply(physical)
-            _, directions = cp.linalg.eigh((projected + projected.T) / 2)
-            selected = physical @ directions[:, : self.rank]
+        if inverse is not None:
+            selected, spectral = preconditioned_ritz(cp, apply, inverse, candidates, self.rank)
+            policy = "existing-coarse-plus-new-directions-preconditioned-ritz-v1"
         else:
-            selected = physical[:, :0]
+            sqrt_d = cp.sqrt(diagonal)
+            scaled = sqrt_d[:, None] * candidates
+            if scaled.shape[1]:
+                norms = cp.linalg.norm(scaled, axis=0)
+                nonzero = norms > 0
+                scaled = scaled[:, nonzero] / norms[nonzero]
+            Q = _orthogonalize(cp, scaled)
+            physical = Q / sqrt_d[:, None]
+            if physical.shape[1] and self.rank:
+                projected = physical.T @ apply(physical)
+                _, directions = cp.linalg.eigh((projected + projected.T) / 2)
+                selected = physical @ directions[:, : self.rank]
+            else:
+                selected = physical[:, :0]
+            spectral = {"candidate_rank": Q.shape[1]}
+            policy = "existing-coarse-plus-new-directions-scaled-Ritz"
         metrics = {
             "status": "selected",
-            "policy": "existing-coarse-plus-new-directions-scaled-Ritz",
+            "policy": policy,
             "existing_columns": deployed.shape[1],
             "candidate_columns": candidates.shape[1],
-            "candidate_rank": Q.shape[1],
+            **spectral,
             "selected_rank": selected.shape[1],
             "new_directions_observed": self.observed,
             "new_directions_retained": len(self.directions),
@@ -340,7 +386,11 @@ class CudaCoupledSolver(StudySolver):
         )
         mark("verification")
         progress("final", residual, "independently_recomputed_cpu", status)
-        selection = self.history.finish(apply, d, Z, status) if self.history is not None else None
+        selection = (
+            self.history.finish(apply, d, Z, status, inverse=self.device_preconditioner)
+            if self.history is not None
+            else None
+        )
         mark("basis_processing")
         previous = self.previous
         self.previous = indices.copy()

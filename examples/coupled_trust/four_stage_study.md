@@ -30,6 +30,13 @@ profiles at source `71ee3c7` retain that identifier; new source-matched GPU
 runs and their verification use the corrected source recorded in their outputs.
 Do not attribute earlier results to the startup correction.
 
+The matched GPU follow-up also uses the host recycling policy with the frozen
+preconditioner: it retains old coarse vectors and new directions and selects
+alternating extremal Ritz directions from the energy-metric pencil. The previous
+resident implementation selected in Jacobi coordinates even with frozen sweeps.
+That earlier selection remains attached to its source; the follow-up records the
+matched policy explicitly. GPU model and backend versions accompany new runs.
+
 Set the four input paths described in [small_to_large.md](small_to_large.md).
 Each new numerical source requires its own `coupled_small_study verify` result.
 The following examples assume that verification is `RUNS/verification/record.json`.

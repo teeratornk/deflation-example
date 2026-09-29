@@ -40,6 +40,7 @@ def summarize(records):
                     cfg.get("repetition", 0),
                     cfg.get("capture_linear_systems", False),
                     record.get("timing_boundary"),
+                    record.get("execution_environment"),
                     [
                         record.get("environment", {}).get(k)
                         for k in ("cpu_model", "numpy", "scipy", "blas")

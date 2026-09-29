@@ -37,17 +37,23 @@ def test_sampler_resolves_the_current_cuda_device_by_uuid(monkeypatch):
 
     def properties(index):
         observed.append(index)
-        return SimpleNamespace(uuid="01234567-89ab-cdef-0123-456789abcdef")
+        return SimpleNamespace(uuid="01234567-89ab-cdef-0123-456789abcdef", name="Test GPU")
 
     cuda = SimpleNamespace(
         current_device=lambda: 2,
         get_device_properties=properties,
         synchronize=lambda index: observed.append(("sync", index)),
     )
-    torch = SimpleNamespace(cuda=cuda, empty=lambda size, device: observed.append((size, device)))
+    torch = SimpleNamespace(
+        cuda=cuda,
+        empty=lambda size, device: observed.append((size, device)),
+        __version__="test",
+        version=SimpleNamespace(cuda="test"),
+    )
     monkeypatch.setattr(gpu, "require_cuda", lambda: torch)
     sampler = ProcessMemory("cuda")
     assert observed == [(1, "cuda:2"), ("sync", 2), 2]
+    assert sampler.device_metadata["gpu_model"] == "Test GPU"
     assert sampler.device_uuid == "GPU-01234567-89ab-cdef-0123-456789abcdef"
     assert sampler.process is None
 

@@ -9,6 +9,7 @@ import pstats
 import statistics
 
 from .coupled_small_report import summarize
+from .coupled_small_study import verification_identity
 from .reporting import file_sha256, write_report
 
 
@@ -79,7 +80,7 @@ def confirmation(records, repetitions=5):
     if len(records) != 3 * repetitions:
         raise ValueError("Retain all three method slots for every declared repetition")
     report = summarize(records)
-    slots, rows = {}, report["runs"]
+    slots, rows, populations = {}, report["runs"], set()
     for record, row in zip(records, rows, strict=True):
         if record is None:
             continue
@@ -88,6 +89,25 @@ def confirmation(records, repetitions=5):
             raise ValueError("Duplicate or undeclared confirmation slot")
         slots[method, repetition] = row
         cfg = record["configuration"]
+        populations.add(
+            json.dumps(
+                [
+                    verification_identity(cfg),
+                    cfg["queries"],
+                    cfg["device"],
+                    record.get("environment", {}).get("source_sha256"),
+                    record.get("baseline_sha256"),
+                    record.get("initial_state"),
+                    record.get("timing_boundary"),
+                    record.get("execution_environment"),
+                    [
+                        record.get("environment", {}).get(k)
+                        for k in ("cpu_model", "numpy", "scipy", "blas")
+                    ],
+                ],
+                sort_keys=True,
+            )
+        )
         if (
             cfg["queries"] != [{"target": t, "upper_K": 357.3} for t in (7, 8, 9)]
             or cfg["slabs"] != 16
@@ -112,7 +132,7 @@ def confirmation(records, repetitions=5):
     methods = {}
     for method in ("baseline", "reference", "recycling"):
         values = [slots.get((method, r)) for r in range(repetitions)]
-        complete = all(v is not None and v["verified"] for v in values)
+        complete = len(populations) == 1 and all(v is not None and v["verified"] for v in values)
         times = [v["cumulative_attempt_seconds"] for v in values if v is not None and v["verified"]]
         methods[method] = {
             "verified_sequences": len(times),
@@ -126,7 +146,7 @@ def confirmation(records, repetitions=5):
         }
     # Per-pair matching is delegated to the strict existing source/hardware/start
     # comparison; a complete but unmatched population also has no headline ratio.
-    paired = all(
+    paired = len(populations) == 1 and all(
         slots.get((method, r), {}).get("speedup") is not None
         for method in ("reference", "recycling")
         for r in range(repetitions)

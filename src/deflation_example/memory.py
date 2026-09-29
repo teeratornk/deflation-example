@@ -102,6 +102,7 @@ class ProcessMemory:
         self.external = query is None
         self.process = self.connection = None
         self.device_uuid = None
+        self.device_metadata = {"backend": device}
         if self.external:
             if device == "cuda":
                 from .gpu import require_cuda
@@ -113,7 +114,13 @@ class ProcessMemory:
                 device = torch.cuda.current_device()
                 initialized = torch.empty(1, device=f"cuda:{device}")
                 torch.cuda.synchronize(device)
-                self.device_uuid = _nvml_device_uuid(torch.cuda.get_device_properties(device).uuid)
+                properties = torch.cuda.get_device_properties(device)
+                self.device_uuid = _nvml_device_uuid(properties.uuid)
+                self.device_metadata.update(
+                    gpu_model=properties.name,
+                    torch_version=torch.__version__,
+                    torch_cuda_version=torch.version.cuda,
+                )
                 del initialized
             elif device != "cpu":
                 raise ValueError("Memory device must be cpu or cuda")

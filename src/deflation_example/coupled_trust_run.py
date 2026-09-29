@@ -123,6 +123,13 @@ def run(
         "cpu" if cfg["device"] == "cpu" else "cuda", cfg.get("memory_interval", 0.1)
     )
     sampler.start()
+    record["execution_environment"] = getattr(sampler, "device_metadata", {})
+    if cfg["device"] != "cpu":
+        import cupy as cp
+
+        record["execution_environment"].update(
+            cupy_version=cp.__version__, cuda_runtime=cp.cuda.runtime.runtimeGetVersion()
+        )
     record["process_preparation_seconds"] = time.perf_counter() - tick
     start = time.perf_counter()
     solver, reference, problem = None, None, None

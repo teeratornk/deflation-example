@@ -37,6 +37,7 @@ def test_complete_cost_includes_construction_and_all_intervals():
         "repetition",
         "capture",
         "hardware",
+        "gpu_hardware",
         "boundary",
     ],
 )
@@ -59,6 +60,8 @@ def test_unmatched_or_failed_comparison_has_no_ratio(defect):
         reference["configuration"]["capture_linear_systems"] = True
     elif defect == "hardware":
         reference["environment"]["cpu_model"] = "different"
+    elif defect == "gpu_hardware":
+        reference["execution_environment"] = {"gpu_model": "different"}
     elif defect == "boundary":
         reference["timing_boundary"] = "excludes construction"
     else:

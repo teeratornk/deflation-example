@@ -91,3 +91,14 @@ def test_profile_uses_exclusive_times_and_strips_machine_paths():
 def test_all_slots_must_remain_visible():
     with pytest.raises(ValueError, match="slots"):
         confirmation(population()[:-1])
+
+
+def test_matched_pairs_from_different_sources_cannot_form_one_population():
+    records = population()
+    for record in records[-3:]:
+        record["environment"]["source_sha256"] = {"module": "later_source"}
+    result = confirmation(records)
+    assert result["all_sequences_verified"]
+    assert not result["all_comparisons_matched"]
+    assert result["median_time_ratios"] is None
+    assert result["methods"]["reference"]["median_complete_seconds"] is None
