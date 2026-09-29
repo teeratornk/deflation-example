@@ -148,3 +148,20 @@ uv run --no-sync python -m deflation_example.coupled_followup_figures \
 The figures show both transfer policies, all three methods on each backend,
 all five confirmation repetitions, termination statuses and sampled memory.
 The recorded input hashes bind each plot to its numerical evidence.
+
+Audit every saved trajectory against the same physical baseline and the
+recorded objective without modifying the optimized source:
+
+```sh
+uv run --no-sync python -m deflation_example.coupled_confirmation_fields \
+  --records RECORD_01 RECORD_02 RECORD_03 RECORD_04 RECORD_05 \
+            RECORD_06 RECORD_07 RECORD_08 RECORD_09 RECORD_10 \
+            RECORD_11 RECORD_12 RECORD_13 RECORD_14 RECORD_15 \
+  --baseline BASELINE --output RUNS/field-audit
+```
+
+This reconstructs the weighted objective from saved fields, checks declared
+discrete temperature bounds, and compares each method with its matched baseline.
+Its comparison thresholds are 0.001 K for temperature and `1e-6` for relative
+objective difference. The original residual and KKT requirements remain those
+of the optimizer; field agreement does not replace them.
