@@ -213,7 +213,7 @@ def test_table_rows_state_the_reading(tree):
         summary, [("Bore", "level 4", "wave8/G-engine-L4-steady-o400", "reference-ref2")]
     )
     assert values == [pytest.approx(50.5 / 25.5)]
-    assert text == r"Bore & level 4 & 1{,}000 & 25.5 & Jacobi-CG 50.5 & 1.98 & 1.00 \\" + "\n"
+    assert text == r"Bore & level 4 & 1{,}000 & 25.5 & Jacobi-CG 50.5 & 1.98 & 1.00 & -- \\" + "\n"
     with pytest.raises(ValueError, match="No population"):
         evidence.table_rows(summary, [("x", "y", "wave1/missing", "reference")])
     with pytest.raises(ValueError, match="No reading"):
@@ -240,3 +240,26 @@ def test_a_population_without_a_completed_method_is_stated(tmp_path):
             {"wave6/F": {**summary["wave6/F"], "methods": {"jacobi": {"accepted": 1}}}},
             [("T", "a", "wave6/F", None)],
         )
+
+
+def test_incomplete_methods_are_named_and_the_reference_must_complete(tree):
+    summary = evidence.summarize(tree)
+    text, _ = evidence.table_rows(summary, [("M", "d", "wave1/M", "reference")])
+    assert text.rstrip().endswith(r"& AmgX, recycling \\")
+    broken = {
+        "wave1/M": {
+            **summary["wave1/M"],
+            "methods": {
+                **summary["wave1/M"]["methods"],
+                "reference": {**summary["wave1/M"]["methods"]["reference"], "accepted": 2},
+            },
+        }
+    }
+    with pytest.raises(ValueError, match="unaccepted repetition"):
+        evidence.table_rows(broken, [("M", "d", "wave1/M", "reference")])
+
+
+def test_campaign_counts_do_not_repeat_augmented_runs(tree):
+    runs = {k: p["methods"] for k, p in evidence.populations(tree).items()}
+    populations, sequences, solves = evidence.campaign_counts(runs, ["wave8/G-steady96"])
+    assert (populations, sequences, solves) == (1, 3, 3)

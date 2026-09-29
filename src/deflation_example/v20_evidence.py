@@ -493,10 +493,20 @@ def _count(value):
     return f"{int(round(value)):,}".replace(",", "{,}")
 
 
-def table_rows(summary, spec):
-    """LaTeX rows: label, detail, unknowns, reference s, alternative (s), ratio, iterations.
+def incomplete(methods):
+    """Methods of a population with a repetition that did not meet the acceptance tests."""
+    names = sorted(
+        NAMES.get(m, m) for m, row in methods.items() if row["accepted"] < row["declared"]
+    )
+    return ", ".join(names) if names else "--"
 
-    A row with arm None states a population in which no method completes.
+
+def table_rows(summary, spec):
+    """LaTeX rows: label, detail, unknowns, reference s, alternative (s), ratio, iterations,
+    and the methods with an unaccepted repetition.
+
+    The row's reference arm must meet the acceptance tests in every repetition. A row
+    with arm None states a population in which no method completes.
     """
     lines, values = [], []
     for label, detail, key, arm in spec:
@@ -508,11 +518,14 @@ def table_rows(summary, spec):
                 raise ValueError(f"A method completes in {key}")
             lines.append(
                 " & ".join([label, detail, _count(population["unknowns"])])
-                + r" & \multicolumn{4}{l}{no method completes} \\"
+                + r" & \multicolumn{5}{l}{no method completes} \\"
             )
             continue
         if arm not in population["readings"]:
             raise ValueError(f"No reading for {key} ({arm})")
+        own = population["methods"][arm]
+        if own["accepted"] != own["declared"]:
+            raise ValueError(f"The reference arm of {key} has an unaccepted repetition")
         reading = population["readings"][arm]
         alternative = NAMES.get(reading["fastest_alternative"], reading["fastest_alternative"])
         lines.append(
@@ -525,6 +538,7 @@ def table_rows(summary, spec):
                     f"{alternative} {_seconds(reading['alternative_seconds'])}",
                     _ratio(reading["ratio"]),
                     _ratio(reading["jacobi_iteration_ratio"]),
+                    incomplete(population["methods"]),
                 ]
             )
             + r" \\"
@@ -724,8 +738,8 @@ def export(root, output):
     keys = [
         k for spec in (SCALE_ROWS, TRANSIENT_ROWS, OPERATION_ROWS, SI_ROWS) for _, _, k, _ in spec
     ]
+    # Augmented AmgX runs are already part of their paired populations.
     keys += [k for _, cpu, gpu in DIRECT_ROWS for k in (cpu, gpu)]
-    keys += [extra for extras in AUGMENT.values() for extra in extras if extra in runs]
     counts = campaign_counts(runs, keys)
     text, values = macros(summary, scale, transient, operation, counts, direct)
     (output / "generated/macros.tex").write_text(text)
