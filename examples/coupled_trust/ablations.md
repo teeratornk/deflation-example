@@ -7,6 +7,8 @@ They use the same nonlinear equations, initial temperature, physical bounds,
 preconditioner, warm starts, and final residual and optimality criteria.
 The older [construction study](../coupled_optimization/corrected_study/ablations.md)
 uses a different numerical procedure and remains separate evidence.
+The [four-stage follow-up](four_stage_study.md) supplies matched trace replay,
+cost profiling, GPU comparisons and repeated complete-sequence commands.
 
 | Comparison | Settings | Quantity it tests |
 | --- | --- | --- |
@@ -96,7 +98,7 @@ diagnostics, but their older reference-bank presets do not constitute a matched
 replay of the new rank-8 space. Such a replay remains a separate required step.
 
 The backend, temporal-size and target-sequence controls are staged after verified
-development runs. GPU modes require the `coupled-gpu` extra and an allocated GPU.
+development runs. GPU modes require both the `gpu` and `coupled-gpu` extras and an allocated GPU.
 Each temporal grid needs its own source-matched equation gate. These refinements
 test optimization cost; they do not by themselves establish physical temporal
 resolution. Keep nearby targets 7, 8, 9 separate from stress targets 7, 15, 14.

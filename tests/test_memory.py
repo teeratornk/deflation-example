@@ -39,10 +39,15 @@ def test_sampler_resolves_the_current_cuda_device_by_uuid(monkeypatch):
         observed.append(index)
         return SimpleNamespace(uuid="01234567-89ab-cdef-0123-456789abcdef")
 
-    cuda = SimpleNamespace(current_device=lambda: 2, get_device_properties=properties)
-    monkeypatch.setattr(gpu, "require_cuda", lambda: SimpleNamespace(cuda=cuda))
+    cuda = SimpleNamespace(
+        current_device=lambda: 2,
+        get_device_properties=properties,
+        synchronize=lambda index: observed.append(("sync", index)),
+    )
+    torch = SimpleNamespace(cuda=cuda, empty=lambda size, device: observed.append((size, device)))
+    monkeypatch.setattr(gpu, "require_cuda", lambda: torch)
     sampler = ProcessMemory("cuda")
-    assert observed == [2]
+    assert observed == [(1, "cuda:2"), ("sync", 2), 2]
     assert sampler.device_uuid == "GPU-01234567-89ab-cdef-0123-456789abcdef"
     assert sampler.process is None
 
@@ -134,3 +139,25 @@ def test_external_sampler_measures_cuda_process_memory():
     assert record["peak_gpu_process_bytes"] >= record["initial_gpu_process_bytes"] > 0
     assert not sampler.process.is_alive()
     del buffer, initialized
+
+
+@pytest.mark.gpu
+def test_cuda_sampler_initializes_a_fresh_process_without_prior_allocations():
+    import json
+    import subprocess
+    import sys
+
+    torch = pytest.importorskip("torch")
+    pytest.importorskip("pynvml")
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA device required")
+    script = (
+        "import json; from deflation_example.memory import ProcessMemory; "
+        "sampler=ProcessMemory('cuda', 0.01); sampler.start(); "
+        "print(json.dumps(sampler.finish()))"
+    )
+    record = json.loads(
+        subprocess.check_output([sys.executable, "-c", script], text=True, timeout=90)
+    )
+    assert record["complete"]
+    assert record["initial_gpu_process_bytes"] > 0

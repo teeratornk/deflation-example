@@ -107,9 +107,14 @@ class ProcessMemory:
                 from .gpu import require_cuda
 
                 torch = require_cuda()
-                self.device_uuid = _nvml_device_uuid(
-                    torch.cuda.get_device_properties(torch.cuda.current_device()).uuid
-                )
+                # Device discovery alone need not create an NVML-visible compute
+                # context. Establish it before asking the separate sampler for
+                # this process's allocation. Callers charge this to preparation.
+                device = torch.cuda.current_device()
+                initialized = torch.empty(1, device=f"cuda:{device}")
+                torch.cuda.synchronize(device)
+                self.device_uuid = _nvml_device_uuid(torch.cuda.get_device_properties(device).uuid)
+                del initialized
             elif device != "cpu":
                 raise ValueError("Memory device must be cpu or cuda")
             self.closed = False

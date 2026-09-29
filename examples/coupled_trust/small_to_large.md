@@ -54,7 +54,7 @@ Repeat with each declared nonzero `--rank`, a separate output directory and
 otherwise identical settings. The gate checks the numerical source and physical
 configuration. `--device hybrid` uses CPU sparse operations and GPU coarse
 operations; `--device cuda` uses the resident GPU implementation. Both require
-the optional `coupled-gpu` environment and an allocated GPU.
+the optional `gpu` and `coupled-gpu` extras and an allocated GPU.
 
 The four-hour optimization allowance starts after initialization and reference
 construction; these costs remain in the complete elapsed time. Preparation has
