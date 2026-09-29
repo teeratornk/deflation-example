@@ -127,8 +127,8 @@ def run(
             tick = time.perf_counter()
             problem, baseline = problem_loader(cfg)
             if cfg.get("cooperative_flow_deadline", False):
-                problem.stop_requested = (
-                    lambda: prior_total + time.perf_counter() - start >= budget_seconds
+                problem.stop_requested = lambda: (
+                    prior_total + time.perf_counter() - start >= budget_seconds
                 )
             record.update(
                 baseline_sha256=baseline["baseline_sha256"],
