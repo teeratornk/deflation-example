@@ -80,6 +80,7 @@ def test_all_time_comparison_includes_initial_condition_and_mass_weights():
 
 def test_local_population_keeps_failed_and_missing_perturbations(tmp_path):
     paths = [tmp_path / str(i) for i in range(27)]
+    paths[11].mkdir()
     write_report(
         paths[11] / "record.json",
         {
@@ -112,3 +113,23 @@ def test_initial_momentum_diagnostic_keeps_original_residual_and_fields():
     )
     assert report["extended_accumulation_momentum_residual"] < problem.flow_tolerance
     np.testing.assert_array_equal(problem.initial_flow.velocity, initial)
+
+
+def test_local_figure_retains_all_trajectory_labels_and_failed_counts(tmp_path):
+    from deflation_example.coupled_discretization_report import plot_local
+
+    records = [
+        {
+            "trajectory": t,
+            "subdivision": q,
+            "perturbation_K": p,
+            "verified": not (t == "retained" and q == 1 and p == 1e-6),
+            "steps": [{"tangent": {"velocity_response_nodal_norm_m_s_per_K": 1.0 / q}}],
+        }
+        for t in ("nominal", "retained", "alternate")
+        for q in (1, 2, 4)
+        for p in (-1e-6, 0, 1e-6)
+    ]
+    plot_local(records, tmp_path)
+    assert (tmp_path / "interval_refinement.pdf").stat().st_size > 0
+    assert (tmp_path / "interval_refinement.png").stat().st_size > 0

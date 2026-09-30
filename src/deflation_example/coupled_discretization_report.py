@@ -194,30 +194,91 @@ def local_rows(directories):
     return rows
 
 
+def plot_local(rows, directory):
+    """Show every signed-perturbation outcome beside the central sensitivity."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(11.5, 4.5), sharey=True)
+    for ax, trajectory, title in zip(
+        axes,
+        ("nominal", "retained", "alternate"),
+        ("Nominal target 7", "Target 8: retained flow", "Target 8: alternative flow"),
+        strict=True,
+    ):
+        x, y = [], []
+        for subdivisions in (1, 2, 4):
+            group = [
+                r
+                for r in rows
+                if r["trajectory"] == trajectory and r["subdivision"] == subdivisions
+            ]
+            center = next(r for r in group if r["perturbation_K"] == 0)
+            if center["verified"] and center.get("steps"):
+                value = center["steps"][-1]["tangent"]["velocity_response_nodal_norm_m_s_per_K"]
+                x.append(subdivisions)
+                y.append(value)
+                good = sum(r["verified"] for r in group)
+                ax.annotate(
+                    f"{good}/3",
+                    (subdivisions, value),
+                    xytext=(0, 9),
+                    textcoords="offset points",
+                    ha="center",
+                    fontsize=9,
+                )
+        ax.semilogy(x, y, "o-", color="#0072B2")
+        ax.set_title(title, fontsize=10)
+        ax.set_xticks([1, 2, 4])
+        ax.set_xlabel("Substeps per original interval")
+        ax.grid(alpha=0.2)
+    axes[0].set_ylabel(
+        r"Nodal sensitivity norm $\|d\mathbf{v}/d\epsilon\|_2$ [m s$^{-1}$ K$^{-1}$]"
+    )
+    fig.text(
+        0.5,
+        0.02,
+        "Labels count verified momentum solves at −1, 0 and +1 μK. Local interval diagnostic; no optimization timing.",
+        ha="center",
+        fontsize=9,
+    )
+    fig.tight_layout(rect=(0, 0.065, 1, 1))
+    for extension in ("pdf", "png"):
+        fig.savefig(directory / f"interval_refinement.{extension}", dpi=180)
+    plt.close(fig)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sequences", type=Path, nargs=6, required=True)
     parser.add_argument("--intervals", type=Path, nargs=27, required=True)
     parser.add_argument("--replay-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--plot", action="store_true")
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError("Preserve the previous study summary")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
     design = [(f, n) for f in PROTOCOL["transport_forms"] for n in PROTOCOL["time_slabs"]]
     rows = [
         sequence_row(p, f, n, args.replay_root)
         for p, (f, n) in zip(args.sequences, design, strict=True)
     ]
+    intervals = local_rows(args.intervals)
     write_report(
         args.output,
         {
             "schema": "coupled-discretization-summary-v1",
             "environment": environment(),
             "sequences": rows,
-            "local": local_rows(args.intervals),
+            "local": intervals,
             "decision": select(rows),
         },
     )
+    if args.plot:
+        plot_local(intervals, args.output.parent)
 
 
 if __name__ == "__main__":
