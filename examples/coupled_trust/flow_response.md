@@ -101,3 +101,42 @@ equations and adjoints, and the final KKT components. A numerical convergence
 result requires subsequent independent derivative checks and complete
 comparisons before it can support a revised optimization claim. Diagnostic
 restart times are separate from the cost of solving the original sequence.
+
+## Matched flow-branch restart
+
+After the complete trajectory check, select either assessed flow explicitly:
+
+```bash
+uv run --extra study python -m deflation_example.coupled_radius_restart \
+  --record RESULTS/record.json --position 1 \
+  --branch-assessment flow-branch-check/record.json --initial-branch retained \
+  --minimum-radius-K 1e-10 --outer-cap 100 --budget-seconds 7200 \
+  --output branch-restart-retained
+uv run --extra study python -m deflation_example.coupled_radius_restart \
+  --record RESULTS/record.json --position 1 \
+  --branch-assessment flow-branch-check/record.json --initial-branch alternate_seed \
+  --minimum-radius-K 1e-10 --outer-cap 100 --budget-seconds 7200 \
+  --output branch-restart-alternative
+```
+
+Both commands use the identical initial temperature and unchanged physical
+inputs. They load the complete assessed flow trajectory and recover the control
+through the thermal equations. The selected flow must survive fresh evaluation
+and optimizer initialization: its nodal velocity distance from the selected
+seed must remain below one tenth of the assessed branch separation plus
+1e-12 m/s. This measures initialization consistency; it does not select a
+physical branch or constrain later iterates to a prescribed velocity.
+
+The two-hour budget covers optimization. Initial verification and final checks
+have separate intervals within the total diagnostic time. Complete checkpoints
+include the retained temperature, flows, objective, KKT components, secant
+history, quadratic state, and remaining-radius policy, bound to the source and
+input checksums. Initial branches, previous attempts, and output directories
+remain separate.
+
+The output recomputes the objective, gradient, and KKT components at the returned
+state. A converged restart additionally runs the existing three-step-size
+directional and adjoint verification. `gpu_gate_passed` requires all final
+checks. Budget exhaustion, branch loss during initialization, and verification
+failures remain explicit outcomes. GPU comparisons proceed only after this
+gate; a decrease in objective alone cannot establish optimization convergence.
