@@ -140,3 +140,16 @@ directional and adjoint verification. `gpu_gate_passed` requires all final
 checks. Budget exhaustion, branch loss during initialization, and verification
 failures remain explicit outcomes. GPU comparisons proceed only after this
 gate; a decrease in objective alone cannot establish optimization convergence.
+
+Generate the paired summary and figure after both arms terminate:
+
+```bash
+uv run --extra study --extra plot python -m deflation_example.coupled_branch_restart_report \
+  --records branch-restart-retained/record.json branch-restart-alternative/record.json \
+  --plot --output branch-restart-summary
+```
+
+The summary checks the common physical inputs, source and restart policy,
+verifies returned-field checksums, and retains both termination statuses.
+The figure reports retained-state histories without treating unsuccessful
+restarts as completed optimization timings.
