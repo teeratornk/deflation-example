@@ -127,7 +127,12 @@ def sequence_row(directory, form, slabs, replay_root):
             replays.append(item)
             p = folder / "verification.json"
             if not p.exists():
+                termination = folder / "execution.json"
                 item["status"] = "pending"
+                if termination.exists():
+                    execution = json.loads(termination.read_text())
+                    item["status"] = "verification_missing_after_termination"
+                    item["execution"] = execution
                 continue
             audit = json.loads(p.read_text())
             if (

@@ -244,3 +244,46 @@ coarsest configuration meeting every optimization, derivative and replay
 criterion. It prefers the advective form on a grid tie and never uses elapsed
 time for this selection. Missing or unsuccessful comparisons stay visible.
 If none passes, the bounded study ends without a GPU speedup claim.
+
+Add `--plot` to write `interval_refinement.pdf` and its PNG counterpart beside
+the summary. The annotations retain the number of successful signed
+perturbations, including failed original-step cases.
+
+An initial-flow failure can be reproduced separately without rerunning the
+optimizer or changing its criterion:
+
+```bash
+uv run --extra study python -m deflation_example.coupled_initial_flow \
+  --record sequence-advective-16/record.json --output initial-flow-check
+```
+
+This diagnostic saves the returned flow and every Newton residual. It also
+evaluates that same field using extended accumulation and a separated storage
+term. Those comparisons investigate cancellation; they do not replace the
+original final residual or change a failed status.
+
+Only a completed six-case summary with action `gpu_feasibility` enables the
+GPU comparison. Allocate one GPU per run and use all five declared arms:
+
+```bash
+for arm in rank0 reference8 reference16 recycling8 recycling16; do
+  uv run --extra study --extra coupled-gpu python -m deflation_example.coupled_discretization_gpu \
+    --summary SUMMARY.json --cpu-sequence SELECTED_SEQUENCE --replay-root replays \
+    --arm "$arm" --repetition 0 --output "gpu-feasibility/$arm"
+done
+```
+
+The hybrid backend keeps momentum factors and individual sparse solves on the
+CPU and coarse processing on the GPU. The five arms share the selected
+physical problem, initial states, three-sweep preconditioner, stopping rules
+and complete timing boundary. Recycling retains a 48-direction window and
+the existing coarse information. The fixed references retain 8 or 16
+directions from the declared 48-step initial-trajectory construction. All
+construction and update work is charged. These small-rank comparisons are
+distinct from a wholly device-resident flow solver.
+
+After all five feasibility runs pass, use repetitions 1 through 5, supply
+`--feasibility-root gpu-feasibility`, and choose a new output directory for
+each run. The driver checks the numerical source and all feasibility records
+before permitting repeated timings. Every arm keeps the eight-hour budget;
+unsuccessful runs remain outcomes rather than completed-solve speedups.

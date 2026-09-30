@@ -133,3 +133,40 @@ def test_local_figure_retains_all_trajectory_labels_and_failed_counts(tmp_path):
     plot_local(records, tmp_path)
     assert (tmp_path / "interval_refinement.pdf").stat().st_size > 0
     assert (tmp_path / "interval_refinement.png").stat().st_size > 0
+
+
+@pytest.mark.parametrize("arm", ["rank0", "reference8", "reference16", "recycling8", "recycling16"])
+def test_gpu_arms_keep_the_selected_physics_accuracy_and_start_policy(arm):
+    from deflation_example.coupled_discretization_gpu import ARMS, configuration
+    from deflation_example.coupled_discretization import configuration as cpu_configuration
+    from test_coupled_discretization import source
+
+    cpu = cpu_configuration(source(), "skew", 64)
+    before = copy.deepcopy(cpu)
+    result = configuration(cpu, arm, 0)
+    assert cpu == before
+    for key in (
+        "queries",
+        "slabs",
+        "transport_form",
+        "inner_tolerance",
+        "nonlinear_tolerance",
+        "flow_tolerance",
+        "initial_state_policy",
+        "initial_radius_K",
+        "minimum_radius_K",
+        "inner_preconditioner",
+        "frozen_sweeps",
+        "alpha",
+        "capture_trials",
+    ):
+        assert result[key] == cpu[key]
+    assert (result["method"], result["rank"]) == ARMS[arm]
+    assert result["device"] == "hybrid" and result["recycle_window"] == 48
+
+
+def test_gpu_repeat_requires_every_feasibility_record(tmp_path):
+    from deflation_example.coupled_discretization_gpu import require_feasibility
+
+    with pytest.raises(FileNotFoundError):
+        require_feasibility(tmp_path, {}, {})
