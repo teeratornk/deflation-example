@@ -190,3 +190,14 @@ def test_independent_validation_accepts_the_skew_transformer_subproblem():
 
     result = validate("physical", "skew")
     assert result["success"]
+
+
+def test_cartesian_transport_is_skew_symmetric_and_the_operator_energy_stable():
+    from deflation_example.problems import cht_operator, build_problem
+
+    problem = build_problem("cht", 12)
+    diffusion, transport = cht_operator(12, problem.coordinates)
+    # The velocity depends only on x3 and points along x1: central differences are skew.
+    assert abs(transport + transport.T).max() == 0
+    negative, zero, positive = inertia(0.5 * (problem.A + problem.A.T))
+    assert negative == 0 and zero == 0 and positive == 12**3
