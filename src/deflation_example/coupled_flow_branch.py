@@ -15,7 +15,7 @@ from scipy.sparse.linalg import splu
 from threadpoolctl import threadpool_limits
 
 from .axisymmetric_flow import FlowResult
-from .coupled_flow_response import response_case
+from .coupled_flow_response import acceleration_at, response_case
 from .coupled_optimize import load_problem
 from .reporting import environment, file_sha256, write_arrays, write_report
 
@@ -52,6 +52,56 @@ def curvature_projection(tangent, inverse_curvature, velocity_size):
         "predicted_turning_step_K": -1 / (4 * coefficient),
         "nonzero_zero_load_seed_parameter_K": -1 / coefficient,
         "scope": "One-direction quadratic approximation used only to select Newton seeds.",
+    }
+
+
+def root_checks(problem, root, previous, state, slab, direction, reference_tangent):
+    """Reassemble residual, Newton correction and the signed local response.
+
+    A small Newton correction is a local numerical check, not a rigorous error
+    bound for an ill-conditioned nonlinear system.
+    """
+    flow, free = problem.flow, problem.flow_free
+    dt = float(problem.physical_steps[slab])
+    acceleration = acceleration_at(problem, state, slab, direction, 0.0)
+    load = flow.load(acceleration) + flow.mass @ previous / dt
+    rhs = np.r_[load[:, 0], load[:, 1], np.zeros(flow.np)]
+    x = np.r_[root.velocity[:, 0], root.velocity[:, 1], root.pressure]
+    operator = flow.operator(root.velocity, time_step=dt)
+    residual = (operator @ x - rhs)[free]
+    jacobian = (operator + flow.convection_derivative(root.velocity))[free][:, free].tocsc()
+    scaling = 1 / np.maximum(abs(jacobian).max(axis=1).toarray().ravel(), np.finfo(float).tiny)
+    factor = splu((sparse.diags(scaling) @ jacobian).tocsc())
+    correction = np.zeros(flow.size)
+    correction[free] = factor.solve(-scaling * residual)
+    force = flow.load(flow.buoyancy(direction, 0.0, problem.expansion))
+    tangent_rhs = np.r_[force[:, 0], force[:, 1], np.zeros(flow.np)][free]
+    tangent = np.zeros(flow.size)
+    tangent[free] = factor.solve(scaling * tangent_rhs)
+    velocity = tangent[: 2 * flow.nv]
+    reference = reference_tangent[: 2 * flow.nv]
+    cosine = float(velocity @ reference) / max(
+        np.linalg.norm(velocity) * np.linalg.norm(reference), 1e-30
+    )
+    checks = flow.verify(
+        root,
+        acceleration,
+        problem.boundary_indices,
+        problem.boundary_values,
+        previous=previous,
+        time_step=dt,
+        pressure_gauge=problem.pressure_gauge,
+    )
+    return {
+        "independent_residuals": checks,
+        "newton_velocity_correction_norm_m_s": float(np.linalg.norm(correction[: 2 * flow.nv])),
+        "tangent_velocity_norm_m_s_per_K": float(np.linalg.norm(velocity)),
+        "tangent_velocity_cosine_with_retained": cosine,
+        "tangent_linear_relative_residual": float(
+            np.linalg.norm(jacobian @ tangent[free] - tangent_rhs)
+            / max(np.linalg.norm(tangent_rhs), 1e-30)
+        ),
+        "scope": "Fresh local Newton correction and response; no rigorous nonlinear error certificate.",
     }
 
 
@@ -117,6 +167,9 @@ def main():
             flow, free = problem.flow, problem.flow_free
             retained = FlowResult(velocities[slab], pressures[slab], "saved", [])
             previous = velocities[slab - 1]
+            report["retained_root_checks"] = root_checks(
+                problem, retained, previous, state, slab, direction, tangent
+            )
             matrix = flow.operator(retained.velocity, time_step=float(problem.physical_steps[slab]))
             matrix = (matrix + flow.convection_derivative(retained.velocity))[free][:, free].tocsc()
             scaling = 1 / np.maximum(
@@ -158,6 +211,10 @@ def main():
                     budget_seconds=180,
                 )
                 row.update(metrics)
+                if row["verified"]:
+                    row["root_checks"] = root_checks(
+                        problem, result, previous, state, slab, direction, tangent
+                    )
                 path = args.output / f"case-{index:02d}.npz"
                 write_arrays(path, velocity=result.velocity, pressure=result.pressure)
                 row["field_sha256"] = file_sha256(path)
