@@ -33,6 +33,20 @@ Perturbed temperatures are diagnostic inputs; they are not clipped to the
 optimization bounds. A change in flow branch must be distinguished from a
 derivative error before using these results to modify the optimizer.
 
+Summarize the three selected slabs and check every saved-field checksum:
+
+```bash
+uv run --extra study --extra plot python -m deflation_example.coupled_flow_response_report \
+  --records flow-response-slab7/record.json flow-response-slab8/record.json \
+  flow-response-slab9/record.json --plot --output flow-response-summary
+```
+
+The summary retains all initial-guess and continuation outcomes. The figure
+compares the signed direct perturbations with the analytic tangent. Its
+velocity norm is a Euclidean norm of nodal values; it is not a spatially
+weighted norm. Unsuccessful solves appear as explicit status annotations,
+without an inferred sensitivity value.
+
 ## Matched trust-radius restart
 
 After diagnosing a restricted local response range, this bounded comparison
