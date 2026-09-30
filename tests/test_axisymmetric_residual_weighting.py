@@ -16,7 +16,12 @@ from test_axisymmetric_flow import annular_rectangle
 
 @pytest.mark.parametrize("axisymmetric", [False, True])
 @pytest.mark.parametrize("quadratic", [False, True])
-def test_cell_stabilization_is_the_integrated_strong_residual(axisymmetric, quadratic):
+@pytest.mark.parametrize("transport_form", ["advective", "skew"])
+def test_cell_stabilization_is_the_integrated_strong_residual(
+    axisymmetric, quadratic, transport_form
+):
+    if transport_form == "skew" and not quadratic:
+        pytest.skip("The declared skew form requires a quadratic velocity")
     base = annular_rectangle(2)
     mesh = ThermalMesh(base.nodes, base.cells, base.materials, base.dirichlet, axisymmetric)
     vertices = mesh.nodes[mesh.cells]
@@ -39,7 +44,9 @@ def test_cell_stabilization_is_the_integrated_strong_residual(axisymmetric, quad
         )
         velocity = field(np.concatenate((vertices, mids), axis=1))
     sampled = field(points) if quadratic else np.broadcast_to(center[:, None], points.shape)
-    built = assemble_thermal(mesh, k, capacity, velocity, streamline=True, consistent=True)
+    built = assemble_thermal(
+        mesh, k, capacity, velocity, streamline=True, consistent=True, transport_form=transport_form
+    )
     h = np.max(np.linalg.norm(vertices[:, :, None] - vertices[:, None, :], axis=3), axis=(1, 2))
     tau = np.minimum(
         h / (2 * capacity * np.linalg.norm(center, axis=1)),
@@ -54,6 +61,14 @@ def test_cell_stabilization_is_the_integrated_strong_residual(axisymmetric, quad
     state = mesh.nodes[:, 0] + 0.3 * mesh.nodes[:, 1]
     gradient = np.array([1.0, 0.3])
     residual = capacity[:, None] * np.einsum("eqd,d->eq", sampled, gradient)
+    if transport_form == "skew":
+        # Analytic divergence of the prescribed quadratic field, independent
+        # of the shape-gradient implementation in the thermal assembly.
+        divergence = 0.4 * points[:, :, 1]
+        if axisymmetric:
+            divergence += sampled[:, :, 0] / points[:, :, 0]
+        temperature = points[:, :, 0] + 0.3 * points[:, :, 1]
+        residual += 0.5 * capacity[:, None] * divergence * temperature
     if axisymmetric:
         residual -= np.einsum("ed,d->e", k[:, 0, :], gradient)[:, None] / points[:, :, 0]
     local = test_weight * np.sum(measure * residual, axis=1)[:, None]
@@ -95,9 +110,9 @@ def test_weighted_velocity_derivative_includes_radial_and_quadratic_terms(speed)
     np.testing.assert_allclose(derivative @ packed, measured, rtol=2e-7, atol=2e-9)
 
 
-def test_weighted_skew_form_requires_an_explicit_reaction_residual():
+def test_weighted_skew_and_advective_forms_coincide_at_zero_velocity():
     mesh = annular_rectangle(2)
-    with pytest.raises(ValueError, match="requires advective"):
+    assemblies = [
         assemble_thermal(
             mesh,
             np.tile(np.eye(2), (len(mesh.cells), 1, 1)),
@@ -105,5 +120,11 @@ def test_weighted_skew_form_requires_an_explicit_reaction_residual():
             np.zeros((len(mesh.cells), 6, 2)),
             streamline=True,
             consistent=True,
-            transport_form="skew",
+            transport_form=form,
+        )
+        for form in ("advective", "skew")
+    ]
+    for name in ("stiffness", "storage", "source_action"):
+        np.testing.assert_array_equal(
+            getattr(assemblies[0], name).toarray(), getattr(assemblies[1], name).toarray()
         )

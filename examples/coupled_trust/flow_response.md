@@ -153,3 +153,94 @@ The summary checks the common physical inputs, source and restart policy,
 verifies returned-field checksums, and retains both termination statuses.
 The figure reports retained-state histories without treating unsuccessful
 restarts as completed optimization timings.
+
+## Momentum time refinement and complete discretization study
+
+The next comparison separates the local momentum response from complete
+optimization and fixed-control time refinement. It leaves the archived
+trajectories unchanged. Run these commands on a compute node.
+
+For the nominal target-7 trajectory and the two target-8 branch restarts,
+integrate the ninth original interval using one, two or four substeps. The
+temperature varies linearly between its saved endpoints; perturb its final
+value by -1e-6, 0 or 1e-6 K along the same normalized target-difference
+direction. The velocity at the interval start stays fixed. Subsequent
+substeps use their computed predecessor, including in the sensitivity equation.
+
+```bash
+uv run --extra study python -m deflation_example.coupled_interval_refinement \
+  --record branch-restart-retained/record.json --position 1 \
+  --direction-record RESULTS/record.json --slab 8 --subdivision 2 \
+  --perturbation-K=1e-6 --output interval-retained-2-plus
+```
+
+Use `RESULTS/record.json --position 0` for the nominal trajectory and the
+alternative restart record for the third trajectory. Retain all 27
+combinations. Each interval has a 900 s limit. A local root or a smaller
+sensitivity alone does not establish convergence of the thermal optimizer.
+
+The complete comparison uses both thermal transport forms and 16, 32 and
+64 time slabs at the original 600 s horizon. All six sequences retain the
+60 s target startup, targets 7/8/9, physical properties, momentum equations,
+boundary data, control regularization and temperature bounds. The first
+target starts from the physical initial temperature and baseline flow;
+subsequent targets use their verified predecessor.
+
+```bash
+for form in advective skew; do
+  for slabs in 16 32 64; do
+    uv run --extra study python -m deflation_example.coupled_discretization \
+      --source-record RESULTS/record.json --transport "$form" --slabs "$slabs" \
+      --output "sequence-$form-$slabs"
+  done
+done
+```
+
+Each sequence has an eight-hour budget and 200 outer iterations per target.
+The initial trust radius is 0.25 K, its minimum is 1e-10 K, and rank-zero CG
+uses the three-sweep velocity-frozen preconditioner. The final inner residual,
+KKT and momentum tolerances remain 1e-10, 1e-8 and 1e-12. Global mass and
+energy checks retain their 1e-6 threshold. Local mass imbalances are recorded
+separately: Taylor--Hood weak continuity does not imply exact cellwise balance.
+
+The skew thermal form includes half the discrete velocity divergence times
+temperature. Its streamline test weights that same term, along with
+advection, diffusion, storage and sources. The implementation differentiates
+both the Galerkin and weighted divergence contributions. Directional and
+transpose tests cover each form; completed sequences receive independent
+derivative checks at every returned target. These are new discretization
+comparisons, separate from the earlier advective timing records.
+
+For each sequence that passes optimization and independent verification,
+replay all three saved controls with subdivisions two and four. Use a new
+directory for every target and subdivision:
+
+```bash
+uv run --extra study python -m deflation_example.coupled_newton_replay \
+  --baseline BASELINE --optimization sequence-advective-32 --method jacobi \
+  --target-position 0 --subdivision 2 --tolerance 1e-12 --cap 30 \
+  --time-scheme backward_euler --line-search equation_max --backtrack-cap 21 \
+  --output replays/advective-32-target-0-x2
+uv run --extra study python -m deflation_example.coupled_discretization_replay \
+  --optimization sequence-advective-32 \
+  --forward replays/advective-32-target-0-x2 --position 0 \
+  --output replays/advective-32-target-0-x2/verification.json
+```
+
+The saved signed source is constant on each original interval and is copied
+unchanged to its subdivisions. Temperature is neither clipped nor reoptimized.
+The check recomputes the coupled equations from saved fields. It compares
+every refined temperature with linear interpolation of the optimized
+trajectory, including the initial condition, and reports maximum and
+mass-weighted RMS differences together with bound violations. A difference
+below 0.05 K is a discrete sensitivity criterion, not a physical error bound.
+
+Summarize all six sequences and 27 local cases with
+`python -m deflation_example.coupled_discretization_report --help`.
+Supply sequences in advective-16/32/64 then skew-16/32/64 order; supply local
+cases in nominal/retained/alternative, subdivision-1/2/4, perturbation-minus/zero/plus
+order. The summary waits for the full declared population and selects the
+coarsest configuration meeting every optimization, derivative and replay
+criterion. It prefers the advective form on a grid tie and never uses elapsed
+time for this selection. Missing or unsuccessful comparisons stay visible.
+If none passes, the bounded study ends without a GPU speedup claim.
