@@ -437,6 +437,84 @@ def transfer_rows(root):
     return "\n".join(lines) + "\n", records
 
 
+# (study, horizon, transport, summary folder, replay folders of the finest-grid controls)
+TEMPORAL = [
+    (
+        "Transformer",
+        "600 s",
+        "skew",
+        "temporal/T-transformer-600s-skew",
+        [
+            "temporal/T-transformer-600s-skew-replay-case-04",
+            "temporal/T-transformer-600s-skew-replay-case-09",
+        ],
+    ),
+    ("Transformer", "1 h", "skew", "temporal/hour-skew", []),
+    (
+        "Bore 1",
+        "0.1",
+        "swirl",
+        "temporal/T-engine-L1",
+        ["temporal/T-engine-L1-replay-case-04", "temporal/T-engine-L1-replay-case-09"],
+    ),
+    ("Transformer", "600 s", "original", "temporal/published-600s-advective", []),
+    ("Transformer", "1 h", "original", "temporal/hour-advective", []),
+]
+TEMPORAL_SLABS = 8
+
+
+def _kelvin(values):
+    return f"{max(values):.2f}" if values else "--"
+
+
+def temporal_rows(root):
+    """Time refinement at the timed slab count and replays of the finest-grid controls."""
+    root = Path(root)
+    lines, values = [], {}
+    for study, horizon, form, folder, replays in TEMPORAL:
+        rows = json.loads((root / folder / "summary.json").read_text())["rows"]
+        at = [r for r in rows if r.get("verified") and r["slabs"] == TEMPORAL_SLABS]
+        verified = sum(bool(r.get("verified")) for r in rows)
+        difference = [
+            r["temperature_max_difference_K"]
+            for r in at
+            if r.get("temperature_max_difference_K") is not None
+        ]
+        rms = [
+            r["temperature_rms_difference_K"]
+            for r in at
+            if r.get("temperature_rms_difference_K") is not None
+        ]
+        change = [r["replay"]["temperature_change_max_K"] for r in at if r.get("replay")]
+        exceed = [r["replay"]["maximum_bound_violation_K"] for r in at if r.get("replay")]
+        finest = []
+        for replay in replays:
+            summary = json.loads((root / replay / "summary.json").read_text())
+            finest.append(summary["rows"][-1]["maximum_bound_violation_K"])
+        cells = [
+            study,
+            horizon,
+            form,
+            f"{verified}/{len(rows)}",
+            _kelvin(difference),
+            _kelvin(rms),
+            _kelvin(change),
+            _kelvin(exceed),
+            _kelvin(finest),
+        ]
+        lines.append(" & ".join(cells) + r" \\")
+        values[f"{study}|{horizon}|{form}"] = {
+            "verified": verified,
+            "cases": len(rows),
+            "difference": difference,
+            "rms": rms,
+            "change": change,
+            "exceedance": exceed,
+            "finest_control_exceedance": finest,
+        }
+    return "\n".join(lines) + "\n", values
+
+
 def primary_components(root):
     """Cost components of the median-time repetition per primary case and method."""
     found = populations(root)
@@ -488,6 +566,7 @@ def export(root, output):
         "direct_rows": direct_rows(summary),
         "support_validation_rows": validation_rows(root),
         "support_transfer_rows": transfer_rows(root),
+        "temporal_rows": temporal_rows(root),
     }.items():
         (output / f"generated/{name}.tex").write_text(text)
         written[name] = values
