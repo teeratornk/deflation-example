@@ -6,9 +6,64 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from deflation_example.coupled_discretization_report import local_rows, select
+from deflation_example.coupled_discretization_report import (
+    local_rows,
+    select,
+    verified_optimization,
+)
 from deflation_example.coupled_discretization_replay import temperature_statistics
 from deflation_example.reporting import write_report
+
+
+def projected_sequence():
+    from test_coupled_projected_report import record
+
+    result = record()
+    first = result["cases"][0]
+    result["configuration"]["queries"] = [{"target": t} for t in (7, 8, 9)]
+    result["cases"] = [
+        {**copy.deepcopy(first), "position": i, "target": t} for i, t in enumerate((7, 8, 9))
+    ]
+    return result
+
+
+def test_sequence_gate_uses_projected_accuracy_and_leaves_source_unchanged():
+    result = projected_sequence()
+    original = copy.deepcopy(result)
+    assert verified_optimization(result)
+    # The frozen protocol allows 1e-2 intermediate targets, followed by 1e-10.
+    attempt = result["cases"][0]["history"][0]["attempts"][0]
+    assert attempt["linear_tolerance"] == 0.01
+    assert "candidate_retained" not in attempt["qp_history"][0]
+    assert result == original
+
+
+@pytest.mark.parametrize("position", range(3))
+@pytest.mark.parametrize("attempt", [0, 1])
+def test_sequence_gate_checks_each_original_residual_without_pdas_flags(position, attempt):
+    result = projected_sequence()
+    row = result["cases"][position]["history"][0]["attempts"][attempt]
+    row["qp_history"][0]["linear_residual"] = 2 * row["linear_tolerance"]
+    assert not verified_optimization(result)
+
+
+@pytest.mark.parametrize("position", range(3))
+def test_sequence_gate_requires_the_final_strict_phase_for_each_target(position):
+    result = projected_sequence()
+    result["cases"][position]["history"][0]["attempts"].pop()
+    assert not verified_optimization(result)
+
+
+def test_sequence_gate_keeps_timing_coverage_and_final_accuracy_checks():
+    result = projected_sequence()
+    result["components_seconds"]["optimization"] += 1
+    assert not verified_optimization(result)
+    result = projected_sequence()
+    result["cases"][1]["kkt"]["stationarity"] = 1e-7
+    assert not verified_optimization(result)
+    result = projected_sequence()
+    result["cases"][1]["target"] = 7
+    assert not verified_optimization(result)
 
 
 def rows():

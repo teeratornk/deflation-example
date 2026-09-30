@@ -7,12 +7,18 @@ from pathlib import Path
 import numpy as np
 
 from .coupled_discretization import PROTOCOL
-from .coupled_optimize import adjoint_acceptance, equation_acceptance
-from .coupled_trust_gate import inner_accuracy
+from .coupled_projected_report import audit as projected_audit
 from .reporting import environment, file_sha256, write_report
 
 
 def verified_optimization(record):
+    """Apply the projected protocol, including intermediate and final accuracy.
+
+    The earlier PDAS audit caps intermediate tolerances at 1e-4. This study uses
+    adaptive projected solves with targets up to 1e-2 and a final strict phase.
+    The projected audit checks every original residual, even though projected
+    histories do not contain the PDAS-specific candidate_retained flag.
+    """
     cfg = record["configuration"]
     cases = record.get("cases", [])
     return bool(
@@ -20,18 +26,9 @@ def verified_optimization(record):
         and record.get("all_problems_verified") is True
         and len(cases) == 3
         and [r["target"] for r in cases] == PROTOCOL["targets"]
-        and all(
-            r["status"] == "converged"
-            and r["verified"]
-            and len(r["kkt"]) == 5
-            and np.isfinite(list(r["kkt"].values())).all()
-            and min(r["kkt"].values()) >= 0
-            and max(r["kkt"].values()) <= 1e-8
-            and equation_acceptance(r["equations"], cfg)
-            and adjoint_acceptance(r["adjoint"])
-            and inner_accuracy(r, cfg)
-            for r in cases
-        )
+        and cfg.get("qp_solver") == "projected"
+        and cfg.get("trust_accuracy") == "adaptive_projected"
+        and projected_audit(record)["verified"]
     )
 
 

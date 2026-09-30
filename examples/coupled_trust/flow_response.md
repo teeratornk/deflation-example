@@ -203,6 +203,13 @@ KKT and momentum tolerances remain 1e-10, 1e-8 and 1e-12. Global mass and
 energy checks retain their 1e-6 threshold. Local mass imbalances are recorded
 separately: Taylor--Hood weak continuity does not imply exact cellwise balance.
 
+Intermediate projected solves use adaptive targets up to 1e-2. The summary
+checks their independently recomputed residuals against those targets and
+requires a final strict phase at 1e-10, together with the final nonlinear
+and coupled-equation checks. It uses the projected-solver audit; the earlier
+PDAS audit has a different intermediate tolerance policy. Updating this
+reporting check does not change the frozen numerical runs.
+
 The skew thermal form includes half the discrete velocity divergence times
 temperature. Its streamline test weights that same term, along with
 advection, diffusion, storage and sources. The implementation differentiates
