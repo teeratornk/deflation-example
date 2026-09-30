@@ -49,12 +49,15 @@ def transformer_subproblem(assembly):
     )
 
 
-def validate(settings="physical"):
+def validate(settings="physical", transformer_transport="advective"):
     if settings not in {"physical", "algebraic"}:
         raise ValueError("Choose physical or algebraic verification settings")
     rows = []
     for geometry, alpha, bound in (("engine_3d", 1e-6, 0.2), ("transformer_2d", 1e-14, 0.8)):
-        showcase = build_showcase(geometry)
+        showcase = build_showcase(
+            geometry,
+            transport_form=transformer_transport if geometry == "transformer_2d" else "advective",
+        )
         a = showcase.assembly
         horizon = (
             0.1
@@ -154,10 +157,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--settings", choices=("physical", "algebraic"), default="physical")
+    parser.add_argument("--transformer-transport", choices=("advective", "skew"),
+                        default="advective")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     with threadpool_limits(4):
-        result = validate(args.settings)
+        result = validate(args.settings, args.transformer_transport)
+        result["transformer_transport"] = args.transformer_transport
     write_report(args.output / "validation.json", result)
     raise SystemExit(0 if result["success"] else 1)
 

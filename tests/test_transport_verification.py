@@ -183,3 +183,10 @@ def test_bore_in_block_operator_is_energy_stable_on_the_first_refinement():
     a = build_showcase("engine_3d", level=1).assembly
     negative, zero, _ = inertia(symmetric_free(a.stiffness, a.mesh.free))
     assert negative == 0 and zero == 0
+
+
+def test_independent_validation_accepts_the_skew_transformer_subproblem():
+    from deflation_example.validate_mesh import validate
+
+    result = validate("physical", "skew")
+    assert result["success"]
