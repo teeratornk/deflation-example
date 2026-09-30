@@ -335,6 +335,19 @@ def primary_rows(summary):
     return "\n".join(lines) + "\n", values
 
 
+def primary_memory_rows(summary):
+    """Largest sampled GPU process allocation (GiB) of each method in the primary cases."""
+    lines = []
+    for geometry, form, key in PRIMARY_ROWS:
+        methods = summary[key]["methods"]
+        cells = [geometry, form] + [
+            f"{methods[m]['peak_gpu_bytes'] / 2**30:.3f}"
+            for m in ("jacobi", "reference", "recycling", "amgx")
+        ]
+        lines.append(" & ".join(cells) + r" \\")
+    return "\n".join(lines) + "\n", None
+
+
 def direct_rows(summary):
     saved = v20.DIRECT_ROWS
     try:
@@ -565,6 +578,7 @@ def export(root, output):
         "single_rows": diagnostic_rows(summary, SINGLE_ROWS),
         "original_rows": diagnostic_rows(summary, ORIGINAL_ROWS),
         "direct_rows": direct_rows(summary),
+        "primary_memory_rows": primary_memory_rows(summary),
         "support_validation_rows": validation_rows(root),
         "support_transfer_rows": transfer_rows(root),
         "temporal_rows": temporal_rows(root),
