@@ -96,10 +96,22 @@ def minimize_trust(
     checkpoint=None,
     resume=None,
     budget_seconds=86400.0,
+    initial_radius_K=None,
+    minimum_radius_K=None,
 ):
     start = time.perf_counter()
     tolerance = positive_real(tolerance, "Nonlinear tolerance")
     budget_seconds = positive_real(budget_seconds, "Optimization time budget")
+    initial_radius = positive_real(
+        POLICY["initial_radius_K"] if initial_radius_K is None else initial_radius_K,
+        "Initial trust radius",
+    )
+    minimum_radius = positive_real(
+        POLICY["minimum_radius_K"] if minimum_radius_K is None else minimum_radius_K,
+        "Minimum trust radius",
+    )
+    if not minimum_radius <= initial_radius <= POLICY["maximum_radius_K"]:
+        raise ValueError("Trust radii must satisfy minimum <= initial <= maximum")
     if solver.device not in {"cpu", "cuda"}:
         raise ValueError("The coupled trust-region runtime requires a supported vector kernel")
     if solver.device == "cuda":
@@ -128,11 +140,17 @@ def minimize_trust(
         raise ValueError("Unknown quadratic correction policy")
     if trial_callback is not None and not callable(trial_callback):
         raise ValueError("The trial callback must be callable")
-    radius, history, secants = POLICY["initial_radius_K"], [], []
+    radius, history, secants = initial_radius, [], []
     iteration, attempts, qp_resume = 0, [], None
     prior_seconds = 0.0
     pending_qp = None
     if resume is not None:
+        for name, value in (
+            ("initial_radius_K", initial_radius),
+            ("minimum_radius_K", minimum_radius),
+        ):
+            if resume.get(name, POLICY[name]) != value:
+                raise ValueError("Checkpoint trust-radius policy differs")
         if (
             resume.get("qp_solver", "pdas") != qp_solver
             or resume.get("accuracy", accuracy) != accuracy
@@ -147,7 +165,7 @@ def minimize_trust(
         radius, history, secants = resume["radius_K"], resume["history"], resume["secants"]
         iteration, attempts, qp_resume = resume["iteration"], resume["attempts"], resume["qp"]
         prior_seconds = resume["elapsed_seconds"]
-        if not POLICY["minimum_radius_K"] <= radius <= POLICY["maximum_radius_K"]:
+        if not minimum_radius <= radius <= POLICY["maximum_radius_K"]:
             raise ValueError("Invalid checkpoint trust radius")
     y = np.zeros(problem.size) if initial is None else np.asarray(initial, dtype=float).copy()
     if y.shape != (problem.size,) or not np.isfinite(y).all():
@@ -181,6 +199,8 @@ def minimize_trust(
                     "stationarity_scale": retained_scale,
                     "stationarity_numerator": retained_kkt["stationarity"] * retained_scale,
                     "radius_K": radius,
+                    "initial_radius_K": initial_radius,
+                    "minimum_radius_K": minimum_radius,
                     "iteration": iteration,
                     "history": list(history),
                     "secants": list(secants),
@@ -383,7 +403,7 @@ def minimize_trust(
                             "evaluation_seconds": trial.seconds,
                         }
                         if accepted and backtrack:
-                            radius = max(POLICY["minimum_radius_K"], min(radius, 2 * physical_step))
+                            radius = max(minimum_radius, min(radius, 2 * physical_step))
                         elif accepted and not roundoff:
                             radius = new_radius
                     except FlowEvaluationError as failure:
@@ -443,7 +463,7 @@ def minimize_trust(
                     callback(row, evaluation)
                 iteration += 1
                 attempts = []
-            if radius < POLICY["minimum_radius_K"]:
+            if radius < minimum_radius:
                 status = "trust_radius_exhausted"
                 break
             save()

@@ -28,6 +28,46 @@ def test_radius_rules():
     assert radius_update(0.25, 1.0, True, flow_failed=True) == (0.125, False)
 
 
+@pytest.mark.parametrize(
+    "initial,minimum", [(0, 1e-6), (3, 1e-6), (1e-6, 1e-5), (0.1, float("nan"))]
+)
+def test_invalid_explicit_radii_fail_before_model_evaluation(initial, minimum):
+    with pytest.raises(ValueError):
+        minimize_trust(
+            None, None, None, None, None, initial_radius_K=initial, minimum_radius_K=minimum
+        )
+
+
+def test_explicit_radii_are_local_and_bound_to_checkpoints():
+    problem = small_coupled_problem()
+    original = dict(POLICY)
+    saved = []
+
+    class Interrupted(Exception):
+        pass
+
+    def stop(payload):
+        saved.append(copy.deepcopy(payload))
+        raise Interrupted
+
+    with pytest.raises(Interrupted):
+        minimize_trust(
+            problem,
+            np.full(problem.size, 0.2),
+            -0.3,
+            0.3,
+            solver(),
+            initial_radius_K=1e-6,
+            minimum_radius_K=1e-10,
+            checkpoint=stop,
+        )
+    assert POLICY == original
+    assert saved[0]["radius_K"] == 1e-6
+    assert saved[0]["minimum_radius_K"] == 1e-10
+    with pytest.raises(ValueError, match="trust-radius policy differs"):
+        minimize_trust(problem, np.full(problem.size, 0.2), -0.3, 0.3, solver(), resume=saved[0])
+
+
 def test_intermediate_targets_restore_strict_accuracy():
     assert intermediate_targets(1, "strict", 1e-10, 1e-10) == (1e-10, 1e-10, True)
     q, linear, strict = intermediate_targets(1, "adaptive", 1e-10, 1e-10)

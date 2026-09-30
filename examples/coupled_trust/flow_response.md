@@ -32,3 +32,31 @@ speedup. A failed perturbation does not establish that no solution exists.
 Perturbed temperatures are diagnostic inputs; they are not clipped to the
 optimization bounds. A change in flow branch must be distinguished from a
 derivative error before using these results to modify the optimizer.
+
+## Matched trust-radius restart
+
+After diagnosing a restricted local response range, this bounded comparison
+tests the trust-radius floor from the same retained unsuccessful trajectory:
+
+```bash
+uv run --extra study python -m deflation_example.coupled_radius_restart \
+  --record RESULTS/record.json --position 1 --minimum-radius-K 1e-6 \
+  --budget-seconds 1800 --output radius-original
+uv run --extra study python -m deflation_example.coupled_radius_restart \
+  --record RESULTS/record.json --position 1 --minimum-radius-K 1e-10 \
+  --budget-seconds 1800 --output radius-smaller
+```
+
+Both arms start with a 1e-6 K radius, discard the old secant and recycling
+history, and use rank-zero, velocity-frozen preconditioned CG on the CPU.
+The maximum number of outer steps is 40. Each arm retains the physical
+equations, temperature bounds, and final residual and KKT criteria from its
+source record. The default optimization procedure still uses the original
+radius policy. Explicit radius settings are local to a solver call and bind
+its checkpoint identity.
+
+The output preserves terminal fields, trial histories, independently evaluated
+equations and adjoints, and the final KKT components. A numerical convergence
+result requires subsequent independent derivative checks and complete
+comparisons before it can support a revised optimization claim. Diagnostic
+restart times are separate from the cost of solving the original sequence.
