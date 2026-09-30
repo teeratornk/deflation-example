@@ -1,0 +1,596 @@
+{
+  "scale_rows": [
+    {
+      "label": "Cartesian",
+      "detail": "$32^3$",
+      "population": "wave8/G-steady32-device",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$48^3$",
+      "population": "wave8/G-steady48-device",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$64^3$",
+      "population": "wave8/G-steady64-device",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$96^3$",
+      "population": "wave8/G-steady96",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$128^3$",
+      "population": "wave8/G-steady128-retry1",
+      "arm": "reference"
+    },
+    {
+      "label": "Transformer",
+      "detail": "packaged mesh",
+      "population": "wave9/O5-sorted-transformer-steady",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore-in-block",
+      "detail": "Bore 1",
+      "population": "wave12/D-gpu-engine-L1-steady",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore-in-block",
+      "detail": "Bore 2",
+      "population": "wave14/E-engine-L2-steady-ref1-r200",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore-in-block",
+      "detail": "Bore 3",
+      "population": "wave14/E-engine-L3-steady-ref1-r200",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore-in-block",
+      "detail": "Bore 4",
+      "population": "wave8/G-engine-L4-steady-o400",
+      "arm": "reference-ref2"
+    }
+  ],
+  "transient_rows": [
+    {
+      "label": "Cartesian",
+      "detail": "$12^3$, 8 slabs",
+      "population": "wave3/C-S2b-transient12-perslab12",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$16^3$, 8 slabs",
+      "population": "wave3/C-S2b-transient16-perslab12",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$24^3$, 8 slabs",
+      "population": "wave3/C-S2b-transient24-perslab12",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$32^3$, 8 slabs",
+      "population": "wave3/C-S2b-transient32-perslab12",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$48^3$, 8 slabs",
+      "population": "wave8/G-transient48-perslab12",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$64^3$, 8 slabs",
+      "population": "wave8/G-transient64-perslab12",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$16^3$, 16 slabs",
+      "population": "wave3/C-S2b-time16-perslab6",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$16^3$, 32 slabs",
+      "population": "wave3/C-S2b-time32-perslab6",
+      "arm": "reference"
+    },
+    {
+      "label": "Transformer",
+      "detail": "4 slabs",
+      "population": "wave3/C-S4b-transformer-x4",
+      "arm": "reference"
+    },
+    {
+      "label": "Transformer",
+      "detail": "8 slabs",
+      "population": "wave3/C-S4b-transformer-x8",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 1",
+      "detail": "4 slabs",
+      "population": "wave3/C-S4b-engine-L1-x4",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 1",
+      "detail": "8 slabs",
+      "population": "wave3/C-S4b-engine-L1-x8",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 2",
+      "detail": "4 slabs",
+      "population": "wave3/C-S4b-engine-L2-x4",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 2",
+      "detail": "8 slabs",
+      "population": "wave3/C-S4b-engine-L2-x8",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 3",
+      "detail": "4 slabs",
+      "population": "wave8/G-engine-L3-x4-ref1-perslab50",
+      "arm": "reference"
+    }
+  ],
+  "operation_rows": [
+    {
+      "label": "Transformer day",
+      "detail": "24 hourly windows",
+      "population": "wave15/O1s-transformer-day-x8-skew",
+      "arm": "reference"
+    },
+    {
+      "label": "Drive cycle",
+      "detail": "16 windows",
+      "population": "wave9/O2-engine-L2-cycle-x4",
+      "arm": "reference"
+    },
+    {
+      "label": "Off-design flow",
+      "detail": "transformer",
+      "population": "wave9/O3-transformer-steady-flows",
+      "arm": "reference"
+    },
+    {
+      "label": "Off-design flow",
+      "detail": "Bore 2",
+      "population": "wave9/O3-engine-L2-steady-flows",
+      "arm": "reference"
+    },
+    {
+      "label": "Off-design flow",
+      "detail": "Bore 3",
+      "population": "wave9/O3-engine-L3-steady-ref1-flows",
+      "arm": "reference"
+    },
+    {
+      "label": "Overloads",
+      "detail": "transformer, 8 slabs",
+      "population": "wave15/O4s-transformer-overload-x8-skew",
+      "arm": "reference"
+    },
+    {
+      "label": "Shuffled order",
+      "detail": "transformer",
+      "population": "wave9/O5-shuffled-transformer-steady",
+      "arm": "reference"
+    },
+    {
+      "label": "Shuffled order",
+      "detail": "Bore 2",
+      "population": "wave9/O5-shuffled-engine-L2-steady",
+      "arm": "reference"
+    },
+    {
+      "label": "Shuffled order",
+      "detail": "Bore 2, 4 slabs",
+      "population": "wave9/O5-shuffled-engine-L2-x4",
+      "arm": "reference"
+    }
+  ],
+  "si_rows": [
+    {
+      "label": "Sorted order",
+      "detail": "transformer",
+      "population": "wave9/O5-sorted-transformer-steady",
+      "arm": "reference"
+    },
+    {
+      "label": "Sorted order",
+      "detail": "Bore 2",
+      "population": "wave9/O5-sorted-engine-L2-steady",
+      "arm": "reference"
+    },
+    {
+      "label": "Sorted order",
+      "detail": "Bore 2, 4 slabs",
+      "population": "wave9/O5-sorted-engine-L2-x4",
+      "arm": "reference"
+    },
+    {
+      "label": "Transformer day",
+      "detail": "advective transport",
+      "population": "wave9/O1-transformer-day-x8",
+      "arm": "reference"
+    },
+    {
+      "label": "Overloads",
+      "detail": "advective transport",
+      "population": "wave9/O4-transformer-overload-x8",
+      "arm": "reference"
+    },
+    {
+      "label": "Transformer steady",
+      "detail": "rtol $10^{-8}$",
+      "population": "wave6/A-tol-transformer-steady-rtol1e-8",
+      "arm": "reference"
+    },
+    {
+      "label": "Transformer steady",
+      "detail": "rtol $10^{-6}$",
+      "population": "wave6/A-tol-transformer-steady-rtol1e-6",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 2 steady",
+      "detail": "rtol $10^{-8}$",
+      "population": "wave6/A-tol-engine-L2-steady-rtol1e-8",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 2 steady",
+      "detail": "rtol $10^{-6}$",
+      "population": "wave6/A-tol-engine-L2-steady-rtol1e-6",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 3 steady",
+      "detail": "rtol $10^{-8}$",
+      "population": "wave6/A-tol-engine-L3-steady-rtol1e-8",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 3 steady",
+      "detail": "rtol $10^{-6}$",
+      "population": "wave6/A-tol-engine-L3-steady-rtol1e-6",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 2 steady",
+      "detail": "$\\alpha=10^{-5}$",
+      "population": "wave6/A-alpha-engine-L2-steady-1e-5",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 2 steady",
+      "detail": "$\\alpha=10^{-4}$",
+      "population": "wave6/A-alpha-engine-L2-steady-1e-4",
+      "arm": "reference"
+    },
+    {
+      "label": "Transformer steady",
+      "detail": "$\\alpha=10^{-13}$",
+      "population": "wave6/A-alpha-transformer-steady-1e-13",
+      "arm": null
+    },
+    {
+      "label": "Transformer steady",
+      "detail": "$\\alpha=10^{-12}$",
+      "population": "wave6/A-alpha-transformer-steady-1e-12",
+      "arm": null
+    },
+    {
+      "label": "Bore 2 steady",
+      "detail": "cold start",
+      "population": "wave6/A-cold-engine-L2-steady",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 3 steady",
+      "detail": "cold start",
+      "population": "wave6/A-cold-engine-L3-steady",
+      "arm": "reference"
+    },
+    {
+      "label": "Transformer steady",
+      "detail": "64 targets",
+      "population": "wave3/C-S3a-transformer-steady-q64",
+      "arm": "reference"
+    },
+    {
+      "label": "Transformer, 8 slabs",
+      "detail": "64 targets",
+      "population": "wave3/C-S3a-transformer-x8-q64",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 2 steady",
+      "detail": "64 targets",
+      "population": "wave3/C-S3a-engine-L2-steady-q64",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 2, 4 slabs",
+      "detail": "64 targets",
+      "population": "wave3/C-S3a-engine-L2-x4-q64",
+      "arm": "reference"
+    },
+    {
+      "label": "Transformer steady",
+      "detail": "256 targets",
+      "population": "wave6/A-q256-transformer-steady",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 2 steady",
+      "detail": "256 targets",
+      "population": "wave6/A-q256-engine-L2-steady",
+      "arm": "reference"
+    },
+    {
+      "label": "Transformer steady",
+      "detail": "4 loads $\\times$ 4 bounds",
+      "population": "wave3/C-S3b-rating-steady",
+      "arm": "reference"
+    },
+    {
+      "label": "Transformer, 8 slabs",
+      "detail": "4 loads $\\times$ 4 bounds",
+      "population": "wave3/C-S3b-rating-x8",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 3 steady",
+      "detail": "level 0, rank 50",
+      "population": "wave11/R-engine-L3-steady-ref0-r50",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 3 steady",
+      "detail": "level 0, rank 100",
+      "population": "wave11/R-engine-L3-steady-ref0-r100",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 3 steady",
+      "detail": "level 0, rank 200",
+      "population": "wave11/R-engine-L3-steady-ref0-r200",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 3 steady",
+      "detail": "level 0, rank 300",
+      "population": "wave11/R-engine-L3-steady-ref0-r300",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 3 steady",
+      "detail": "level 1, rank 50",
+      "population": "wave11/R-engine-L3-steady-ref1-r50",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 3 steady",
+      "detail": "level 1, rank 100",
+      "population": "wave11/R-engine-L3-steady-ref1-r100",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 3 steady",
+      "detail": "level 1, rank 400",
+      "population": "wave7/F-engine-L3-steady-ref1-r400",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 3 steady",
+      "detail": "level 2, rank 200",
+      "population": "wave8/G-engine-L3-steady-ref2-r200",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 3 steady",
+      "detail": "level 0, four methods",
+      "population": "wave3/C-S1a-engine-L3-steady",
+      "arm": "reference"
+    },
+    {
+      "label": "Bore 4 steady",
+      "detail": "level 3, rank 200",
+      "population": "wave8/G-engine-L4-steady-o400",
+      "arm": "reference-ref3"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$12^3$, 8 slabs, global",
+      "population": "wave3/C-S4a-transient12-global",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$16^3$, 8 slabs, global",
+      "population": "wave3/C-S4a-transient16-global",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$24^3$, 8 slabs, global",
+      "population": "wave3/C-S4a-transient24-global",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$32^3$, 8 slabs, global",
+      "population": "wave3/C-S4a-transient32-global",
+      "arm": "reference"
+    }
+  ],
+  "single_rows": [
+    {
+      "label": "Transformer",
+      "detail": "16 slabs, global",
+      "population": "wave1/S2a-gpu-transformer-x16-global",
+      "arm": "reference"
+    },
+    {
+      "label": "Transformer",
+      "detail": "16 slabs, $S=4$",
+      "population": "wave1/S2a-gpu-transformer-x16-global",
+      "arm": "reference-perslab4"
+    },
+    {
+      "label": "Transformer",
+      "detail": "32 slabs, global",
+      "population": "wave1/S2a-gpu-transformer-x32-global",
+      "arm": "reference"
+    },
+    {
+      "label": "Transformer",
+      "detail": "32 slabs, $S=4$",
+      "population": "wave1/S2a-gpu-transformer-x32-global",
+      "arm": "reference-perslab4"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$16^3$, 64 slabs, global",
+      "population": "wave2/S2b-n16-x64-global",
+      "arm": "reference"
+    },
+    {
+      "label": "Cartesian",
+      "detail": "$16^3$, 64 slabs, $S=6$",
+      "population": "wave2/S2b-n16-x64-global",
+      "arm": "reference-perslab6"
+    },
+    {
+      "label": "Transformer, refined twice",
+      "detail": "steady",
+      "population": "wave4/S1d-transformer-L2-steady",
+      "arm": null
+    },
+    {
+      "label": "Transformer, refined twice",
+      "detail": "4 slabs",
+      "population": "wave4/S1d-transformer-L2-x4",
+      "arm": null
+    },
+    {
+      "label": "Bore 4",
+      "detail": "outer cap 100",
+      "population": "wave4/S1c-engine-L4-steady",
+      "arm": null
+    }
+  ],
+  "direct_rows": [
+    {
+      "label": "Transformer steady",
+      "cpu": "wave12/D-transformer-steady",
+      "gpu": "wave9/O5-sorted-transformer-steady"
+    },
+    {
+      "label": "Bore 1 steady",
+      "cpu": "wave12/D-engine-L1-steady",
+      "gpu": "wave12/D-gpu-engine-L1-steady"
+    },
+    {
+      "label": "Bore 2 steady",
+      "cpu": "wave12/D-engine-L2-steady",
+      "gpu": "wave9/O5-sorted-engine-L2-steady"
+    },
+    {
+      "label": "Transformer, 8 slabs",
+      "cpu": "wave12/D-transformer-x8",
+      "gpu": "wave3/C-S4b-transformer-x8"
+    },
+    {
+      "label": "Bore 1, 8 slabs",
+      "cpu": "wave12/D-engine-L1-x8",
+      "gpu": "wave3/C-S4b-engine-L1-x8"
+    }
+  ],
+  "temporal_rows": [
+    {
+      "horizon": "600 s",
+      "form": "advective",
+      "folder": "temporal/published-600s-advective"
+    },
+    {
+      "horizon": "600 s",
+      "form": "skew",
+      "folder": "temporal/published-600s-skew"
+    },
+    {
+      "horizon": "1 h",
+      "form": "advective",
+      "folder": "temporal/hour-advective"
+    },
+    {
+      "horizon": "1 h",
+      "form": "skew",
+      "folder": "temporal/hour-skew"
+    }
+  ],
+  "merged": {
+    "G-pilot-engine-L4-steady-o400-": "G-pilot-engine-L4-steady-o400",
+    "G-engine-L4-steady-o400-": "G-engine-L4-steady-o400"
+  },
+  "augment": {
+    "wave8/G-steady96": [
+      "wave10/H-amgx001-steady96"
+    ],
+    "wave8/G-steady128-retry1": [
+      "wave10/H-amgx001-steady128",
+      "wave10/H-amgx0001-steady128"
+    ],
+    "wave8/G-transient64-perslab12": [
+      "wave10/H-amgx001-transient64-perslab12"
+    ],
+    "wave9/O3-transformer-steady-flows": [
+      "wave10/H-amgx001-O3-transformer-steady-flows",
+      "wave10/H-amgx0001-O3-transformer-steady-flows"
+    ]
+  },
+  "paired": {
+    "wave1/S2a-gpu-transformer-x16-global": [
+      [
+        "wave1/S2a-gpu-transformer-x16-perslab4",
+        "reference",
+        "reference-perslab4"
+      ]
+    ],
+    "wave1/S2a-gpu-transformer-x32-global": [
+      [
+        "wave1/S2a-gpu-transformer-x32-perslab4",
+        "reference",
+        "reference-perslab4"
+      ]
+    ],
+    "wave2/S2b-n16-x64-global": [
+      [
+        "wave2/S2b-n16-x64-perslab6",
+        "reference",
+        "reference-perslab6"
+      ]
+    ]
+  }
+}

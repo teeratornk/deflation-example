@@ -41,6 +41,8 @@ Each section links to commands for regenerating its numerical evidence.
 - [Cartesian steady memory](#cartesian-steady-memory)
 - [Cartesian transient memory](#cartesian-transient-memory)
 - [Cartesian memory budgets](#cartesian-memory-budgets)
+- [Cartesian steady cost components](#cartesian-steady-cost-components)
+- [Cartesian transient cost components](#cartesian-transient-cost-components)
 
 ## Data and measurement definitions
 
@@ -475,3 +477,31 @@ Retrospective rank choices at steady 32^3 and transient 24^3 with eight slabs. T
 | Transient | 8 | AmgX | 0 | 91.872 |
 | Transient | 16 | AmgX | 0 | 91.872 |
 | Transient | 64 | AmgX | 0 | 91.872 |
+
+## Cartesian steady cost components
+
+Disjoint cost components in seconds of the actual median-time steady 48^3 sequences with matched outer and inner warm starts. Construction and setup include assembly, reference or persistent-resource construction, basis transfer and processing, and coarse or hierarchy setup. Conversion and transfers include matrix conversion, upload and download. Verification and remaining work include residual and KKT checks, outer updates and matrix extraction, per-solve resource handling, synchronization and cleanup. The raw intervals sum exactly to each complete time before rounding. The complete steady 48^3 reference sequence ranges from 44.392 to 83.664 s with identical outer and inner work across repetitions. The largest-time repetition spends 36.905 s in basis transfer and related reference processing and the smallest-time repetition 4.324 s; their kernel iteration intervals are 26.767 and 26.509 s.
+
+[Reproduction example](reference-policy-study.md#frozen-complete-optimization-campaign).
+
+| Interval | Jacobi-CG | Reference | Recycling | AmgX |
+| --- | --- | --- | --- | --- |
+| Construction and setup | 1.129 | 9.845 | 24.193 | 5.576 |
+| Iteration | 76.896 | 28.410 | 70.467 | 72.075 |
+| Conversion and transfers | 0.872 | 3.332 | 3.184 | 2.216 |
+| Verification and remaining work | 12.168 | 7.961 | 8.423 | 8.802 |
+| Total | 91.065 | 49.548 | 106.266 | 88.669 |
+
+## Cartesian transient cost components
+
+Disjoint cost components in seconds of the actual median-time transient 16^3 sequences with four slabs. Interval definitions match the steady cost components.
+
+[Reproduction example](reference-policy-study.md#frozen-complete-optimization-campaign).
+
+| Interval | Jacobi-CG | Reference | Recycling | AmgX |
+| --- | --- | --- | --- | --- |
+| Construction and setup | 0.091 | 1.998 | 3.200 | 1.840 |
+| Iteration | 8.258 | 3.711 | 4.874 | 13.894 |
+| Conversion and transfers | 0.091 | 0.236 | 0.206 | 0.201 |
+| Verification and remaining work | 0.980 | 0.993 | 0.862 | 1.546 |
+| Total | 9.420 | 6.938 | 9.142 | 17.482 |

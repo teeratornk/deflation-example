@@ -296,6 +296,48 @@
           "rows": 24
         }
       ]
+    },
+    {
+      "id": "cartesian-steady-cost-components",
+      "title": "Cartesian steady cost components",
+      "columns": [
+        "Interval",
+        "Jacobi-CG",
+        "Reference",
+        "Recycling",
+        "AmgX"
+      ],
+      "description": "Disjoint cost components in seconds of the actual median-time steady 48^3 sequences with matched outer and inner warm starts. Construction and setup include assembly, reference or persistent-resource construction, basis transfer and processing, and coarse or hierarchy setup. Conversion and transfers include matrix conversion, upload and download. Verification and remaining work include residual and KKT checks, outer updates and matrix extraction, per-solve resource handling, synchronization and cleanup. The raw intervals sum exactly to each complete time before rounding. The complete steady 48^3 reference sequence ranges from 44.392 to 83.664 s with identical outer and inner work across repetitions. The largest-time repetition spends 36.905 s in basis transfer and related reference processing and the smallest-time repetition 4.324 s; their kernel iteration intervals are 26.767 and 26.509 s.",
+      "guide": "reference-policy-study.md#frozen-complete-optimization-campaign",
+      "files": [
+        {
+          "path": "sources/cht_cost_rows_steady48.tex",
+          "sha256": "247fe3ee91898c79efa917374eb74417572202787d07ac12827793fb76cbf92d",
+          "source_path": "sections/generated/si/cost_steady48.tex",
+          "rows": 5
+        }
+      ]
+    },
+    {
+      "id": "cartesian-transient-cost-components",
+      "title": "Cartesian transient cost components",
+      "columns": [
+        "Interval",
+        "Jacobi-CG",
+        "Reference",
+        "Recycling",
+        "AmgX"
+      ],
+      "description": "Disjoint cost components in seconds of the actual median-time transient 16^3 sequences with four slabs. Interval definitions match the steady cost components.",
+      "guide": "reference-policy-study.md#frozen-complete-optimization-campaign",
+      "files": [
+        {
+          "path": "sources/cht_cost_rows_time4.tex",
+          "sha256": "f19a31b9ca06728cbf7af0b7c899e45290c61b36ebdb0b8a74f76852c1558fd4",
+          "source_path": "sections/generated/si/cost_time4.tex",
+          "rows": 5
+        }
+      ]
     }
   ]
 }

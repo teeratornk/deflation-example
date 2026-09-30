@@ -1,0 +1,31 @@
+{
+  "format": "prescribed-speedup-v20-records-v1",
+  "study_source": {
+    "branch": "study/prescribed-speedup-v20",
+    "operating_scenarios": "e741f1b0b9cc01a7ecb028e75a2ef81cd6ddc670",
+    "skew_transport": "5fc1e3d400a81ac4a3c6c775689ce97cb68f65db"
+  },
+  "evidence_source": {
+    "branch": "study/prescribed-speedup-v20-evidence",
+    "commit": "9c0ec6d3bea5bb2972683c51dc0dcffe494f81ea"
+  },
+  "evidence_manifest_sha256": "7d947be5857f466439fac3a00e081daa8f62a5790069ad8d57c0a61e01a0ae1e",
+  "files": {
+    "evidence.tar.gz": {
+      "sha256": "0abaca32acd92f45876b55bc7f2505c90264c551afa7b63598ef2145fa025500",
+      "bytes": 1593759
+    },
+    "populations.md": {
+      "sha256": "cc13cbe98915a228a1f934720d4acdb0e140a5f8a36f612109dda55e5a7c7c88",
+      "bytes": 19170
+    },
+    "rows.json": {
+      "sha256": "e19c32d591fc6870e298d82e9481e4568548f2e4a822db17820291ea2f5c5a8e",
+      "bytes": 15297
+    },
+    "summary.json": {
+      "sha256": "2d32e273eba4e646dbf203cde5b903723c74fbfab7534dcdc77d8e5bca73d468",
+      "bytes": 237345
+    }
+  }
+}

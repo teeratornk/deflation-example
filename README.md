@@ -18,7 +18,10 @@ runner for the archived figures and tables, plus versioned numerical reruns.
 The [detailed supplementary tables](docs/supplementary-tables.md) provide
 per-case accuracy, ranks, cost components, preparation times, memory and
 refinement diagnostics. Read them on GitHub or regenerate them from the
-bundled data without a GPU.
+bundled data without a GPU. The [supplementary figures](docs/supplementary-figures.md)
+plot the first-implementation Cartesian comparisons, and the
+[scale, trajectory and operating-condition page](docs/prescribed-speedup-v20.md)
+documents the comparisons up to 2.5 million unknowns with every timed run.
 
 ## Quickstart
 

@@ -3,8 +3,7 @@
 The [steady](steady.csv) and [transient](transient.csv) files retain all 60
 original solver rows: complete-sequence median and full timing range,
 iteration counts, requested rank, start policy and verified repetitions.
-The compact SI tables show the same times and ranges with one row per
-configuration. The original numerical measurements are unchanged.
+The original numerical measurements are unchanged.
 
 Every sequence contains 16 targets. Five independent timing repetitions
 use the same physical target sequence. Warm starts apply to both the outer
@@ -19,4 +18,6 @@ source-row checksums and CSV checksums. The
 provides the configurations, numerical source and complete-run commands.
 
 Jacobi-CG has the lowest measured complete time in several refined transient
-comparisons. These outcomes remain in both the SI and these records.
+comparisons. These records hold every comparison; the SI summarizes them, and
+the [supplementary figures](../../docs/supplementary-figures.md) plot their
+times and memory.

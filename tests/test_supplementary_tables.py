@@ -17,8 +17,8 @@ spec.loader.exec_module(tables)
 
 def test_all_tables_and_rows_are_reproduced():
     manifest = tables.verify()
-    assert len(manifest["tables"]) == 11
-    assert sum(f["rows"] for t in manifest["tables"] for f in t["files"]) == 317
+    assert len(manifest["tables"]) == 13
+    assert sum(f["rows"] for t in manifest["tables"] for f in t["files"]) == 327
     assert tables.DOCUMENT.read_text() == tables.render()
     for table in manifest["tables"]:
         for item in table["files"]:
