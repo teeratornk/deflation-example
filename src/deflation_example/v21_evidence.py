@@ -251,42 +251,64 @@ def coverage(methods):
 
 
 def main_rows(summary, spec, marker=r"$^\dagger$"):
-    """Main-table rows: speedup with its range over repetitions and converged counts."""
+    """Rows with the speedup, its range over repetitions and converged counts.
+
+    A row whose reference arm misses a repetition reports the fastest converged
+    alternative without a speedup; a row in which no method converges says so.
+    The arm None of a v20 specification reads the reference arm.
+    """
     lines, values = [], []
     for label, detail, key, arm in spec:
         population = summary.get(key)
         if population is None:
             raise ValueError(f"No population {key}")
-        own = population["methods"][arm]
-        if own["accepted"] != own["declared"]:
-            raise ValueError(f"The reference arm of {key} has an unconverged repetition")
+        arm = arm or "reference"
+        methods = population["methods"]
+        mark = marker if coverage(methods) else ""
+        head = [label + mark, detail, v20._count(population["unknowns"])]
+        converged = {m: r for m, r in methods.items() if r["accepted"] == r["declared"]}
+        if not any(r["accepted"] for r in methods.values()):
+            lines.append(
+                " & ".join(head) + r" & \multicolumn{5}{l}{no method converges at every query} \\"
+            )
+            values.append({"population": key, "converged": False})
+            continue
+        if arm not in converged or arm not in population["readings"]:
+            others = {
+                m: r["median_seconds"]
+                for m, r in methods.items()
+                if not v20._is_reference(m) and r["median_seconds"] is not None
+            }
+            fastest = min(others, key=others.get)
+            cells = head + [
+                "--",
+                f"{v20.NAMES.get(fastest, fastest)} {v20._seconds(others[fastest])}",
+                "--",
+                "--",
+                not_converged(methods),
+            ]
+            lines.append(" & ".join(cells) + r" \\")
+            values.append({"population": key, "converged": False, "fastest": fastest})
+            continue
         reading = population["readings"][arm]
         alternative = reading["fastest_alternative"]
         low, high = _range(population, arm, alternative)
         name = v20.NAMES.get(alternative, alternative)
-        mark = marker if coverage(population["methods"]) else ""
-        lines.append(
-            " & ".join(
-                [
-                    label + mark,
-                    detail,
-                    v20._count(population["unknowns"]),
-                    v20._seconds(reading["reference_seconds"]),
-                    f"{name} {v20._seconds(reading['alternative_seconds'])}",
-                    f"{v20._ratio(reading['ratio'])} [{v20._ratio(low)}, {v20._ratio(high)}]",
-                    v20._ratio(reading["jacobi_iteration_ratio"]),
-                    not_converged(population["methods"]),
-                ]
-            )
-            + r" \\"
-        )
-        values.append({**reading, "range": [low, high], "population": key})
+        cells = head + [
+            v20._seconds(reading["reference_seconds"]),
+            f"{name} {v20._seconds(reading['alternative_seconds'])}",
+            f"{v20._ratio(reading['ratio'])} [{v20._ratio(low)}, {v20._ratio(high)}]",
+            v20._ratio(reading["jacobi_iteration_ratio"]),
+            not_converged(methods),
+        ]
+        lines.append(" & ".join(cells) + r" \\")
+        values.append({**reading, "range": [low, high], "population": key, "converged": True})
     return "\n".join(lines) + "\n", values
 
 
 def diagnostic_rows(summary, spec):
-    """Rows of the SI tables in the v20 format (no-completion rows allowed)."""
-    return v20.table_rows(summary, spec)
+    """SI rows use the main-table format."""
+    return main_rows(summary, spec)
 
 
 def primary_rows(summary):

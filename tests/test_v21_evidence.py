@@ -170,3 +170,36 @@ def test_every_advective_transformer_population_of_the_manuscript_has_a_skew_twi
         for _, _, key, _ in v21.ORIGINAL_ROWS
         if key.startswith(("wave3", "wave9/O5", "wave9/O3"))
     )
+
+
+def test_rows_without_a_converged_reference_or_any_converged_method(tmp_path):
+    runs, campaign = tmp_path / "v21", tmp_path / "campaign"
+    write_population(
+        runs / "wave2/failed-reference",
+        {"jacobi": [8, 9], "reference": [3, 3], "recycling": [7, 7], "amgx": [6, 6]},
+        fail={("reference", 0)},
+    )
+    write_population(
+        runs / "wave2/all-failed",
+        {"jacobi": [8, 9], "reference": [3, 3], "recycling": [7, 7], "amgx": [6, 6]},
+        fail={(m, r) for m in ("jacobi", "reference", "recycling", "amgx") for r in (0, 1)},
+    )
+    for name in v21.CAMPAIGN_FILES:
+        (campaign / name).parent.mkdir(parents=True, exist_ok=True)
+        (campaign / name).write_text("{}")
+    out = tmp_path / "evidence"
+    v21.bundle([(runs, v21.PREFIX)], campaign, out)
+    summary = v21.summarize(out)
+    text, values = v21.main_rows(
+        summary,
+        [
+            ("A", "ref fails", "v21-wave2/failed-reference", "reference"),
+            ("B", "all fail", "v21-wave2/all-failed", None),
+        ],
+    )
+    first, second = text.strip().split("\n")
+    cells = [c.strip() for c in first.rstrip("\\").split(" & ")]
+    assert cells[3] == "--" and cells[4] == "AmgX 6.0" and cells[5] == "--"
+    assert cells[7] == "reference 1/2"
+    assert "no method converges at every query" in second
+    assert [v["converged"] for v in values] == [False, False]
