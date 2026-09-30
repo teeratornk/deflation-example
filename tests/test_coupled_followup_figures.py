@@ -65,6 +65,7 @@ def test_repeated_failures_keep_all_points_without_repeating_annotations(tmp_pat
     assert len(axis.lines) == 15
     assert all(line.get_marker() == "x" for line in axis.lines)
     assert len(axis.texts) == 3
+    assert axis.get_xlim() == (-0.5, 2.5)
     assert all("5/5" in text.get_text() for text in axis.texts)
     assert all("trust radius" in text.get_text() for text in axis.texts)
 

@@ -183,6 +183,7 @@ def confirmation_figure(report, output):
     labels = ["Frozen CG", "Reference", "Recycling"]
     for axis in axes:
         axis.set_xticks(range(3), labels)
+        axis.set_xlim(-0.5, 2.5)
         axis.set_ylim(bottom=0)
     failed = any(not row["verified"] for row in rows)
     if failed:
