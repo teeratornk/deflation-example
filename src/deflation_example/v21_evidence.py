@@ -25,6 +25,7 @@ from .mesh_report import components
 FORMAT = "prescribed-speedup-v21-evidence-v1"
 CAMPAIGN_FILES = v20.CAMPAIGN_FILES + (
     "prescribed-speedup-v21-protocol.json",
+    "prescribed-speedup-v21-jobs.txt",
     "prescribed-speedup-v21-operations/O3-transformer-steady-flows-skew.args",
     "prescribed-speedup-v21-operations/O5-shuffled-transformer-steady-skew.args",
     "prescribed-speedup-v21-operations/O5-sorted-transformer-steady-skew.args",
