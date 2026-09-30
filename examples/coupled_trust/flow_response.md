@@ -47,6 +47,25 @@ velocity norm is a Euclidean norm of nodal values; it is not a spatially
 weighted norm. Unsuccessful solves appear as explicit status annotations,
 without an inferred sensitivity value.
 
+## Curvature-selected flow initial guesses
+
+For a strongly sensitive slab, this additional check projects the quadratic
+momentum residual onto its velocity response. The resulting scalar approximation
+selects three Newton initial guesses at the unchanged temperature and preceding
+velocity. Its predicted turning point is diagnostic; every proposed root must
+satisfy the full original equations independently.
+
+```bash
+uv run --extra study python -m deflation_example.coupled_flow_branch \
+  --record RESULTS/record.json --response flow-response-slab8/record.json \
+  --output flow-branch-check
+```
+
+The seed multipliers are -1, 1, and 2, each with a 180 s limit. The output
+retains every result and its field checksum. Convergence of two distinct roots
+would establish local numerical nonuniqueness at this time step; it would
+neither establish a physical bifurcation nor choose the physical trajectory.
+
 ## Matched trust-radius restart
 
 After diagnosing a restricted local response range, this bounded comparison
