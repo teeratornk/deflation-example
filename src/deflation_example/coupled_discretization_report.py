@@ -226,8 +226,13 @@ def plot_local(rows, directory):
                 x.append(subdivisions)
                 y.append(value)
                 good = sum(r["verified"] for r in group)
+                mark = (
+                    "†"
+                    if center["steps"][-1]["tangent"].get("linear_relative_residual", 0) > 1e-8
+                    else ""
+                )
                 ax.annotate(
-                    f"{good}/3",
+                    f"{good}/3{mark}",
                     (subdivisions, value),
                     xytext=(0, 9),
                     textcoords="offset points",
@@ -239,17 +244,25 @@ def plot_local(rows, directory):
         ax.set_xticks([1, 2, 4])
         ax.set_xlabel("Substeps per original interval")
         ax.grid(alpha=0.2)
+        ax.margins(y=0.15)
     axes[0].set_ylabel(
         r"Nodal sensitivity norm $\|d\mathbf{v}/d\epsilon\|_2$ [m s$^{-1}$ K$^{-1}$]"
     )
     fig.text(
         0.5,
-        0.02,
-        "Labels count verified momentum solves at −1, 0 and +1 μK. Local interval diagnostic; no optimization timing.",
+        0.045,
+        "Labels count verified momentum solves at −1, 0 and +1 μK. † Tangent relative residual exceeds 10⁻⁸.",
         ha="center",
         fontsize=9,
     )
-    fig.tight_layout(rect=(0, 0.065, 1, 1))
+    fig.text(
+        0.5,
+        0.012,
+        "Local interval diagnostic; temperature is prescribed and no optimization time is compared.",
+        ha="center",
+        fontsize=9,
+    )
+    fig.tight_layout(rect=(0, 0.11, 1, 1))
     for extension in ("pdf", "png"):
         fig.savefig(directory / f"interval_refinement.{extension}", dpi=180)
     plt.close(fig)
