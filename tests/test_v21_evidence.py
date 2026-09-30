@@ -237,7 +237,7 @@ def test_transfer_rows_follow_the_supporting_table_format(tmp_path):
         (tmp_path / path).write_text(json.dumps(trace(0.25, 40)))
     text, records = v21.transfer_rows(tmp_path)
     first = text.splitlines()[0]
-    assert first == r"Bore steady & 2 & 4/10 & Full reference & 2 & 100 & 0.250 & 80 & 1.000 \\"
+    assert first == r"Bore 2, steady & 2 & 4/10 & Full reference & 2 & 100 & 0.250 & 80 & 1.000 \\"
     assert text.splitlines()[1].startswith(" &  &  & Sequential transfer")
     assert len(records) == 6 and records[0]["newly_inactive"] == 10
 

@@ -430,9 +430,9 @@ def certificate_rows(root):
 
 
 TRANSFERS = {
-    "Bore steady": "diagnostics/transfer/M-engine-L2-steady-transfer.json",
-    "Bore transient": "diagnostics/transfer/M-engine-L2-x4-transfer.json",
-    "Transformer transient": "diagnostics/transfer/M-transformer-x4-skew-transfer.json",
+    "Bore 2, steady": "diagnostics/transfer/M-engine-L2-steady-transfer.json",
+    "Bore 2, 4 slabs": "diagnostics/transfer/M-engine-L2-x4-transfer.json",
+    "Transformer, 4 slabs": "diagnostics/transfer/M-transformer-x4-skew-transfer.json",
 }
 VALIDATION = "diagnostics/validation/V-validation-skew.json"
 
