@@ -203,3 +203,38 @@ def test_rows_without_a_converged_reference_or_any_converged_method(tmp_path):
     assert cells[7] == "reference 1/2"
     assert "no method converges at every query" in second
     assert [v["converged"] for v in values] == [False, False]
+
+
+def test_transfer_rows_follow_the_supporting_table_format(tmp_path):
+    def trace(energy, iterations):
+        repetition = {
+            "status": "converged",
+            "original_residual": 1e-11,
+            "iterations": iterations,
+            "seconds": 0.5,
+            "deployed_rank": 100,
+        }
+        method = {
+            "repetitions": [repetition] * 3,
+            "correction": {"coarse_removed_energy_fraction": energy},
+        }
+        return {
+            "success": True,
+            "source_controls": {"rtol": 1e-10},
+            "rows": [
+                {
+                    "methods": {"full_reference": method, "sequential_transfer": method},
+                    "newly_active": 2,
+                    "newly_inactive": 5,
+                }
+            ]
+            * 2,
+        }
+
+    for path in v21.TRANSFERS.values():
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / path).write_text(json.dumps(trace(0.25, 40)))
+    text, records = v21.transfer_rows(tmp_path)
+    first = text.splitlines()[0]
+    assert first == r"Bore steady & Full reference & 2 & 100 & 0.250 & 80 & 1.000 \\"
+    assert len(records) == 6 and records[0]["newly_inactive"] == 10

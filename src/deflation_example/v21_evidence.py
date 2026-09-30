@@ -16,6 +16,7 @@ method with a repetition that does not converge together with its converged coun
 
 import argparse
 import json
+import statistics
 from pathlib import Path, PurePosixPath
 
 from . import v20_evidence as v20
@@ -342,6 +343,100 @@ def direct_rows(summary):
         v20.DIRECT_ROWS = saved
 
 
+TRANSFERS = {
+    "Bore steady": "diagnostics/transfer/M-engine-L2-steady-transfer.json",
+    "Bore transient": "diagnostics/transfer/M-engine-L2-x4-transfer.json",
+    "Transformer transient": "diagnostics/transfer/M-transformer-x4-skew-transfer.json",
+}
+VALIDATION = "diagnostics/validation/V-validation-skew.json"
+
+
+def _median(values):
+    return float(statistics.median(values))
+
+
+def validation_rows(root):
+    """Independent bounded least-squares verification, in the format of mesh_support."""
+    checked = json.loads((Path(root) / VALIDATION).read_text())
+    if not checked["success"] or len(checked["cases"]) != 12:
+        raise ValueError("Mesh verification requires the complete 12-case population")
+    lines = []
+    for c in checked["cases"]:
+        if (
+            not c["success"]
+            or not c["independent_success"]
+            or c["pdas_status"] != "converged"
+            or max(c["independent_kkt"].values()) > 1e-8
+            or max(c["pdas_kkt"].values()) > 1e-8
+            or c["state_relative_difference"] > 1e-7
+        ):
+            raise ValueError("A small mesh verification failed independent optimality")
+        name = "Bore-in-block" if c["geometry"] == "engine_3d" else "Transformer subproblem"
+        steps = c["time_steps"]
+        kind = "Steady" if steps is None else "Uniform" if len(set(steps)) == 1 else "Unequal"
+        cells = [
+            name,
+            kind,
+            c["query"] + 1,
+            c["dimension"],
+            f"{c['state_relative_difference']:.2e}",
+            f"{c['objective_relative_difference']:.2e}",
+            f"{max(c['pdas_kkt'].values()):.2e}",
+        ]
+        lines.append(" & ".join(map(str, cells)) + r" \\")
+    return "\n".join(lines) + "\n", checked
+
+
+def transfer_rows(root):
+    """Matched transfer replays, in the format of mesh_support."""
+    lines, records = [], []
+    for name, path in TRANSFERS.items():
+        source = json.loads((Path(root) / path).read_text())
+        if not source["success"]:
+            raise ValueError("The transfer source contains a failed replay")
+        selected = [r for r in source["rows"] if r["methods"]]
+        for method, label in (
+            ("full_reference", "Full reference"),
+            ("sequential_transfer", "Sequential transfer"),
+        ):
+            data = [r["methods"][method] for r in selected]
+            repetitions = [p for v in data for p in v["repetitions"]]
+            if any(
+                p["status"] != "converged"
+                or p["original_residual"] > source["source_controls"]["rtol"]
+                for p in repetitions
+            ):
+                raise ValueError("A transfer repetition fails residual acceptance")
+            ranks = [p["deployed_rank"] for p in repetitions]
+            rank = str(min(ranks)) if min(ranks) == max(ranks) else f"{min(ranks)}--{max(ranks)}"
+            energy = _median([v["correction"]["coarse_removed_energy_fraction"] for v in data])
+            iterations = sum(_median([p["iterations"] for p in v["repetitions"]]) for v in data)
+            seconds = sum(_median([p["seconds"] for p in v["repetitions"]]) for v in data)
+            cells = [
+                name,
+                label,
+                len(selected),
+                rank,
+                f"{energy:.3f}",
+                f"{iterations:.0f}",
+                f"{seconds:.3f}",
+            ]
+            lines.append(" & ".join(map(str, cells)) + r" \\")
+            records.append(
+                {
+                    "trace": name,
+                    "method": method,
+                    "energy": energy,
+                    "iterations": iterations,
+                    "seconds": seconds,
+                    "newly_active": sum(r["newly_active"] for r in source["rows"]),
+                    "newly_inactive": sum(r["newly_inactive"] for r in source["rows"]),
+                    "systems": len(source["rows"]),
+                }
+            )
+    return "\n".join(lines) + "\n", records
+
+
 def primary_components(root):
     """Cost components of the median-time repetition per primary case and method."""
     found = populations(root)
@@ -391,6 +486,8 @@ def export(root, output):
         "single_rows": diagnostic_rows(summary, SINGLE_ROWS),
         "original_rows": diagnostic_rows(summary, ORIGINAL_ROWS),
         "direct_rows": direct_rows(summary),
+        "support_validation_rows": validation_rows(root),
+        "support_transfer_rows": transfer_rows(root),
     }.items():
         (output / f"generated/{name}.tex").write_text(text)
         written[name] = values
