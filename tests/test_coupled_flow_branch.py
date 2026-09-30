@@ -62,3 +62,39 @@ def test_fresh_root_checks_detect_a_perturbed_momentum_field():
     failed = root_checks(problem, changed, previous, state, 1, direction, tangent)
     assert max(failed["independent_residuals"].values()) > problem.flow_tolerance
     assert failed["newton_velocity_correction_norm_m_s"] > 1e-6
+
+
+def test_trajectory_evaluation_preserves_temperatures_and_never_claims_optimization(tmp_path):
+    from deflation_example.coupled_flow_branch import trajectory_check
+    from test_coupled_derivatives import small_coupled_problem
+
+    problem = small_coupled_problem([0.2, 0.35])
+    state = np.linspace(0.04, 0.1, problem.size)
+    evaluation = problem.evaluate(state)
+    velocities = np.stack([f.velocity for f in evaluation.flows])
+    pressures = np.stack([f.pressure for f in evaluation.flows])
+    cfg = dict(
+        nonlinear_tolerance=1e-8, equation_acceptance_tolerance=1e-9, conservation_tolerance=1e-6
+    )
+    report = {}
+    trajectory_check(
+        problem,
+        state,
+        velocities,
+        pressures,
+        evaluation.flows[1],
+        1,
+        np.full(problem.size, 0.12),
+        (-0.5, 0.5),
+        cfg,
+        tmp_path,
+        report,
+    )
+    assert len(report["trajectory_checks"]) == 2
+    for row in report["trajectory_checks"]:
+        assert row["status"] == "evaluated"
+        assert row["equations_verified"] and row["adjoint_verified"]
+        assert not row["optimization_performed"]
+        assert not row["stationarity_criterion_met"]
+    assert report["trajectory_checks"][1]["temperature_change_max"] == 0
+    assert abs(report["trajectory_checks"][1]["normalized_objective_change"]) < 1e-12

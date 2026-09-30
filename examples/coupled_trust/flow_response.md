@@ -66,6 +66,14 @@ retains every result and its field checksum. Convergence of two distinct roots
 would establish local numerical nonuniqueness at this time step; it would
 neither establish a physical bifurcation nor choose the physical trajectory.
 
+Add `--trajectory-check` to evaluate both the retained and the unit-multiplier
+flow seeds over the complete saved temperature trajectory. Each evaluation has
+a 300 s flow-solve budget. It keeps the temperature fixed and recovers the
+corresponding source control from the thermal equations. This is an evaluation
+of the temperature-elimination objective, not a fixed-control forward assessment
+or a new optimization. Both equation checks, adjoint checks and KKT components
+are retained, even when the alternative seed provides no improvement.
+
 ## Matched trust-radius restart
 
 After diagnosing a restricted local response range, this bounded comparison

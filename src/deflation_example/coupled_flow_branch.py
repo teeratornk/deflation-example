@@ -16,7 +16,10 @@ from threadpoolctl import threadpool_limits
 
 from .axisymmetric_flow import FlowResult
 from .coupled_flow_response import acceleration_at, response_case
-from .coupled_optimize import load_problem
+from .coupled_optimize import adjoint_acceptance, equation_acceptance, load_problem
+from .coupled_control import FlowEvaluationError
+from .coupled_sequence import RestoredEvaluation
+from .coupled_trust import optimality
 from .reporting import environment, file_sha256, write_arrays, write_report
 
 
@@ -105,11 +108,92 @@ def root_checks(problem, root, previous, state, slab, direction, reference_tange
     }
 
 
+def trajectory_check(
+    problem, state, velocities, pressures, alternative, slab, desired, bounds, cfg, output, report
+):
+    """Evaluate two flow seeds at fixed temperature, recovering their controls.
+
+    This evaluates the temperature-elimination objective. It is not a forward
+    assessment with a fixed source control and performs no optimization.
+    """
+    report["trajectory_checks"] = []
+    reference = None
+    for name in ("retained", "alternate_seed"):
+        row = {
+            "initial_flow": name,
+            "status": "running",
+            "optimization_performed": False,
+            "equations_verified": False,
+            "scope": "Temperature is fixed; each flow trajectory recovers its own control. No optimization is performed.",
+        }
+        report["trajectory_checks"].append(row)
+        write_report(output / "record.json", report)
+        guess_v, guess_p = velocities.copy(), pressures.copy()
+        if name == "alternate_seed":
+            guess_v[slab], guess_p[slab] = alternative.velocity, alternative.pressure
+        guess = RestoredEvaluation(state, guess_v, guess_p)
+        start = time.perf_counter()
+        previous_stop = problem.stop_requested
+        problem.stop_requested = lambda: time.perf_counter() - start >= 300
+        try:
+            evaluation = problem.evaluate(state, initial=guess)
+            problem.stop_requested = None
+            value, gradient = problem.objective_gradient(evaluation, desired)
+            kkt, _ = optimality(problem, evaluation, desired, gradient, *bounds)
+            equations = problem.verify(evaluation, local_mass=True)
+            adjoint = problem.verify_adjoint(evaluation, desired)
+            row.update(
+                status="evaluated",
+                normalized_objective=value,
+                physical_objective=value * problem.objective_scale,
+                kkt=kkt,
+                equations=equations,
+                adjoint=adjoint,
+                equations_verified=bool(equation_acceptance(equations, cfg)),
+                adjoint_verified=bool(adjoint_acceptance(adjoint)),
+                stationarity_criterion_met=bool(max(kkt.values()) <= cfg["nonlinear_tolerance"]),
+            )
+            if name == "retained":
+                reference = evaluation
+            elif reference is not None:
+                row["normalized_objective_change"] = problem.objective_difference(
+                    evaluation, reference, desired
+                )
+                row["control_change_norm"] = float(
+                    np.linalg.norm(evaluation.control - reference.control)
+                )
+                row["temperature_change_max"] = float(
+                    np.max(np.abs(evaluation.state - reference.state))
+                )
+            path = output / f"trajectory-{name}.npz"
+            write_arrays(
+                path,
+                state=evaluation.state,
+                control=evaluation.control,
+                gradient=gradient,
+                velocity=np.stack([f.velocity for f in evaluation.flows]),
+                pressure=np.stack([f.pressure for f in evaluation.flows]),
+            )
+            row["field_sha256"] = file_sha256(path)
+        except FlowEvaluationError as error:
+            row.update(
+                status="flow_" + error.result.status,
+                slab=error.slab,
+                metrics=error.metrics,
+                history=error.result.history,
+            )
+        finally:
+            problem.stop_requested = previous_stop
+            row["seconds"] = time.perf_counter() - start
+            write_report(output / "record.json", report)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--record", type=Path, required=True)
     parser.add_argument("--response", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--trajectory-check", action="store_true")
     args = parser.parse_args()
     source = json.loads(args.record.read_text())
     response = json.loads(args.response.read_text())
@@ -143,6 +227,7 @@ def main():
         tangent, direction = data["tangent"].copy(), data["direction_K"].copy()
     with np.load(field, allow_pickle=False) as data:
         state, velocities, pressures = (data[k].copy() for k in ("state", "velocity", "pressure"))
+        desired = data["desired"].copy()
     args.output.mkdir(parents=True, exist_ok=False)
     report = {
         "schema": "coupled-local-flow-branch-v1",
@@ -155,6 +240,7 @@ def main():
         "cases": [],
         "seed_multipliers": [-1.0, 1.0, 2.0],
         "budget_seconds_per_case": 180,
+        "trajectory_check_requested": args.trajectory_check,
         "scope": "Curvature-selected initial guesses at the unchanged temperature, preceding velocity, physical time step and boundary data. An approximate scalar turning point is not a bifurcation certificate. No trajectory optimization or performance comparison is performed.",
     }
     write_report(args.output / "record.json", report)
@@ -188,6 +274,7 @@ def main():
             write_report(args.output / "record.json", report)
             parameter = report["curvature"]["nonzero_zero_load_seed_parameter_K"]
             base = np.r_[retained.velocity[:, 0], retained.velocity[:, 1], retained.pressure]
+            alternative = None
             for index, multiplier in enumerate(report["seed_multipliers"]):
                 proposal = base + multiplier * parameter * tangent
                 seed = FlowResult(
@@ -211,6 +298,8 @@ def main():
                     budget_seconds=180,
                 )
                 row.update(metrics)
+                if multiplier == 1 and row["verified"]:
+                    alternative = result
                 if row["verified"]:
                     row["root_checks"] = root_checks(
                         problem, result, previous, state, slab, direction, tangent
@@ -219,6 +308,26 @@ def main():
                 write_arrays(path, velocity=result.velocity, pressure=result.pressure)
                 row["field_sha256"] = file_sha256(path)
                 write_report(args.output / "record.json", report)
+            if args.trajectory_check:
+                if alternative is None:
+                    raise ValueError("The preselected unit-multiplier seed did not converge")
+                bounds = tuple(
+                    (v - problem.temperature_offset) / problem.temperature_scale
+                    for v in (cfg["lower_K"], cfg["queries"][position]["upper_K"])
+                )
+                trajectory_check(
+                    problem,
+                    state,
+                    velocities,
+                    pressures,
+                    alternative,
+                    slab,
+                    desired,
+                    bounds,
+                    cfg,
+                    args.output,
+                    report,
+                )
             report["status"] = "complete"
     except Exception as error:
         report.update(status="diagnostic_error", error_type=type(error).__name__, error=str(error))
