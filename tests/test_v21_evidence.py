@@ -42,6 +42,7 @@ def timed_record(seconds, inner=100, success=True, statuses=("converged", "conve
                     }
                 ],
                 "outer_history": [{"stationarity": 1e-9, "entered": 0, "left": 0}],
+                "kkt": {"stationarity": 1e-9, "primal": 0.0, "dual": 2e-10},
                 "outer_timing": {
                     "components_seconds": {
                         "restriction": 0.0,
@@ -238,3 +239,49 @@ def test_transfer_rows_follow_the_supporting_table_format(tmp_path):
     first = text.splitlines()[0]
     assert first == r"Bore steady & Full reference & 2 & 100 & 0.250 & 80 & 1.000 \\"
     assert len(records) == 6 and records[0]["newly_inactive"] == 10
+
+
+def test_complete_rows_and_accuracy_of_the_primary_cases(evidence, monkeypatch):
+    monkeypatch.setattr(
+        v21, "PRIMARY_ROWS", [("Transformer", "4 slabs", "v21-wave2/C-S4b-transformer-x4-skew")]
+    )
+    summary = v21.summarize(evidence)
+    text, _ = v21.primary_complete_rows(summary)
+    cells = [c.strip() for c in text.strip().removesuffix(r"\\[4pt]").split(" & ")]
+    assert cells[:3] == ["Transformer", "4 slabs", "100"]
+    assert cells[4] == r"\shortstack{11.000\\{[10.000, 12.000]}\\1.000}"
+    assert cells[6] == r"\shortstack{50.000 (1/2)\\{[50.000, 50.000]}\\1.000}"
+    sentence, values = v21.primary_accuracy(evidence)
+    assert values["kkt"] == pytest.approx(1e-9) and values["residual"] == pytest.approx(1e-11)
+    assert r"$1.00\times10^{-9}$" in sentence
+
+
+def test_certificate_rows_report_operator_inertia_and_stability(tmp_path):
+    def certificate(geometry, level, form, negative):
+        return {
+            "geometry": geometry,
+            "level": level,
+            "transport_form": form,
+            "free_nodes": 10830,
+            "operator": {"negative": negative, "zero": 0, "positive": 10830 - negative},
+            "transport": {"negative": 4753, "zero": 0, "positive": 6077},
+            "energy_stable": negative == 0,
+        }
+
+    path = tmp_path / v21.CERTIFICATES
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "source_tree_clean": True,
+                "certificates": [
+                    certificate("transformer_2d", 0, "advective", 11),
+                    certificate("engine_3d", 3, "advective", 0),
+                ],
+            }
+        )
+    )
+    text, _ = v21.certificate_rows(tmp_path)
+    first, second = text.strip().splitlines()
+    assert first == r"Transformer & advective & 10{,}830 & 11/0/10819 & 4{,}753 & no \\"
+    assert second.startswith("Bore 3 & advective") and second.endswith(r"& yes \\")

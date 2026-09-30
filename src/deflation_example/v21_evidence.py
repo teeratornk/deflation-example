@@ -108,11 +108,16 @@ ALTERNATIVES = {"jacobi", "recycling", "amgx"}
 
 
 def _with_components(path, digest):
-    """Add the disjoint cost components of an accepted body-fitted record."""
+    """Add the disjoint cost components and largest KKT component of an accepted record."""
     if not digest.get("accepted") or not digest.get("source", "").endswith("record.json"):
         return digest
     record = json.loads((path / digest["source"]).read_text())
-    return {**digest, "components": components(record)}
+    kkt = [value for case in record["cases"] for value in (case.get("kkt") or {}).values()]
+    return {
+        **digest,
+        "components": components(record),
+        "max_kkt": max(kkt) if kkt else None,
+    }
 
 
 def bundle(roots, campaign, output, extra=()):
@@ -335,17 +340,50 @@ def primary_rows(summary):
     return "\n".join(lines) + "\n", values
 
 
-def primary_memory_rows(summary):
-    """Largest sampled GPU process allocation (GiB) of each method in the primary cases."""
+def primary_complete_rows(summary):
+    """Median time, range over converged repetitions and largest GPU allocation (GiB)."""
     lines = []
     for geometry, form, key in PRIMARY_ROWS:
         methods = summary[key]["methods"]
-        cells = [geometry, form] + [
-            f"{methods[m]['peak_gpu_bytes'] / 2**30:.3f}"
-            for m in ("jacobi", "reference", "recycling", "amgx")
-        ]
-        lines.append(" & ".join(cells) + r" \\")
+        cells = [geometry, form, "100"]
+        for method in ("jacobi", "reference", "recycling", "amgx"):
+            row = methods[method]
+            if not row["seconds"]:
+                cells.append("--")
+                continue
+            median = f"{row['median_seconds']:.3f}"
+            if row["accepted"] < row["declared"]:
+                median += f" ({row['accepted']}/{row['declared']})"
+            low, high = min(row["seconds"]), max(row["seconds"])
+            gib = row["peak_gpu_bytes"] / 2**30
+            cells.append(rf"\shortstack{{{median}\\{{[{low:.3f}, {high:.3f}]}}\\{gib:.3f}}}")
+        lines.append(" & ".join(cells) + r" \\[4pt]")
     return "\n".join(lines) + "\n", None
+
+
+def _scientific(value):
+    coefficient, exponent = f"{value:.2e}".split("e")
+    return rf"${coefficient}\times10^{{{int(exponent)}}}$"
+
+
+def primary_accuracy(root):
+    """Largest original residual and KKT component over the converged primary repetitions."""
+    found = populations(root)
+    runs = [
+        r
+        for _, _, key in PRIMARY_ROWS
+        for method_runs in found[key]["methods"].values()
+        for r in method_runs
+        if r["accepted"]
+    ]
+    residual = max(c["max_residual"] for r in runs for c in r["cases"])
+    kkt = max(r["max_kkt"] for r in runs)
+    text = (
+        "The maximum independently evaluated relative original residual is\n"
+        f"{_scientific(residual)}, and the maximum of the five KKT components is "
+        f"{_scientific(kkt)}.\n"
+    )
+    return text, {"residual": residual, "kkt": kkt, "runs": len(runs)}
 
 
 def direct_rows(summary):
@@ -355,6 +393,37 @@ def direct_rows(summary):
         return v20.direct_rows(summary)
     finally:
         v20.DIRECT_ROWS = saved
+
+
+CERTIFICATES = "diagnostics/certificates.json"
+CERTIFICATE_MODELS = {
+    ("transformer_2d", 0): "Transformer",
+    ("transformer_2d", 1): "Transformer, refined once",
+    ("transformer_2d", 2): "Transformer, refined twice",
+    ("engine_3d", 1): "Bore 1",
+    ("engine_3d", 2): "Bore 2",
+    ("engine_3d", 3): "Bore 3",
+}
+
+
+def certificate_rows(root):
+    """Inertia of the symmetric parts of the free-node operator and of its transport part."""
+    source = json.loads((Path(root) / CERTIFICATES).read_text())
+    if not source["source_tree_clean"]:
+        raise ValueError("The certificates require a clean source tree")
+    lines = []
+    for c in source["certificates"]:
+        operator = c["operator"]
+        cells = [
+            CERTIFICATE_MODELS[(c["geometry"], c["level"])],
+            c["transport_form"],
+            v20._count(c["free_nodes"]),
+            f"{operator['negative']}/{operator['zero']}/{operator['positive']}",
+            v20._count(c["transport"]["negative"]),
+            "yes" if c["energy_stable"] else "no",
+        ]
+        lines.append(" & ".join(cells) + r" \\")
+    return "\n".join(lines) + "\n", source["certificates"]
 
 
 TRANSFERS = {
@@ -578,7 +647,9 @@ def export(root, output):
         "single_rows": diagnostic_rows(summary, SINGLE_ROWS),
         "original_rows": diagnostic_rows(summary, ORIGINAL_ROWS),
         "direct_rows": direct_rows(summary),
-        "primary_memory_rows": primary_memory_rows(summary),
+        "primary_complete_rows": primary_complete_rows(summary),
+        "primary_accuracy": primary_accuracy(root),
+        "certificate_rows": certificate_rows(root),
         "support_validation_rows": validation_rows(root),
         "support_transfer_rows": transfer_rows(root),
         "temporal_rows": temporal_rows(root),
