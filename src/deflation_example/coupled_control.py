@@ -362,6 +362,7 @@ class CoupledControlProblem:
                 limit_rows=assembly.consistent,
                 residual_weighted=assembly.consistent,
                 streamline_rule=self.streamline_rule,
+                transport_form=self.transport_form,
             )
             if action is not None:
                 # The consistent weighting puts the same streamline factor on the

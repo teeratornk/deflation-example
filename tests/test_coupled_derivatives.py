@@ -89,6 +89,7 @@ def small_coupled_problem(
     consistent=False,
     reference_stabilization="shipped",
     streamline_rule="hard_min",
+    transport_form="advective",
 ):
     """The shared small coupled problem.
 
@@ -132,6 +133,7 @@ def small_coupled_problem(
         consistent_stabilization=consistent,
         reference_stabilization=reference_stabilization,
         streamline_rule=streamline_rule,
+        transport_form=transport_form,
     )
 
 

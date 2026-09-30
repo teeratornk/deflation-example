@@ -97,6 +97,7 @@ def thermal_velocity_jacobian(
     limit_rows=False,
     residual_weighted=False,
     streamline_rule="hard_min",
+    transport_form="advective",
 ):
     """Derivative of K(v)y, including the active streamline-diffusion branch.
 
@@ -110,6 +111,8 @@ def thermal_velocity_jacobian(
     carries the same bounded parameter, so this derivative has to know about it.
     """
     mesh = flow.mesh
+    if transport_form not in {"advective", "skew"}:
+        raise ValueError("Choose advective or skew thermal transport")
     state = np.asarray(state, dtype=float)
     if state.shape != (len(mesh.nodes),) or not np.isfinite(state).all():
         raise ValueError("Thermal derivative requires a finite full-domain state")
@@ -135,6 +138,38 @@ def thermal_velocity_jacobian(
     # Derivative of capacity * integral N_i v . grad(y).
     moments = np.einsum("eq,qi,qa->eia", measure, bary, shape)
     transport = c[:, None, None, None] * moments[:, :, :, None] * gradient_y[:, None, None, :]
+    skew_derivative = None
+    if transport_form == "skew":
+        # Derivative of (c/2) integral N_i div(v) T, including v_r/r.
+        # Use the thermal quadrature, rather than the distinct momentum rule.
+        shape_grad = np.concatenate(
+            (
+                (4 * bary[None, :, :, None] - 1) * grad[:, None, :, :],
+                np.stack(
+                    [
+                        4
+                        * (
+                            bary[None, :, left, None] * grad[:, None, right]
+                            + bary[None, :, right, None] * grad[:, None, left]
+                        )
+                        for left, right in ((0, 1), (0, 2), (1, 2))
+                    ],
+                    axis=2,
+                ),
+            ),
+            axis=2,
+        )
+        radius = vertices[:, :, 0] @ bary.T
+        shape_grad[:, :, :, 0] += shape[None, :, :] / radius[:, :, None]
+        temperature = state[cells] @ bary.T
+        transport += (
+            0.5
+            * c[:, None, None, None]
+            * np.einsum("eq,qi,eqad,eq->eiad", measure, bary, shape_grad, temperature)
+        )
+        skew_derivative = (
+            0.5 * c[:, None, None] * np.einsum("eq,eqad,eq->ead", measure, shape_grad, temperature)
+        )
     center_shape = np.array([-1, -1, -1, 4, 4, 4]) / 9
     v = velocity_scale * np.einsum("a,ead->ed", center_shape, velocity[flow.p2])
     tau, dtau = streamline_parameter(grad, lump, c, kmin, v, vertices, limit_rows, streamline_rule)
@@ -156,6 +191,8 @@ def thermal_velocity_jacobian(
             "ea,ead->ed", integrated_shape, velocity[flow.p2]
         )
         scalar = c * np.einsum("ed,ed->e", integrated_velocity, gradient_y)
+        if skew_derivative is not None:
+            scalar += velocity_scale * np.einsum("ead,ead->e", skew_derivative, velocity[flow.p2])
         if mesh.axisymmetric:
             k = np.asarray(conductivity)[flow.fluid_cells]
             scalar -= 2 * np.pi * area * np.einsum("ed,ed->e", k[:, 0, :], gradient_y)
@@ -169,6 +206,8 @@ def thermal_velocity_jacobian(
             * integrated_shape[:, None, :, None]
             * gradient_y[:, None, None, :]
         )
+        if skew_derivative is not None:
+            local += velocity_scale * weighted[:, :, None, None] * skew_derivative[:, None, :, :]
     blocks = [
         flow._matrix(local[:, :, :, d], cells, flow.p2, (len(mesh.nodes), flow.nv))
         for d in range(2)

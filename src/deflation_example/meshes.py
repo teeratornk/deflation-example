@@ -244,8 +244,6 @@ def assemble_thermal(
         raise ValueError("Choose advective or skew thermal transport")
     if consistent and not streamline:
         raise ValueError("A consistent stabilisation needs the streamline term it weights")
-    if consistent and transport_form != "advective":
-        raise ValueError("Residual-weighted stabilization currently requires advective transport")
     # The row bound belongs to the consistent weighting, so it follows that choice
     # unless asked for on its own. Asking for it without the weighting gives the
     # corrected model's stiffness with lumped storage and source, which is what a
@@ -380,6 +378,12 @@ def assemble_thermal(
             convection = measure[:, None] * transport_gradient
             if quadratic_flow:
                 convection = c[:, None] * np.einsum("ed,ejd->ej", moments.sum(axis=1), grad)
+                if transport_form == "skew":
+                    # Weight the same half-divergence term as in the Galerkin
+                    # equation; the streamline test is constant within a cell.
+                    convection += (
+                        0.5 * c[:, None] * np.einsum("eq,qj->ej", weighted_divergence, bary)
+                    )
             if mesh.axisymmetric:
                 # The cylindrical 1/r cancels the 2*pi*r volume weight. The
                 # remaining integral is exact for cell-constant K and P1 T.

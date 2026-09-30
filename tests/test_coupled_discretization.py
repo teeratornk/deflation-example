@@ -137,8 +137,8 @@ def test_physical_initialization_and_explicit_radii_in_complete_runner(tmp_path,
         trial_policy="backtrack",
         qp_solver="projected",
         nonlinear_cap=1,
-        lower_K=-0.6,
-        queries=[{"target": 7, "upper_K": 0.6}],
+        lower_K=299.4,
+        queries=[{"target": 7, "upper_K": 300.6}],
         target_count=16,
         target_startup_s=60,
         initial_state_policy="physical_initial",
@@ -154,6 +154,7 @@ def test_physical_initialization_and_explicit_radii_in_complete_runner(tmp_path,
         budget_seconds=120,
     )
     assert report["initial_state"]["policy"] == "physical_initial"
+    assert report["cases"][0]["upper_K"] == 300.6
     assert report["cases"][0]["status"] in {"converged", "nonlinear_iteration_cap"}
     from deflation_example.coupled_recovery import RecoveryStore, identity
 
@@ -165,3 +166,47 @@ def test_physical_initialization_and_explicit_radii_in_complete_runner(tmp_path,
     if recovered["optimizer"] is not None:
         assert recovered["optimizer"]["minimum_radius_K"] == 1e-10
     assert report["cumulative_attempt_seconds"] > 0
+
+
+@pytest.mark.parametrize("form", ["advective", "skew"])
+@pytest.mark.parametrize("consistent", [False, True])
+def test_selected_transport_has_exact_thermal_and_coupled_derivatives(form, consistent):
+    from test_coupled_derivatives import small_coupled_problem
+    from deflation_example.coupled_derivatives import thermal_velocity_jacobian
+    from deflation_example.coupled_trust_check import check
+
+    problem = small_coupled_problem(
+        [0.2, 0.35],
+        uniform_capacity=True,
+        consistent=consistent,
+        streamline_rule="smooth_p8",
+        transport_form=form,
+    )
+    rng = np.random.default_rng(834)
+    state = rng.uniform(0.04, 0.12, problem.size)
+    velocity = problem.initial_flow.velocity + 0.003 * rng.normal(size=(problem.flow.nv, 2))
+    direction = rng.normal(size=velocity.shape)
+    full = problem.full_temperature(state[: problem.spatial_size])
+    derivative = thermal_velocity_jacobian(
+        problem.flow,
+        velocity,
+        full,
+        problem.capacity,
+        problem.conductivity,
+        problem.velocity_scale,
+        limit_rows=consistent,
+        residual_weighted=consistent,
+        streamline_rule="smooth_p8",
+        transport_form=form,
+    )
+    h = 1e-6
+    numerical = (
+        problem.assemble(velocity + h * direction).stiffness @ full
+        - problem.assemble(velocity - h * direction).stiffness @ full
+    ) / (2 * h)
+    analytic = derivative @ np.r_[direction[:, 0], direction[:, 1], np.zeros(problem.flow.np)]
+    np.testing.assert_allclose(analytic, numerical, rtol=1e-6, atol=1e-8)
+    evaluation = problem.evaluate(state)
+    report = check(problem, state, evaluation, np.full(problem.size, 0.15))
+    assert report["derivatives_passed"]
+    assert report["adjoint"]["gradient_relative_difference"] < 1e-10

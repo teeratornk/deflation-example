@@ -52,6 +52,7 @@ def step_linearization(problem, state, velocity, slab, control=None, previous=No
         limit_rows=assembly.consistent,
         residual_weighted=assembly.consistent,
         streamline_rule=getattr(problem, "streamline_rule", "hard_min"),
+        transport_form=problem.transport_form,
     )[problem.free][:, problem.flow_free]
     if assembly.consistent:
         thermal_mass = (

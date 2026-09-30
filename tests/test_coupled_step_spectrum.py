@@ -15,8 +15,9 @@ from test_coupled_derivatives import small_coupled_problem
     ids=["lumped", "consistent-slack-bound", "consistent-binding-bound"],
 )
 @pytest.mark.parametrize("streamline_rule", ["hard_min", "smooth_p8"])
+@pytest.mark.parametrize("transport_form", ["advective", "skew"])
 def test_current_and_previous_derivatives_against_complete_equations(
-    consistent, inlet, streamline_rule
+    consistent, inlet, streamline_rule, transport_form
 ):
     """The step Jacobian is the derivative of the step the runner actually solves.
 
@@ -26,7 +27,11 @@ def test_current_and_previous_derivatives_against_complete_equations(
     state are handed over as complete nodal fields, the way the runner holds them.
     """
     problem = small_coupled_problem(
-        [0.2, 0.35], uniform_capacity=True, inlet=inlet, streamline_rule=streamline_rule
+        [0.2, 0.35],
+        uniform_capacity=True,
+        inlet=inlet,
+        streamline_rule=streamline_rule,
+        transport_form=transport_form,
     )
     if consistent:
         problem.consistent_stabilization = True

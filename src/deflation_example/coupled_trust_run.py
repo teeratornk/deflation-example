@@ -366,6 +366,7 @@ def run(
                 case = {
                     "position": position,
                     "target": query["target"],
+                    "upper_K": query["upper_K"],
                     "status": result.status,
                     "verified": verified,
                     "kkt": result.kkt,
