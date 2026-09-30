@@ -68,7 +68,7 @@ def test_trajectory_evaluation_preserves_temperatures_and_never_claims_optimizat
     from deflation_example.coupled_flow_branch import trajectory_check
     from test_coupled_derivatives import small_coupled_problem
 
-    problem = small_coupled_problem([0.2, 0.35])
+    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
     state = np.linspace(0.04, 0.1, problem.size)
     evaluation = problem.evaluate(state)
     velocities = np.stack([f.velocity for f in evaluation.flows])
