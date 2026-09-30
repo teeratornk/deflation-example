@@ -67,3 +67,24 @@ def test_summary_rejects_mixed_or_mislabeled_evidence(mutation):
         other["cases"][0]["status"] = "iteration_cap"
     with pytest.raises(ValueError):
         summarize([first, other])
+
+
+def test_plot_uses_comparable_axis_limits(tmp_path, monkeypatch):
+    pytest.importorskip("matplotlib")
+    from matplotlib.figure import Figure
+    from deflation_example.coupled_flow_response_report import plot
+
+    first, other = record(), record()
+    other["slab_zero_based"] = 9
+    other["tangent"]["velocity_derivative_norm_m_s_per_K"] = 300
+    summary = summarize([first, other])
+    checked = []
+
+    def inspect(figure, *args, **kwargs):
+        assert figure.axes[0].get_ylim() == figure.axes[1].get_ylim()
+        assert figure.axes[0].get_ylim()[1] >= 300
+        checked.append(True)
+
+    monkeypatch.setattr(Figure, "savefig", inspect)
+    plot(summary, tmp_path)
+    assert len(checked) == 2

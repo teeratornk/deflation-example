@@ -86,7 +86,20 @@ def plot(summary, output):
     import matplotlib.pyplot as plt
 
     count = len(summary["slabs"])
-    fig, axes = plt.subplots(1, count, figsize=(4.4 * count, 4.7), squeeze=False)
+    fig, axes = plt.subplots(1, count, figsize=(4.4 * count, 4.7), squeeze=False, sharey=True)
+    positive = [row["tangent"]["velocity_derivative_norm_m_s_per_K"] for row in summary["slabs"]]
+    positive += [
+        case["measured_velocity_response_m_s_per_K"]
+        for row in summary["slabs"]
+        for case in row["cases"]
+        if case["measured_velocity_response_m_s_per_K"] is not None
+    ]
+    positive = [value for value in positive if value > 0]
+    if not positive:
+        raise ValueError("A logarithmic response plot requires a positive response")
+    limits = (10 ** np.floor(np.log10(min(positive))), 10 ** np.ceil(np.log10(max(positive))))
+    if limits[0] == limits[1]:
+        limits = (limits[0] / 10, limits[1] * 10)
     for ax, row in zip(axes[0], summary["slabs"], strict=True):
         failures = []
         for sign, color, label in (
@@ -128,6 +141,7 @@ def plot(summary, output):
             label="Analytic tangent",
         )
         ax.set_title(f"Time slab {row['slab_zero_based'] + 1}")
+        ax.set_ylim(*limits)
         ax.set_xlabel("Maximum temperature perturbation (K)")
         ax.set_xticks([1e-8, 1e-6, 1e-4])
         ax.grid(alpha=0.2, which="both")
