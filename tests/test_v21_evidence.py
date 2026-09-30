@@ -285,3 +285,14 @@ def test_certificate_rows_report_operator_inertia_and_stability(tmp_path):
     first, second = text.strip().splitlines()
     assert first == r"Transformer & advective & 10{,}830 & 11/0/10819 & 4{,}753 & no \\"
     assert second.startswith("Bore 3 & advective") and second.endswith(r"& yes \\")
+
+
+def test_records_without_inner_components_keep_their_kkt(tmp_path):
+    record = timed_record(5.0)
+    for case in record["cases"]:
+        for row in case["inner"]:
+            del row["components_seconds"]
+    (tmp_path / "direct-0").mkdir()
+    (tmp_path / "direct-0/record.json").write_text(json.dumps(record))
+    digest = v21._with_components(tmp_path, {"accepted": True, "source": "direct-0/record.json"})
+    assert digest["components"] is None and digest["max_kkt"] == pytest.approx(1e-9)

@@ -113,9 +113,12 @@ def _with_components(path, digest):
         return digest
     record = json.loads((path / digest["source"]).read_text())
     kkt = [value for case in record["cases"] for value in (case.get("kkt") or {}).values()]
+    inner = [row for case in record["cases"] for row in case.get("inner") or []]
+    # CPU direct and block-in-time records carry no inner cost components.
+    timed = bool(inner) and all("components_seconds" in row for row in inner)
     return {
         **digest,
-        "components": components(record),
+        "components": components(record) if timed else None,
         "max_kkt": max(kkt) if kkt else None,
     }
 
