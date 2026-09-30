@@ -1,8 +1,10 @@
 """Figures generated from complete follow-up records, including unsuccessful runs."""
 
 import argparse
+from collections import Counter
 import json
 from pathlib import Path
+import textwrap
 
 import numpy as np
 
@@ -139,23 +141,38 @@ def confirmation_figure(report, output):
             symbol = "o" if row["verified"] else "x"
             elapsed = row.get("cumulative_attempt_seconds")
             if elapsed is None:
-                axes[0].text(x, 0, row["status"].replace("_", " "), rotation=90, fontsize=7)
                 continue
             axes[0].plot(x, elapsed / 60, symbol, color=COLORS[method])
             memory = row.get("memory") or {}
             if memory.get("complete"):
                 for axis, key in zip(axes[1:], memory_keys, strict=True):
                     axis.plot(x, memory[key] / 2**30, symbol, color=COLORS[method])
-            if not row["verified"]:
-                axes[0].annotate(
-                    row["status"].replace("_", " "),
-                    (x, row["cumulative_attempt_seconds"] / 60),
-                    xytext=(3, 3),
-                    textcoords="offset points",
-                    fontsize=7,
-                    rotation=35,
-                )
         summary = report["methods"][method]
+        failures = Counter(
+            row["status"] if row["status"] != "complete" else "verification_failed"
+            for row in selected
+            if not row["verified"]
+        )
+        missing = summary["declared_sequences"] - len(selected)
+        if missing > 0:
+            failures["missing"] += missing
+        if failures:
+            note = "\n".join(
+                textwrap.fill(
+                    f"{status.replace('_', ' ')}: {count}/{summary['declared_sequences']}",
+                    width=23,
+                )
+                for status, count in sorted(failures.items())
+            )
+            axes[0].text(
+                position,
+                0.98,
+                note,
+                transform=axes[0].get_xaxis_transform(),
+                ha="center",
+                va="top",
+                fontsize=8,
+            )
         if summary["median_complete_seconds"] is not None:
             axes[0].plot(
                 [position - 0.18, position + 0.18],
@@ -168,6 +185,8 @@ def confirmation_figure(report, output):
         axis.set_xticks(range(3), labels)
         axis.set_ylim(bottom=0)
     failed = any(not row["verified"] for row in rows)
+    if failed:
+        axes[0].set_ylim(top=axes[0].get_ylim()[1] * 1.35)
     axes[0].set_ylabel("Elapsed attempt time (min)" if failed else "Complete sequence time (min)")
     axes[1].set_ylabel("Sampled host process RSS (GiB)")
     if gpu:

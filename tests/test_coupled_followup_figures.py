@@ -50,6 +50,25 @@ def test_backend_figure_keeps_failures_and_both_execution_backends(tmp_path):
     assert (tmp_path / "backend_development.pdf").stat().st_size > 1000
 
 
+def test_repeated_failures_keep_all_points_without_repeating_annotations(tmp_path, monkeypatch):
+    pytest.importorskip("matplotlib")
+    records = population()
+    for record in records:
+        record["status"] = "trust_radius_exhausted"
+    figures = []
+    monkeypatch.setattr(
+        "deflation_example.coupled_followup_figures.save",
+        lambda fig, *_: figures.append(fig),
+    )
+    confirmation_figure(confirmation(records), tmp_path)
+    axis = figures[0].axes[0]
+    assert len(axis.lines) == 15
+    assert all(line.get_marker() == "x" for line in axis.lines)
+    assert len(axis.texts) == 3
+    assert all("5/5" in text.get_text() for text in axis.texts)
+    assert all("trust radius" in text.get_text() for text in axis.texts)
+
+
 def test_hybrid_confirmation_reports_host_and_gpu_memory(tmp_path, monkeypatch):
     pytest.importorskip("matplotlib")
     records = population()
