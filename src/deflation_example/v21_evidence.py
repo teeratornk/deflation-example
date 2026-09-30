@@ -498,8 +498,13 @@ def transfer_rows(root):
             energy = _median([v["correction"]["coarse_removed_energy_fraction"] for v in data])
             iterations = sum(_median([p["iterations"] for p in v["repetitions"]]) for v in data)
             seconds = sum(_median([p["seconds"] for p in v["repetitions"]]) for v in data)
+            first = method == "full_reference"
+            active = sum(r["newly_active"] for r in source["rows"])
+            inactive = sum(r["newly_inactive"] for r in source["rows"])
             cells = [
-                name,
+                name if first else "",
+                len(source["rows"]) if first else "",
+                f"{active}/{inactive}" if first else "",
                 label,
                 len(selected),
                 rank,
@@ -538,19 +543,26 @@ TEMPORAL = [
     ("Transformer", "1 h", "skew", "temporal/hour-skew", []),
     (
         "Bore 1",
-        "0.1",
-        "swirl",
+        "$T_f=0.1$",
+        "advective",
         "temporal/T-engine-L1",
         ["temporal/T-engine-L1-replay-case-04", "temporal/T-engine-L1-replay-case-09"],
     ),
-    ("Transformer", "600 s", "original", "temporal/published-600s-advective", []),
-    ("Transformer", "1 h", "original", "temporal/hour-advective", []),
+    ("Transformer", "600 s", "advective", "temporal/published-600s-advective", []),
+    ("Transformer", "1 h", "advective", "temporal/hour-advective", []),
 ]
 TEMPORAL_SLABS = 8
 
 
 def _kelvin(values):
-    return f"{max(values):.2f}" if values else "--"
+    """Largest value in kelvin; diverged replays of the original transport use powers of ten."""
+    if not values:
+        return "--"
+    value = max(values)
+    if value < 1e3:
+        return f"{value:.2f}"
+    mantissa, exponent = f"{value:.1e}".split("e")
+    return rf"${mantissa}\times10^{{{int(exponent)}}}$"
 
 
 def temporal_rows(root):

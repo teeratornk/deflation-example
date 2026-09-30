@@ -237,7 +237,8 @@ def test_transfer_rows_follow_the_supporting_table_format(tmp_path):
         (tmp_path / path).write_text(json.dumps(trace(0.25, 40)))
     text, records = v21.transfer_rows(tmp_path)
     first = text.splitlines()[0]
-    assert first == r"Bore steady & Full reference & 2 & 100 & 0.250 & 80 & 1.000 \\"
+    assert first == r"Bore steady & 2 & 4/10 & Full reference & 2 & 100 & 0.250 & 80 & 1.000 \\"
+    assert text.splitlines()[1].startswith(" &  &  & Sequential transfer")
     assert len(records) == 6 and records[0]["newly_inactive"] == 10
 
 
@@ -296,3 +297,9 @@ def test_records_without_inner_components_keep_their_kkt(tmp_path):
     (tmp_path / "direct-0/record.json").write_text(json.dumps(record))
     digest = v21._with_components(tmp_path, {"accepted": True, "source": "direct-0/record.json"})
     assert digest["components"] is None and digest["max_kkt"] == pytest.approx(1e-9)
+
+
+def test_diverged_replays_are_printed_as_powers_of_ten():
+    assert v21._kelvin([0.4, 2.871]) == "2.87"
+    assert v21._kelvin([9.27e145]) == r"$9.3\times10^{145}$"
+    assert v21._kelvin([]) == "--"
