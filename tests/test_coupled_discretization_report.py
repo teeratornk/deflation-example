@@ -96,3 +96,19 @@ def test_local_population_keeps_failed_and_missing_perturbations(tmp_path):
     assert results[11]["status"] == "iteration_cap"
     assert results[12]["status"] == "missing"
     assert not any(r["verified"] for r in results)
+
+
+def test_initial_momentum_diagnostic_keeps_original_residual_and_fields():
+    from test_coupled_derivatives import small_coupled_problem
+    from deflation_example.coupled_initial_flow import diagnose
+
+    problem = small_coupled_problem([0.2, 0.35], uniform_capacity=True)
+    initial = problem.initial_flow.velocity.copy()
+    result, report = diagnose(problem)
+    assert result.status == "converged"
+    assert report["float64_momentum_residual"] == pytest.approx(
+        report["original_equations"]["momentum_relative_residual"],
+        abs=1e-15,
+    )
+    assert report["extended_accumulation_momentum_residual"] < problem.flow_tolerance
+    np.testing.assert_array_equal(problem.initial_flow.velocity, initial)
