@@ -58,6 +58,8 @@ def run(
         "frozen_layout": "serial",
         **cfg,
     }
+    if cfg.get("initial_state_policy", "snapshot") not in {"snapshot", "physical_initial"}:
+        raise ValueError("Choose snapshot or physical_initial initialization")
     if cfg["trial_policy"] not in {"radius_rebuild", "backtrack"}:
         raise ValueError("Unknown trial policy")
     if cfg["qp_correction_policy"] not in {"kkt_decrease", "allow_partition_change"}:
@@ -156,7 +158,29 @@ def run(
             )
             guess = None
             if saved is None:
-                guess, record["initial_state"] = snapshot_initial_guess(cfg, problem, baseline, 0)
+                if cfg.get("initial_state_policy", "snapshot") == "physical_initial":
+                    state = np.tile(problem.initial, problem.slabs)
+                    lower = (
+                        cfg["lower_K"] - problem.temperature_offset
+                    ) / problem.temperature_scale
+                    upper = (
+                        cfg["queries"][0]["upper_K"] - problem.temperature_offset
+                    ) / problem.temperature_scale
+                    if np.any(state < lower) or np.any(state > upper):
+                        raise ValueError("The physical initial temperature violates the bounds")
+                    guess = RestoredEvaluation(
+                        state,
+                        np.repeat(problem.initial_flow.velocity[None], problem.slabs, axis=0),
+                        np.repeat(problem.initial_flow.pressure[None], problem.slabs, axis=0),
+                    )
+                    record["initial_state"] = {
+                        "policy": "physical_initial",
+                        "retained_optimizer_history": False,
+                    }
+                else:
+                    guess, record["initial_state"] = snapshot_initial_guess(
+                        cfg, problem, baseline, 0
+                    )
             components["model_and_initialization"] = time.perf_counter() - tick
             tick = time.perf_counter()
             if cfg["method"] == "reference":
@@ -315,6 +339,8 @@ def run(
                     observer=trace,
                     checkpoint=save_optimizer,
                     resume=optimizer_resume,
+                    initial_radius_K=cfg.get("initial_radius_K"),
+                    minimum_radius_K=cfg.get("minimum_radius_K"),
                     budget_seconds=max(
                         1e-6, budget_seconds - prior_total - (time.perf_counter() - start)
                     )
