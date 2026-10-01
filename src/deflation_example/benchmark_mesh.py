@@ -20,6 +20,7 @@ from .mesh_control import build_mesh_control
 from .mesh_reference import build_mesh_reference
 from .mesh_reference import DeviceMeshReference
 from .mesh_showcases import build_showcase, desired_temperature, reassemble
+from .reference_transfer import ZeroExtensionReference
 from .reporting import environment, write_report, write_fields
 from .solvers import pdas, independent_residual, LinearResult, relative_norm
 from .study_solvers import StudySolver
@@ -36,6 +37,9 @@ METHOD_SOLVERS = {
     "direct": "direct",
     "block": "jacobi",
     "block_reference": "reference",
+    # Retention ablation: the same reference, carried between inactive sets by zero
+    # extension instead of being restricted directly.
+    "reference_zero": "reference",
 }
 BLOCK_METHODS = {"block", "block_reference"}
 
@@ -399,6 +403,10 @@ def sequence(c, method, torch=None, api=None):
             )
             if c["reference_device"] == "cuda":
                 reference = DeviceMeshReference(reference, torch)
+            if method == "reference_zero":
+                reference = ZeroExtensionReference(
+                    reference, torch if c["reference_device"] == "cuda" else None
+                )
             storage.update(reference.storage())
             storage["reference_description"] = reference.description
         components["reference_construction"] = time.perf_counter() - tick
