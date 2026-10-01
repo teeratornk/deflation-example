@@ -237,8 +237,10 @@ def test_transfer_rows_follow_the_supporting_table_format(tmp_path):
         (tmp_path / path).write_text(json.dumps(trace(0.25, 40)))
     text, records = v21.transfer_rows(tmp_path)
     first = text.splitlines()[0]
-    assert first == r"Bore 2, steady & 2 & 4/10 & Full reference & 2 & 100 & 0.250 & 80 & 1.000 \\"
-    assert text.splitlines()[1].startswith(" &  &  & Sequential transfer")
+    assert (
+        first == r"Bore 2, steady & 2 & 4/10 & Direct restriction & 2 & 100 & 0.250 & 80 & 1.000 \\"
+    )
+    assert text.splitlines()[1].startswith(" &  &  & Zero-extension transfer")
     assert len(records) == 6 and records[0]["newly_inactive"] == 10
 
 
@@ -344,3 +346,24 @@ def test_provenance_records_the_transport_of_replays_and_figure_records(evidence
     assert {t["transport_form"] for t in record["transfers"].values()} == {"skew"}
     assert record["figure_records"]["r.json"]["transport_form"] == "skew"
     assert record["figure_records"]["r.json"]["source_sha256"]
+
+
+def test_ablation_rows_compare_zero_extension_with_direct_restriction(tmp_path, monkeypatch):
+    runs, campaign = tmp_path / "v21", tmp_path / "campaign"
+    write_population(
+        runs / "wave6/X-case-zero",
+        {"jacobi": [30.0, 32.0], "reference": [10.0, 12.0], "reference_zero": [18.0, 20.0]},
+        methods=("jacobi", "reference", "reference_zero"),
+    )
+    for name in v21.CAMPAIGN_FILES:
+        (campaign / name).parent.mkdir(parents=True, exist_ok=True)
+        (campaign / name).write_text("{}")
+    out = tmp_path / "evidence"
+    v21.bundle([(runs, v21.PREFIX)], campaign, out)
+    monkeypatch.setattr(v21, "ABLATION_ROWS", [("Bore 2", "Steady", "v21-wave6/X-case-zero")])
+    text, values = v21.ablation_rows(v21.summarize(out))
+    cells = [c.strip() for c in text.strip().rstrip("\\").split(" & ")]
+    assert cells[2:5] == ["31.000", "11.000", "19.000"]
+    assert cells[5] == "1.73 [1.50, 2.00]"
+    assert cells[6] == "1.00"
+    assert values[0]["ratio"] == pytest.approx(19 / 11)

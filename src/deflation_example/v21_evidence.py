@@ -347,6 +347,59 @@ def primary_rows(summary):
     return "\n".join(lines) + "\n", values
 
 
+ABLATION_ROWS = [
+    ("Transformer", "Steady", "v21-wave6/X-transformer-steady-skew-zero"),
+    ("Transformer", "4 slabs", "v21-wave6/X-transformer-x4-skew-zero"),
+    ("Bore 1", "Steady", "v21-wave6/X-engine-L1-steady-zero"),
+    ("Bore 1", "4 slabs", "v21-wave6/X-engine-L1-x4-zero"),
+    ("Bore 2", "Steady", "v21-wave6/X-engine-L2-steady-zero"),
+    ("Bore 2", "4 slabs", "v21-wave6/X-engine-L2-x4-zero"),
+]
+
+
+def ablation_rows(summary):
+    """Retention ablation: the same reference with direct restriction or zero extension.
+
+    Cells give the median complete seconds of Jacobi-CG, direct restriction and
+    zero-extension transfer, the ratio of the zero-extension to the direct-restriction
+    median with its envelope over repetitions, and the ratio of their median inner
+    iterations. A count in parentheses gives converged and attempted repetitions.
+    """
+    lines, values = [], []
+    for geometry, form, key in ABLATION_ROWS:
+        methods = summary[key]["methods"]
+        cells = [geometry, form]
+        for method in ("jacobi", "reference", "reference_zero"):
+            row = methods[method]
+            text = "--" if row["median_seconds"] is None else f"{row['median_seconds']:.3f}"
+            if row["accepted"] < row["declared"]:
+                text += f" ({row['accepted']}/{row['declared']})"
+            cells.append(text)
+        direct, zero = methods["reference"], methods["reference_zero"]
+        if direct["median_seconds"] is None or zero["median_seconds"] is None:
+            cells += ["--", "--"]
+            values.append({"population": key, "ratio": None})
+        else:
+            ratio = zero["median_seconds"] / direct["median_seconds"]
+            low = min(zero["seconds"]) / max(direct["seconds"])
+            high = max(zero["seconds"]) / min(direct["seconds"])
+            iterations = zero["median_inner"] / direct["median_inner"]
+            cells += [
+                f"{v20._ratio(ratio)} [{v20._ratio(low)}, {v20._ratio(high)}]",
+                v20._ratio(iterations),
+            ]
+            values.append(
+                {
+                    "population": key,
+                    "ratio": ratio,
+                    "range": [low, high],
+                    "iterations": iterations,
+                }
+            )
+        lines.append(" & ".join(cells) + r" \\")
+    return "\n".join(lines) + "\n", values
+
+
 def primary_complete_rows(summary):
     """Median time, range over converged repetitions and largest GPU allocation (GiB)."""
     lines = []
@@ -486,8 +539,8 @@ def transfer_rows(root):
             raise ValueError("The transfer source contains a failed replay")
         selected = [r for r in source["rows"] if r["methods"]]
         for method, label in (
-            ("full_reference", "Full reference"),
-            ("sequential_transfer", "Sequential transfer"),
+            ("full_reference", "Direct restriction"),
+            ("sequential_transfer", "Zero-extension transfer"),
         ):
             data = [r["methods"][method] for r in selected]
             repetitions = [p for v in data for p in v["repetitions"]]
@@ -696,6 +749,7 @@ def export(root, output):
         "original_rows": diagnostic_rows(summary, ORIGINAL_ROWS),
         "direct_rows": direct_rows(summary),
         "primary_complete_rows": primary_complete_rows(summary),
+        "ablation_rows": ablation_rows(summary),
         "primary_accuracy": primary_accuracy(root),
         "certificate_rows": certificate_rows(root),
         "support_validation_rows": validation_rows(root),
@@ -730,6 +784,9 @@ def export(root, output):
         )
     }
     index["primary_rows"] = [dict(zip(("geometry", "form", "population"), r)) for r in PRIMARY_ROWS]
+    index["ablation_rows"] = [
+        dict(zip(("geometry", "form", "population"), r)) for r in ABLATION_ROWS
+    ]
     index["direct_rows"] = [dict(zip(("label", "cpu", "gpu"), r)) for r in DIRECT_ROWS]
     index["twins"], index["augment"] = TWINS, AUGMENT
     index["provenance"] = provenance(root, found)
