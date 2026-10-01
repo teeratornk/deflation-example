@@ -56,7 +56,7 @@ tabulated comparison and the source digest of each replay and figure record.
 | SI Table S10, transformer trace | `diagnostics/transfer/M-transformer-x4-skew-transfer.json`, replaying `reference-0` of `v21-wave1/P-transformer-x4-skew` | skew |
 | SI Table S5, transformer subproblem | `diagnostics/validation/V-validation-skew.json` | skew |
 | SI Table S7, transformer rows | `temporal/T-transformer-600s-skew`, `temporal/hour-skew` (skew); `temporal/published-600s-advective`, `temporal/hour-advective` (diagnostics) | skew; advective |
-| SI Table S12 (retention ablation), transformer rows | `v21-wave6/X-transformer-*-skew-zero` | skew |
+| SI Table S12 (retention ablation), all rows; run commit `5ddc619` | `v21-wave6/X-transformer-*-skew-zero`, `v21-wave6/X-engine-L1-*-zero`, `v21-wave6/X-engine-L2-*-zero` | skew (transformer); advective, energy-stable (bore-in-block) |
 | SI Table S1 | `diagnostics/certificates.json` | both forms |
 | SI Table S18 (original-transport diagnostics) | `wave3/C-S4b-transformer-*`, `wave9/O*-transformer-*` | advective |
 
