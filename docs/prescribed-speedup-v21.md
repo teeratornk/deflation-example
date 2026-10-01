@@ -30,9 +30,10 @@ transformer operator has negative eigenvalues and grows under time refinement.
 
 | Component | Branch | Commit |
 | --- | --- | --- |
+| Retention ablation (method `reference_zero`) | `study/prescribed-speedup-v21` | [`5ddc619`](https://github.com/teeratornk/deflation-example/tree/5ddc6197c060543c27255400247876ea67fd881b) |
 | Stability certificates | `study/prescribed-speedup-v21` | [`6e22606`](https://github.com/teeratornk/deflation-example/tree/6e2260685b0f319bb682a0d1345c660b14cfaf73) |
 | Timed comparisons, temporal studies, verification and transfer replays | `study/prescribed-speedup-v21` | [`297899f`](https://github.com/teeratornk/deflation-example/tree/297899fdba3a38b07d09db86114acdefbd4d5111) |
-| Evidence digests and table rows | `study/prescribed-speedup-v21-evidence` | [`97a8b3e`](https://github.com/teeratornk/deflation-example/tree/97a8b3e2c27f401c746bdfe421ee7af6af233c6b) |
+| Evidence digests and table rows | `study/prescribed-speedup-v21-evidence` | [`a457629`](https://github.com/teeratornk/deflation-example/tree/a457629aed64c3545203541325b37e7382020715) |
 
 The [records](../examples/prescribed_speedup_v21/README.md) contain the evidence
 archive, the complete comparison listing and the checksums.
@@ -51,12 +52,13 @@ tabulated comparison and the source digest of each replay and figure record.
 | Table 2, transformer rows; Figure 5 | `v21-wave1/P-transformer-steady-skew`, `v21-wave1/P-transformer-x4-skew` | skew |
 | Figure 1(c) | record `reference-0` of `v21-wave1/P-transformer-x4-skew` | skew |
 | Tables 4–6, transformer rows; Figure 7 | `v21-wave2/*-skew` (steady, 4 and 8 slabs, sorted and shuffled order, off-design flow), `wave15/O1s-*`, `wave15/O4s-*` | skew |
-| SI Tables S13–S15, transformer rows | `v21-wave2/*-skew`, `v21-wave3/D-transformer-*-skew` | skew |
+| SI Tables S14–S16, transformer rows | `v21-wave2/*-skew`, `v21-wave3/D-transformer-*-skew` | skew |
 | SI Table S10, transformer trace | `diagnostics/transfer/M-transformer-x4-skew-transfer.json`, replaying `reference-0` of `v21-wave1/P-transformer-x4-skew` | skew |
 | SI Table S5, transformer subproblem | `diagnostics/validation/V-validation-skew.json` | skew |
 | SI Table S7, transformer rows | `temporal/T-transformer-600s-skew`, `temporal/hour-skew` (skew); `temporal/published-600s-advective`, `temporal/hour-advective` (diagnostics) | skew; advective |
+| SI Table S12 (retention ablation), transformer rows | `v21-wave6/X-transformer-*-skew-zero` | skew |
 | SI Table S1 | `diagnostics/certificates.json` | both forms |
-| SI Table S17 (original-transport diagnostics) | `wave3/C-S4b-transformer-*`, `wave9/O*-transformer-*` | advective |
+| SI Table S18 (original-transport diagnostics) | `wave3/C-S4b-transformer-*`, `wave9/O*-transformer-*` | advective |
 
 ## Definitions
 
@@ -84,6 +86,8 @@ In addition:
   4 to 64 slabs, with the piecewise-constant controls replayed on up to 4096 steps.
 - **Support:** independent bounded least squares on 12 small mesh problems and
   matched transfer replays of the primary traces.
+- **Retention ablation:** the six primary cases with Jacobi-CG, direct restriction
+  and zero-extension transfer of the same reference in one job per case.
 
 The [complete listing](../examples/prescribed_speedup_v21/populations.md)
 reports every comparison with converged and attempted repetitions per method.
@@ -96,7 +100,7 @@ From a checkout of this revision, copy the archive and switch to the evidence co
 
 ```bash
 cp examples/prescribed_speedup_v21/evidence.tar.gz /tmp/v21-evidence.tar.gz
-git checkout --detach 97a8b3e2c27f401c746bdfe421ee7af6af233c6b
+git checkout --detach a457629aed64c3545203541325b37e7382020715
 mkdir /tmp/v21 && tar -xzf /tmp/v21-evidence.tar.gz -C /tmp/v21
 uv run --locked python -m deflation_example.v21_evidence export \
     --evidence /tmp/v21 --output /tmp/v21-out

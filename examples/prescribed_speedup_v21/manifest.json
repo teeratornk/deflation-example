@@ -3,29 +3,30 @@
   "study_source": {
     "branch": "study/prescribed-speedup-v21",
     "runs": "297899fdba3a38b07d09db86114acdefbd4d5111",
-    "certificates": "6e2260685b0f319bb682a0d1345c660b14cfaf73"
+    "certificates": "6e2260685b0f319bb682a0d1345c660b14cfaf73",
+    "retention_ablation": "5ddc619"
   },
   "evidence_source": {
     "branch": "study/prescribed-speedup-v21-evidence",
-    "commit": "97a8b3e2c27f401c746bdfe421ee7af6af233c6b"
+    "commit": "a457629aed64c3545203541325b37e7382020715"
   },
-  "evidence_manifest_sha256": "5b3a5506a0a2fe0f34a6b72ee2da38eb18df74369207c343d688776a056b0f9f",
+  "evidence_manifest_sha256": "110c924fe1f1e0b31488236a8ca8b89fa99e5d3ff77f99b5d1d013ef4fe8d3dc",
   "files": {
     "evidence.tar.gz": {
-      "sha256": "3ac39b44885dd8e4889b807fca643b26efd2cddb9af13385d8fee060a260e3e7",
-      "bytes": 2235700
+      "sha256": "af14bb7a025ffedff318620127e625112ec0c8ad284466845ce12c271c8923b6",
+      "bytes": 2303161
     },
     "populations.md": {
-      "sha256": "1095441b33f23ac8fedf26796d4a46b1340f9d2d0ca551d7fc976d235dd993b7",
-      "bytes": 23449
+      "sha256": "79afa6cd6f29abf252bd7e091192c04b7080f02045f624638b59d25b18741f58",
+      "bytes": 24312
     },
     "rows.json": {
-      "sha256": "8713fa34640058acebab6e2353c06147acfa073eda72ff0c81dd146af7fe3e40",
-      "bytes": 20015
+      "sha256": "9286ded9219cf2c08ead99ff193fcea8d9fb45e10e243287ac171fb67b21037c",
+      "bytes": 20701
     },
     "summary.json": {
-      "sha256": "c1512276cdd39ba2a3c263708b09459f2a559fdcbb297dfabec59abff0ba9b6e",
-      "bytes": 257229
+      "sha256": "3a67d216f2f37c4a47e14a9a38c9081b79028e7c33b985e1f4f01e4cee864e17",
+      "bytes": 266265
     }
   }
 }

@@ -1,4 +1,36 @@
 {
+ "ablation_rows": [
+  {
+   "form": "Steady",
+   "geometry": "Transformer",
+   "population": "v21-wave6/X-transformer-steady-skew-zero"
+  },
+  {
+   "form": "4 slabs",
+   "geometry": "Transformer",
+   "population": "v21-wave6/X-transformer-x4-skew-zero"
+  },
+  {
+   "form": "Steady",
+   "geometry": "Bore 1",
+   "population": "v21-wave6/X-engine-L1-steady-zero"
+  },
+  {
+   "form": "4 slabs",
+   "geometry": "Bore 1",
+   "population": "v21-wave6/X-engine-L1-x4-zero"
+  },
+  {
+   "form": "Steady",
+   "geometry": "Bore 2",
+   "population": "v21-wave6/X-engine-L2-steady-zero"
+  },
+  {
+   "form": "4 slabs",
+   "geometry": "Bore 2",
+   "population": "v21-wave6/X-engine-L2-x4-zero"
+  }
+ ],
  "augment": {
   "v21-wave2/O3-transformer-steady-flows-skew": [
    "v21-wave2/H-amgx001-O3-transformer-steady-flows-skew",

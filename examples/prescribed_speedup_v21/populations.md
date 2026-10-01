@@ -30,6 +30,12 @@
 | v21-wave2/S2a-gpu-transformer-x32-perslab4-skew | pilot | reference 1/1, 26.1 | -- |
 | v21-wave3/D-transformer-steady-skew | final | direct 5/5, 5.0 | -- |
 | v21-wave3/D-transformer-x8-skew | final | block 5/5, 44.3; direct 5/5, 343.3 | -- |
+| v21-wave6/X-engine-L1-steady-zero | final | jacobi 5/5, 6.6; reference 5/5, 3.9; reference_zero 5/5, 9.3 | reference: 1.69x vs jacobi |
+| v21-wave6/X-engine-L1-x4-zero | final | jacobi 5/5, 11.6; reference 5/5, 9.9; reference_zero 5/5, 15.3 | reference: 1.17x vs jacobi |
+| v21-wave6/X-engine-L2-steady-zero | final | jacobi 5/5, 55.7; reference 5/5, 31.1; reference_zero 5/5, 67.2 | reference: 1.79x vs jacobi |
+| v21-wave6/X-engine-L2-x4-zero | final | jacobi 5/5, 158.6; reference 5/5, 138.1; reference_zero 5/5, 184.8 | reference: 1.15x vs jacobi |
+| v21-wave6/X-transformer-steady-skew-zero | final | jacobi 5/5, 26.3; reference 5/5, 11.0; reference_zero 5/5, 21.5 | reference: 1.95x vs reference_zero |
+| v21-wave6/X-transformer-x4-skew-zero | final | jacobi 5/5, 39.9; reference 5/5, 23.2; reference_zero 5/5, 28.4 | reference: 1.22x vs reference_zero |
 | wave0/S1a-pilot-engine-L3-steady | pilot | amgx 1/1, 1210.0; jacobi 1/1, 705.1; recycling 1/1, 722.9; reference 1/1, 529.0 | reference: 1.33x vs jacobi |
 | wave0/S3a-pilot-engine-L2-steady | pilot | amgx 1/1, 214.6; jacobi 1/1, 121.3; recycling 1/1, 82.2; reference 1/1, 64.3 | reference: 1.28x vs recycling |
 | wave0/S3a-pilot-engine-L2-x4 | pilot | amgx 1/1, 1106.3; jacobi 1/1, 336.3; recycling 1/1, 327.0; reference 1/1, 289.3 | reference: 1.13x vs recycling |
