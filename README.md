@@ -21,7 +21,11 @@ refinement diagnostics. Read them on GitHub or regenerate them from the
 bundled data without a GPU. The [supplementary figures](docs/supplementary-figures.md)
 plot the first-implementation Cartesian comparisons, and the
 [scale, trajectory and operating-condition page](docs/prescribed-speedup-v20.md)
-documents the comparisons up to 2.5 million unknowns with every timed run.
+documents the comparisons up to 2.5 million unknowns with every timed run. The
+[skew-symmetric transformer page](docs/prescribed-speedup-v21.md) documents the
+transformer comparisons with the energy-stable transport, the body-fitted
+baselines and the time-refinement studies, and
+[transport forms](docs/transport-forms.md) derives the two transport forms.
 
 ## Quickstart
 
