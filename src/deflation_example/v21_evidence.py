@@ -304,10 +304,14 @@ def main_rows(summary, spec, marker=r"$^\dagger$"):
         alternative = reading["fastest_alternative"]
         low, high = _range(population, arm, alternative)
         name = v20.NAMES.get(alternative, alternative)
+        speedup = f"{v20._ratio(reading['ratio'])} [{v20._ratio(low)}, {v20._ratio(high)}]"
+        if methods[arm]["declared"] == 1 and methods[alternative]["declared"] == 1:
+            # A single repetition of each configuration gives one ratio and no envelope.
+            speedup = v20._ratio(reading["ratio"])
         cells = head + [
             v20._seconds(reading["reference_seconds"]),
             f"{name} {v20._seconds(reading['alternative_seconds'])}",
-            f"{v20._ratio(reading['ratio'])} [{v20._ratio(low)}, {v20._ratio(high)}]",
+            speedup,
             v20._ratio(reading["jacobi_iteration_ratio"]),
             not_converged(methods),
         ]
@@ -645,6 +649,35 @@ def cumulative_curves(root, key):
     }
 
 
+FIGURE_RECORDS = {
+    "P-transformer-x4-skew-reference-0.json": ("v21-wave1/P-transformer-x4-skew", "reference", 0),
+    "P-engine-L2-x4-reference-0.json": ("v21-wave1/P-engine-L2-x4", "reference", 0),
+}
+
+
+def provenance(root, found):
+    """Transport form and source of the transfer replays and of the figure records."""
+    transfers = {}
+    for name, path in TRANSFERS.items():
+        source = json.loads((Path(root) / path).read_text())
+        transfers[name] = {
+            "path": path,
+            "transport_form": source["source_controls"].get("transport_form"),
+            "source_record_sha256": source["source_record_sha256"],
+            "git_head": source["environment"].get("git_head"),
+        }
+    records = {}
+    for name, (key, method, repetition) in FIGURE_RECORDS.items():
+        run = next(r for r in found[key]["methods"][method] if r["repetition"] == repetition)
+        records[name] = {
+            "population": key,
+            "transport_form": found[key]["controls"].get("transport_form"),
+            "source_sha256": run["source_sha256"],
+            "git_head": run.get("git_head"),
+        }
+    return {"transfers": transfers, "figure_records": records}
+
+
 def export(root, output):
     """Write rows, figure data and the population listing of a verified evidence tree."""
     output = Path(output)
@@ -678,8 +711,15 @@ def export(root, output):
     }
     v20._write_json(output / "figures.json", figures)
     v20._write_json(output / "summary.json", summary)
+    found = populations(root)
+
+    def entry(row):
+        item = dict(zip(("label", "detail", "population", "arm"), row))
+        item["transport_form"] = found[row[2]]["controls"].get("transport_form")
+        return item
+
     index = {
-        name: [dict(zip(("label", "detail", "population", "arm"), row)) for row in spec]
+        name: [entry(row) for row in spec]
         for name, spec in (
             ("scale_rows", SCALE_ROWS),
             ("transient_rows", TRANSIENT_ROWS),
@@ -692,6 +732,7 @@ def export(root, output):
     index["primary_rows"] = [dict(zip(("geometry", "form", "population"), r)) for r in PRIMARY_ROWS]
     index["direct_rows"] = [dict(zip(("label", "cpu", "gpu"), r)) for r in DIRECT_ROWS]
     index["twins"], index["augment"] = TWINS, AUGMENT
+    index["provenance"] = provenance(root, found)
     index["paired"] = {k: [list(a) for a in v] for k, v in PAIRED.items()}
     v20._write_json(output / "rows.json", index)
     (output / "populations.md").write_text(v20.listing(summary))

@@ -303,3 +303,44 @@ def test_diverged_replays_are_printed_as_powers_of_ten():
     assert v21._kelvin([0.4, 2.871]) == "2.87"
     assert v21._kelvin([9.27e145]) == r"$9.3\times10^{145}$"
     assert v21._kelvin([]) == "--"
+
+
+def test_single_repetition_rows_report_one_ratio_without_an_envelope(tmp_path):
+    runs, campaign = tmp_path / "v21", tmp_path / "campaign"
+    write_population(
+        runs / "wave2/single",
+        {"jacobi": [21.0], "reference": [15.0], "recycling": [30.0], "amgx": [40.0]},
+    )
+    for name in v21.CAMPAIGN_FILES:
+        (campaign / name).parent.mkdir(parents=True, exist_ok=True)
+        (campaign / name).write_text("{}")
+    out = tmp_path / "evidence"
+    v21.bundle([(runs, v21.PREFIX)], campaign, out)
+    text, _ = v21.main_rows(v21.summarize(out), [("T", "x16", "v21-wave2/single", "reference")])
+    cells = [c.strip() for c in text.strip().rstrip("\\").split(" & ")]
+    assert cells[5] == "1.40"
+
+
+def test_provenance_records_the_transport_of_replays_and_figure_records(evidence, monkeypatch):
+    for path in v21.TRANSFERS.values():
+        (evidence / path).parent.mkdir(parents=True, exist_ok=True)
+        (evidence / path).write_text(
+            json.dumps(
+                {
+                    "source_controls": {"transport_form": "skew"},
+                    "source_record_sha256": "abc",
+                    "environment": {"git_head": "297899f"},
+                }
+            )
+        )
+    monkeypatch.setattr(
+        v21,
+        "FIGURE_RECORDS",
+        {"r.json": ("v21-wave2/C-S4b-transformer-x4-skew", "reference", 0)},
+    )
+    found = v21.populations(evidence)
+    found["v21-wave2/C-S4b-transformer-x4-skew"]["controls"]["transport_form"] = "skew"
+    record = v21.provenance(evidence, found)
+    assert {t["transport_form"] for t in record["transfers"].values()} == {"skew"}
+    assert record["figure_records"]["r.json"]["transport_form"] == "skew"
+    assert record["figure_records"]["r.json"]["source_sha256"]
