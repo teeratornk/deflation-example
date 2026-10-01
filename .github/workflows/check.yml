@@ -62,6 +62,9 @@ jobs:
           "$example_env/venv/bin/python" -m deflation_example.validate_mesh --output mesh-independent-validation
           "$example_env/venv/bin/python" -m deflation_example.benchmark_mesh targets=2 transient=true rank=20 spatial_reference=scaled_schur temporal_metric=jacobi +residual_policy=refine output=mesh-residual-correction
           "$example_env/venv/bin/python" -m deflation_example.coupled_projected_example --device cpu --output coupled-projected-verification
+          for mode in local path trajectory; do
+            "$example_env/venv/bin/python" -m deflation_example.coupled_momentum_example --example --mode "$mode" --subdivision 2 --output "momentum-$mode"
+          done
   release:
     if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
     needs: cpu
