@@ -7,7 +7,7 @@
   },
   "evidence_source": {
     "branch": "study/prescribed-speedup-v21-evidence",
-    "commit": "713e6c3f3aa349630c7212962b2de46545bc3cec"
+    "commit": "97a8b3e2c27f401c746bdfe421ee7af6af233c6b"
   },
   "evidence_manifest_sha256": "5b3a5506a0a2fe0f34a6b72ee2da38eb18df74369207c343d688776a056b0f9f",
   "files": {
@@ -20,8 +20,8 @@
       "bytes": 23449
     },
     "rows.json": {
-      "sha256": "e1d739ed2c23cbd93a1f1dcf81aee07e95ad0783690abc132ef343e5b569a70f",
-      "bytes": 16129
+      "sha256": "8713fa34640058acebab6e2353c06147acfa073eda72ff0c81dd146af7fe3e40",
+      "bytes": 20015
     },
     "summary.json": {
       "sha256": "c1512276cdd39ba2a3c263708b09459f2a559fdcbb297dfabec59abff0ba9b6e",

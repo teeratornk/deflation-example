@@ -37,55 +37,64 @@
    "arm": "reference",
    "detail": "24 hourly windows",
    "label": "Transformer day",
-   "population": "wave15/O1s-transformer-day-x8-skew"
+   "population": "wave15/O1s-transformer-day-x8-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "16 windows",
    "label": "Drive cycle",
-   "population": "wave9/O2-engine-L2-cycle-x4"
+   "population": "wave9/O2-engine-L2-cycle-x4",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "transformer",
    "label": "Off-design flow",
-   "population": "v21-wave2/O3-transformer-steady-flows-skew"
+   "population": "v21-wave2/O3-transformer-steady-flows-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "Bore 2",
    "label": "Off-design flow",
-   "population": "wave9/O3-engine-L2-steady-flows"
+   "population": "wave9/O3-engine-L2-steady-flows",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "Bore 3",
    "label": "Off-design flow",
-   "population": "wave9/O3-engine-L3-steady-ref1-flows"
+   "population": "wave9/O3-engine-L3-steady-ref1-flows",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "transformer, 8 slabs",
    "label": "Overloads",
-   "population": "wave15/O4s-transformer-overload-x8-skew"
+   "population": "wave15/O4s-transformer-overload-x8-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "transformer",
    "label": "Shuffled order",
-   "population": "v21-wave2/O5-shuffled-transformer-steady-skew"
+   "population": "v21-wave2/O5-shuffled-transformer-steady-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "Bore 2",
    "label": "Shuffled order",
-   "population": "wave9/O5-shuffled-engine-L2-steady"
+   "population": "wave9/O5-shuffled-engine-L2-steady",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "Bore 2, 4 slabs",
    "label": "Shuffled order",
-   "population": "wave9/O5-shuffled-engine-L2-x4"
+   "population": "wave9/O5-shuffled-engine-L2-x4",
+   "transport_form": null
   }
  ],
  "original_rows": [
@@ -93,43 +102,50 @@
    "arm": "reference",
    "detail": "steady",
    "label": "Transformer",
-   "population": "wave9/O5-sorted-transformer-steady"
+   "population": "wave9/O5-sorted-transformer-steady",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "4 slabs",
    "label": "Transformer",
-   "population": "wave3/C-S4b-transformer-x4"
+   "population": "wave3/C-S4b-transformer-x4",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "8 slabs",
    "label": "Transformer",
-   "population": "wave3/C-S4b-transformer-x8"
+   "population": "wave3/C-S4b-transformer-x8",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "24 hourly windows",
    "label": "Transformer day",
-   "population": "wave9/O1-transformer-day-x8"
+   "population": "wave9/O1-transformer-day-x8",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "transformer, 8 slabs",
    "label": "Overloads",
-   "population": "wave9/O4-transformer-overload-x8"
+   "population": "wave9/O4-transformer-overload-x8",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "transformer",
    "label": "Off-design flow",
-   "population": "wave9/O3-transformer-steady-flows"
+   "population": "wave9/O3-transformer-steady-flows",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "transformer",
    "label": "Shuffled order",
-   "population": "wave9/O5-shuffled-transformer-steady"
+   "population": "wave9/O5-shuffled-transformer-steady",
+   "transport_form": null
   }
  ],
  "paired": {
@@ -180,66 +196,112 @@
    "population": "v21-wave1/P-engine-L2-x4"
   }
  ],
+ "provenance": {
+  "figure_records": {
+   "P-engine-L2-x4-reference-0.json": {
+    "git_head": "297899fdba3a38b07d09db86114acdefbd4d5111",
+    "population": "v21-wave1/P-engine-L2-x4",
+    "source_sha256": "9ca6ca7b4510ab5ceb8dc88c8f9d1137780037fee3be0e60d4ce1bc3300f9ea6",
+    "transport_form": "advective"
+   },
+   "P-transformer-x4-skew-reference-0.json": {
+    "git_head": "297899fdba3a38b07d09db86114acdefbd4d5111",
+    "population": "v21-wave1/P-transformer-x4-skew",
+    "source_sha256": "843a76d3b9f5b8b0a4dc59d41eea94a31f601431e26260dc035abc4fd269e5be",
+    "transport_form": "skew"
+   }
+  },
+  "transfers": {
+   "Bore 2, 4 slabs": {
+    "git_head": "297899fdba3a38b07d09db86114acdefbd4d5111",
+    "path": "diagnostics/transfer/M-engine-L2-x4-transfer.json",
+    "source_record_sha256": "9ca6ca7b4510ab5ceb8dc88c8f9d1137780037fee3be0e60d4ce1bc3300f9ea6",
+    "transport_form": "advective"
+   },
+   "Bore 2, steady": {
+    "git_head": "297899fdba3a38b07d09db86114acdefbd4d5111",
+    "path": "diagnostics/transfer/M-engine-L2-steady-transfer.json",
+    "source_record_sha256": "053c3d40c8044b5b16c03fcd3e178c770359b27c30d4a06edb5b685058e9a9c5",
+    "transport_form": "advective"
+   },
+   "Transformer, 4 slabs": {
+    "git_head": "297899fdba3a38b07d09db86114acdefbd4d5111",
+    "path": "diagnostics/transfer/M-transformer-x4-skew-transfer.json",
+    "source_record_sha256": "843a76d3b9f5b8b0a4dc59d41eea94a31f601431e26260dc035abc4fd269e5be",
+    "transport_form": "skew"
+   }
+  }
+ },
  "scale_rows": [
   {
    "arm": "reference",
    "detail": "$32^3$",
    "label": "Cartesian",
-   "population": "wave8/G-steady32-device"
+   "population": "wave8/G-steady32-device",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$48^3$",
    "label": "Cartesian",
-   "population": "wave8/G-steady48-device"
+   "population": "wave8/G-steady48-device",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$64^3$",
    "label": "Cartesian",
-   "population": "wave8/G-steady64-device"
+   "population": "wave8/G-steady64-device",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$96^3$",
    "label": "Cartesian",
-   "population": "wave8/G-steady96"
+   "population": "wave8/G-steady96",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$128^3$",
    "label": "Cartesian",
-   "population": "wave8/G-steady128-retry1"
+   "population": "wave8/G-steady128-retry1",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "packaged mesh",
    "label": "Transformer",
-   "population": "v21-wave2/O5-sorted-transformer-steady-skew"
+   "population": "v21-wave2/O5-sorted-transformer-steady-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "Bore 1",
    "label": "Bore-in-block",
-   "population": "wave12/D-gpu-engine-L1-steady"
+   "population": "wave12/D-gpu-engine-L1-steady",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "Bore 2",
    "label": "Bore-in-block",
-   "population": "wave14/E-engine-L2-steady-ref1-r200"
+   "population": "wave14/E-engine-L2-steady-ref1-r200",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "Bore 3",
    "label": "Bore-in-block",
-   "population": "wave14/E-engine-L3-steady-ref1-r200"
+   "population": "wave14/E-engine-L3-steady-ref1-r200",
+   "transport_form": null
   },
   {
    "arm": "reference-ref2",
    "detail": "Bore 4",
    "label": "Bore-in-block",
-   "population": "wave8/G-engine-L4-steady-o400"
+   "population": "wave8/G-engine-L4-steady-o400",
+   "transport_form": null
   }
  ],
  "si_rows": [
@@ -247,223 +309,260 @@
    "arm": "reference",
    "detail": "transformer",
    "label": "Sorted order",
-   "population": "v21-wave2/O5-sorted-transformer-steady-skew"
+   "population": "v21-wave2/O5-sorted-transformer-steady-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "Bore 2",
    "label": "Sorted order",
-   "population": "wave9/O5-sorted-engine-L2-steady"
+   "population": "wave9/O5-sorted-engine-L2-steady",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "Bore 2, 4 slabs",
    "label": "Sorted order",
-   "population": "wave9/O5-sorted-engine-L2-x4"
+   "population": "wave9/O5-sorted-engine-L2-x4",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "rtol $10^{-8}$",
    "label": "Transformer steady",
-   "population": "v21-wave2/A-tol-transformer-steady-rtol1e-8-skew"
+   "population": "v21-wave2/A-tol-transformer-steady-rtol1e-8-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "rtol $10^{-6}$",
    "label": "Transformer steady",
-   "population": "v21-wave2/A-tol-transformer-steady-rtol1e-6-skew"
+   "population": "v21-wave2/A-tol-transformer-steady-rtol1e-6-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "rtol $10^{-8}$",
    "label": "Bore 2 steady",
-   "population": "wave6/A-tol-engine-L2-steady-rtol1e-8"
+   "population": "wave6/A-tol-engine-L2-steady-rtol1e-8",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "rtol $10^{-6}$",
    "label": "Bore 2 steady",
-   "population": "wave6/A-tol-engine-L2-steady-rtol1e-6"
+   "population": "wave6/A-tol-engine-L2-steady-rtol1e-6",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "rtol $10^{-8}$",
    "label": "Bore 3 steady",
-   "population": "wave6/A-tol-engine-L3-steady-rtol1e-8"
+   "population": "wave6/A-tol-engine-L3-steady-rtol1e-8",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "rtol $10^{-6}$",
    "label": "Bore 3 steady",
-   "population": "wave6/A-tol-engine-L3-steady-rtol1e-6"
+   "population": "wave6/A-tol-engine-L3-steady-rtol1e-6",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$\\alpha=10^{-5}$",
    "label": "Bore 2 steady",
-   "population": "wave6/A-alpha-engine-L2-steady-1e-5"
+   "population": "wave6/A-alpha-engine-L2-steady-1e-5",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$\\alpha=10^{-4}$",
    "label": "Bore 2 steady",
-   "population": "wave6/A-alpha-engine-L2-steady-1e-4"
+   "population": "wave6/A-alpha-engine-L2-steady-1e-4",
+   "transport_form": null
   },
   {
    "arm": null,
    "detail": "$\\alpha=10^{-13}$",
    "label": "Transformer steady",
-   "population": "v21-wave2/A-alpha-transformer-steady-1e-13-skew"
+   "population": "v21-wave2/A-alpha-transformer-steady-1e-13-skew",
+   "transport_form": "skew"
   },
   {
    "arm": null,
    "detail": "$\\alpha=10^{-12}$",
    "label": "Transformer steady",
-   "population": "v21-wave2/A-alpha-transformer-steady-1e-12-skew"
+   "population": "v21-wave2/A-alpha-transformer-steady-1e-12-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "cold start",
    "label": "Bore 2 steady",
-   "population": "wave6/A-cold-engine-L2-steady"
+   "population": "wave6/A-cold-engine-L2-steady",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "cold start",
    "label": "Bore 3 steady",
-   "population": "wave6/A-cold-engine-L3-steady"
+   "population": "wave6/A-cold-engine-L3-steady",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "64 targets",
    "label": "Transformer steady",
-   "population": "v21-wave2/C-S3a-transformer-steady-q64-skew"
+   "population": "v21-wave2/C-S3a-transformer-steady-q64-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "64 targets",
    "label": "Transformer, 8 slabs",
-   "population": "v21-wave2/C-S3a-transformer-x8-q64-skew"
+   "population": "v21-wave2/C-S3a-transformer-x8-q64-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "64 targets",
    "label": "Bore 2 steady",
-   "population": "wave3/C-S3a-engine-L2-steady-q64"
+   "population": "wave3/C-S3a-engine-L2-steady-q64",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "64 targets",
    "label": "Bore 2, 4 slabs",
-   "population": "wave3/C-S3a-engine-L2-x4-q64"
+   "population": "wave3/C-S3a-engine-L2-x4-q64",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "256 targets",
    "label": "Transformer steady",
-   "population": "v21-wave2/A-q256-transformer-steady-skew"
+   "population": "v21-wave2/A-q256-transformer-steady-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "256 targets",
    "label": "Bore 2 steady",
-   "population": "wave6/A-q256-engine-L2-steady"
+   "population": "wave6/A-q256-engine-L2-steady",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "4 loads $\\times$ 4 bounds",
    "label": "Transformer steady",
-   "population": "v21-wave2/C-S3b-rating-steady-skew"
+   "population": "v21-wave2/C-S3b-rating-steady-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "4 loads $\\times$ 4 bounds",
    "label": "Transformer, 8 slabs",
-   "population": "v21-wave2/C-S3b-rating-x8-skew"
+   "population": "v21-wave2/C-S3b-rating-x8-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "level 0, rank 50",
    "label": "Bore 3 steady",
-   "population": "wave11/R-engine-L3-steady-ref0-r50"
+   "population": "wave11/R-engine-L3-steady-ref0-r50",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "level 0, rank 100",
    "label": "Bore 3 steady",
-   "population": "wave11/R-engine-L3-steady-ref0-r100"
+   "population": "wave11/R-engine-L3-steady-ref0-r100",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "level 0, rank 200",
    "label": "Bore 3 steady",
-   "population": "wave11/R-engine-L3-steady-ref0-r200"
+   "population": "wave11/R-engine-L3-steady-ref0-r200",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "level 0, rank 300",
    "label": "Bore 3 steady",
-   "population": "wave11/R-engine-L3-steady-ref0-r300"
+   "population": "wave11/R-engine-L3-steady-ref0-r300",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "level 1, rank 50",
    "label": "Bore 3 steady",
-   "population": "wave11/R-engine-L3-steady-ref1-r50"
+   "population": "wave11/R-engine-L3-steady-ref1-r50",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "level 1, rank 100",
    "label": "Bore 3 steady",
-   "population": "wave11/R-engine-L3-steady-ref1-r100"
+   "population": "wave11/R-engine-L3-steady-ref1-r100",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "level 1, rank 400",
    "label": "Bore 3 steady",
-   "population": "wave7/F-engine-L3-steady-ref1-r400"
+   "population": "wave7/F-engine-L3-steady-ref1-r400",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "level 2, rank 200",
    "label": "Bore 3 steady",
-   "population": "wave8/G-engine-L3-steady-ref2-r200"
+   "population": "wave8/G-engine-L3-steady-ref2-r200",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "level 0, four methods",
    "label": "Bore 3 steady",
-   "population": "wave3/C-S1a-engine-L3-steady"
+   "population": "wave3/C-S1a-engine-L3-steady",
+   "transport_form": null
   },
   {
    "arm": "reference-ref3",
    "detail": "level 3, rank 200",
    "label": "Bore 4 steady",
-   "population": "wave8/G-engine-L4-steady-o400"
+   "population": "wave8/G-engine-L4-steady-o400",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$12^3$, 8 slabs, global",
    "label": "Cartesian",
-   "population": "wave3/C-S4a-transient12-global"
+   "population": "wave3/C-S4a-transient12-global",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$16^3$, 8 slabs, global",
    "label": "Cartesian",
-   "population": "wave3/C-S4a-transient16-global"
+   "population": "wave3/C-S4a-transient16-global",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$24^3$, 8 slabs, global",
    "label": "Cartesian",
-   "population": "wave3/C-S4a-transient24-global"
+   "population": "wave3/C-S4a-transient24-global",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$32^3$, 8 slabs, global",
    "label": "Cartesian",
-   "population": "wave3/C-S4a-transient32-global"
+   "population": "wave3/C-S4a-transient32-global",
+   "transport_form": null
   }
  ],
  "single_rows": [
@@ -471,55 +570,64 @@
    "arm": "reference",
    "detail": "16 slabs, global",
    "label": "Transformer",
-   "population": "v21-wave2/S2a-gpu-transformer-x16-global-skew"
+   "population": "v21-wave2/S2a-gpu-transformer-x16-global-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference-perslab4",
    "detail": "16 slabs, $S=4$",
    "label": "Transformer",
-   "population": "v21-wave2/S2a-gpu-transformer-x16-global-skew"
+   "population": "v21-wave2/S2a-gpu-transformer-x16-global-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "32 slabs, global",
    "label": "Transformer",
-   "population": "v21-wave2/S2a-gpu-transformer-x32-global-skew"
+   "population": "v21-wave2/S2a-gpu-transformer-x32-global-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference-perslab4",
    "detail": "32 slabs, $S=4$",
    "label": "Transformer",
-   "population": "v21-wave2/S2a-gpu-transformer-x32-global-skew"
+   "population": "v21-wave2/S2a-gpu-transformer-x32-global-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "$16^3$, 64 slabs, global",
    "label": "Cartesian",
-   "population": "wave2/S2b-n16-x64-global"
+   "population": "wave2/S2b-n16-x64-global",
+   "transport_form": null
   },
   {
    "arm": "reference-perslab6",
    "detail": "$16^3$, 64 slabs, $S=6$",
    "label": "Cartesian",
-   "population": "wave2/S2b-n16-x64-global"
+   "population": "wave2/S2b-n16-x64-global",
+   "transport_form": null
   },
   {
    "arm": null,
    "detail": "steady",
    "label": "Transformer, refined twice",
-   "population": "v21-wave2/S1d-transformer-L2-steady-skew"
+   "population": "v21-wave2/S1d-transformer-L2-steady-skew",
+   "transport_form": "skew"
   },
   {
    "arm": null,
    "detail": "4 slabs",
    "label": "Transformer, refined twice",
-   "population": "v21-wave2/S1d-transformer-L2-x4-skew"
+   "population": "v21-wave2/S1d-transformer-L2-x4-skew",
+   "transport_form": "skew"
   },
   {
    "arm": null,
    "detail": "outer cap 100",
    "label": "Bore 4",
-   "population": "wave4/S1c-engine-L4-steady"
+   "population": "wave4/S1c-engine-L4-steady",
+   "transport_form": null
   }
  ],
  "transient_rows": [
@@ -527,91 +635,106 @@
    "arm": "reference",
    "detail": "$12^3$, 8 slabs",
    "label": "Cartesian",
-   "population": "wave3/C-S2b-transient12-perslab12"
+   "population": "wave3/C-S2b-transient12-perslab12",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$16^3$, 8 slabs",
    "label": "Cartesian",
-   "population": "wave3/C-S2b-transient16-perslab12"
+   "population": "wave3/C-S2b-transient16-perslab12",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$24^3$, 8 slabs",
    "label": "Cartesian",
-   "population": "wave3/C-S2b-transient24-perslab12"
+   "population": "wave3/C-S2b-transient24-perslab12",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$32^3$, 8 slabs",
    "label": "Cartesian",
-   "population": "wave3/C-S2b-transient32-perslab12"
+   "population": "wave3/C-S2b-transient32-perslab12",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$48^3$, 8 slabs",
    "label": "Cartesian",
-   "population": "wave8/G-transient48-perslab12"
+   "population": "wave8/G-transient48-perslab12",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$64^3$, 8 slabs",
    "label": "Cartesian",
-   "population": "wave8/G-transient64-perslab12"
+   "population": "wave8/G-transient64-perslab12",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$16^3$, 16 slabs",
    "label": "Cartesian",
-   "population": "wave3/C-S2b-time16-perslab6"
+   "population": "wave3/C-S2b-time16-perslab6",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "$16^3$, 32 slabs",
    "label": "Cartesian",
-   "population": "wave3/C-S2b-time32-perslab6"
+   "population": "wave3/C-S2b-time32-perslab6",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "4 slabs",
    "label": "Transformer",
-   "population": "v21-wave2/C-S4b-transformer-x4-skew"
+   "population": "v21-wave2/C-S4b-transformer-x4-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "8 slabs",
    "label": "Transformer",
-   "population": "v21-wave2/C-S4b-transformer-x8-skew"
+   "population": "v21-wave2/C-S4b-transformer-x8-skew",
+   "transport_form": "skew"
   },
   {
    "arm": "reference",
    "detail": "4 slabs",
    "label": "Bore 1",
-   "population": "wave3/C-S4b-engine-L1-x4"
+   "population": "wave3/C-S4b-engine-L1-x4",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "8 slabs",
    "label": "Bore 1",
-   "population": "wave3/C-S4b-engine-L1-x8"
+   "population": "wave3/C-S4b-engine-L1-x8",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "4 slabs",
    "label": "Bore 2",
-   "population": "wave3/C-S4b-engine-L2-x4"
+   "population": "wave3/C-S4b-engine-L2-x4",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "8 slabs",
    "label": "Bore 2",
-   "population": "wave3/C-S4b-engine-L2-x8"
+   "population": "wave3/C-S4b-engine-L2-x8",
+   "transport_form": null
   },
   {
    "arm": "reference",
    "detail": "4 slabs",
    "label": "Bore 3",
-   "population": "wave8/G-engine-L3-x4-ref1-perslab50"
+   "population": "wave8/G-engine-L3-x4-ref1-perslab50",
+   "transport_form": null
   }
  ],
  "twins": {

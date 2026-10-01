@@ -32,10 +32,31 @@ transformer operator has negative eigenvalues and grows under time refinement.
 | --- | --- | --- |
 | Stability certificates | `study/prescribed-speedup-v21` | [`6e22606`](https://github.com/teeratornk/deflation-example/tree/6e2260685b0f319bb682a0d1345c660b14cfaf73) |
 | Timed comparisons, temporal studies, verification and transfer replays | `study/prescribed-speedup-v21` | [`297899f`](https://github.com/teeratornk/deflation-example/tree/297899fdba3a38b07d09db86114acdefbd4d5111) |
-| Evidence digests and table rows | `study/prescribed-speedup-v21-evidence` | [`713e6c3`](https://github.com/teeratornk/deflation-example/tree/713e6c3f3aa349630c7212962b2de46545bc3cec) |
+| Evidence digests and table rows | `study/prescribed-speedup-v21-evidence` | [`97a8b3e`](https://github.com/teeratornk/deflation-example/tree/97a8b3e2c27f401c746bdfe421ee7af6af233c6b) |
 
 The [records](../examples/prescribed_speedup_v21/README.md) contain the evidence
 archive, the complete comparison listing and the checksums.
+
+## Provenance of the corrected transformer items
+
+Every timed transformer run below used commit `297899f`, which contains the
+skew-symmetric transport (`transport_form=skew`); the stability certificates used
+`6e22606`, whose transport code is identical. All items regenerate from
+[`evidence.tar.gz`](../examples/prescribed_speedup_v21/evidence.tar.gz) with the
+export command of the last section; `rows.json` records the transport of every
+tabulated comparison and the source digest of each replay and figure record.
+
+| Manuscript item | Comparisons in the archive | Transport |
+| --- | --- | --- |
+| Table 2, transformer rows; Figure 5 | `v21-wave1/P-transformer-steady-skew`, `v21-wave1/P-transformer-x4-skew` | skew |
+| Figure 1(c) | record `reference-0` of `v21-wave1/P-transformer-x4-skew` | skew |
+| Tables 4–6, transformer rows; Figure 7 | `v21-wave2/*-skew` (steady, 4 and 8 slabs, sorted and shuffled order, off-design flow), `wave15/O1s-*`, `wave15/O4s-*` | skew |
+| SI Tables S13–S15, transformer rows | `v21-wave2/*-skew`, `v21-wave3/D-transformer-*-skew` | skew |
+| SI Table S10, transformer trace | `diagnostics/transfer/M-transformer-x4-skew-transfer.json`, replaying `reference-0` of `v21-wave1/P-transformer-x4-skew` | skew |
+| SI Table S5, transformer subproblem | `diagnostics/validation/V-validation-skew.json` | skew |
+| SI Table S7, transformer rows | `temporal/T-transformer-600s-skew`, `temporal/hour-skew` (skew); `temporal/published-600s-advective`, `temporal/hour-advective` (diagnostics) | skew; advective |
+| SI Table S1 | `diagnostics/certificates.json` | both forms |
+| SI Table S17 (original-transport diagnostics) | `wave3/C-S4b-transformer-*`, `wave9/O*-transformer-*` | advective |
 
 ## Definitions
 
@@ -75,7 +96,7 @@ From a checkout of this revision, copy the archive and switch to the evidence co
 
 ```bash
 cp examples/prescribed_speedup_v21/evidence.tar.gz /tmp/v21-evidence.tar.gz
-git checkout --detach 713e6c3f3aa349630c7212962b2de46545bc3cec
+git checkout --detach 97a8b3e2c27f401c746bdfe421ee7af6af233c6b
 mkdir /tmp/v21 && tar -xzf /tmp/v21-evidence.tar.gz -C /tmp/v21
 uv run --locked python -m deflation_example.v21_evidence export \
     --evidence /tmp/v21 --output /tmp/v21-out
