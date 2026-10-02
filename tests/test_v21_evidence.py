@@ -201,7 +201,7 @@ def test_rows_without_a_converged_reference_or_any_converged_method(tmp_path):
     first, second = text.strip().split("\n")
     cells = [c.strip() for c in first.rstrip("\\").split(" & ")]
     assert cells[3] == "--" and cells[4] == "AmgX 6.0" and cells[5] == "--"
-    assert cells[7] == "reference 1/2"
+    assert cells[7] == "RefDef 1/2"
     assert "no method converges at every query" in second
     assert [v["converged"] for v in values] == [False, False]
 

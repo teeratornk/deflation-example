@@ -102,6 +102,9 @@ ORIGINAL_ROWS = [
     ("Shuffled order", "transformer", "wave9/O5-shuffled-transformer-steady", "reference"),
 ]
 ALTERNATIVES = {"jacobi", "recycling", "amgx"}
+# Display names of the v21 tables; the method key in configurations and records stays
+# "reference", and the manuscript names the method RefDef.
+NAMES = {**v20.NAMES, "reference": "RefDef"}
 
 
 # ---------------------------------------------------------------------- evidence
@@ -247,7 +250,7 @@ def _range(population, arm, alternative):
 def not_converged(methods):
     """Methods with a repetition that did not converge, with converged/attempted counts."""
     cells = sorted(
-        f"{v20.NAMES.get(m, m)} {row['accepted']}/{row['declared']}"
+        f"{NAMES.get(m, m)} {row['accepted']}/{row['declared']}"
         for m, row in methods.items()
         if row["accepted"] < row["declared"]
     )
@@ -292,7 +295,7 @@ def main_rows(summary, spec, marker=r"$^\dagger$"):
             fastest = min(others, key=others.get)
             cells = head + [
                 "--",
-                f"{v20.NAMES.get(fastest, fastest)} {v20._seconds(others[fastest])}",
+                f"{NAMES.get(fastest, fastest)} {v20._seconds(others[fastest])}",
                 "--",
                 "--",
                 not_converged(methods),
@@ -303,7 +306,7 @@ def main_rows(summary, spec, marker=r"$^\dagger$"):
         reading = population["readings"][arm]
         alternative = reading["fastest_alternative"]
         low, high = _range(population, arm, alternative)
-        name = v20.NAMES.get(alternative, alternative)
+        name = NAMES.get(alternative, alternative)
         speedup = f"{v20._ratio(reading['ratio'])} [{v20._ratio(low)}, {v20._ratio(high)}]"
         if methods[arm]["declared"] == 1 and methods[alternative]["declared"] == 1:
             # A single repetition of each configuration gives one ratio and no envelope.
