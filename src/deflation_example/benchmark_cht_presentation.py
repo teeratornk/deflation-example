@@ -12,7 +12,7 @@ from .benchmark_extended import digest
 from .reporting import atomic_output, environment, write_report
 
 
-LABELS = {"jacobi": "Jacobi-CG", "reference": "Reference", "recycling": "Recycling", "amgx": "AmgX"}
+LABELS = {"jacobi": "Jacobi-CG", "reference": "RefDef", "recycling": "Recycling", "amgx": "AmgX"}
 COLORS = {"jacobi": "#666666", "reference": "#0072B2", "recycling": "#CC79A7", "amgx": "#D55E00"}
 
 

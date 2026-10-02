@@ -5,6 +5,10 @@ prescribed velocity, desired temperature and regularization. It changes only
 the upper bound within each steady or transient comparison. The primary
 16-target timing sequences retain their original fixed bounds and records.
 
+RefDef denotes reference deflation, the full-domain reference restricted directly
+to each inactive set; its method key in configurations and records remains
+`reference`.
+
 The declared comparison uses Bore 1 (3958 spatial state degrees of freedom),
 target 8 of the original 16-target definition, and bounds 0.2, 0.25 and 0.3.
 The transient problem has four backward-Euler steps over horizon 0.1;
@@ -14,7 +18,7 @@ outer-boundary temperatures are zero, and regularization is `alpha=1e-6`.
 
 Each form constructs one rank-100 coarse-mesh reference in Jacobi-scaled
 coordinates. The same reference is restricted for every inactive solve at
-all three bounds. CPU reference deflation uses `residual_policy=refine`.
+all three bounds. CPU RefDef uses `residual_policy=refine`.
 Each optimization starts independently with all state variables active;
 inner solves use the current state as their initial guess. Sparse-direct
 PDAS provides a separate linear-solver check with the same initial mask.

@@ -5,6 +5,10 @@ a GPU. It preserves the four-target finer-transformer problems and final
 accuracy requirements of the correction study. It is separate from the six
 primary body-fitted comparisons and from the changed-transport temporal pilot.
 
+RefDef denotes reference deflation, the full-domain reference restricted directly
+to each inactive set; its method key in configurations and records remains
+`reference`.
+
 Use source `0b3b3f06a535f515256932c0dbf27537c242744d`, which introduced the
 initial guard. The measured correction study remains attached to source
 `926b37c40935fbbe7134a3ab5f87ebdfddb68837`. A new measurement does not change
@@ -26,7 +30,7 @@ uv run --no-sync python -m deflation_example.benchmark_mesh \
 
 The preset fixes level 1, rank 100, four targets, five independent complete
 sequence repetitions, and matched outer/inner warm starts. All four methods
-participate: Jacobi-CG, fixed-reference deflation, recycling and persistent-resource
+participate: Jacobi-CG, RefDef, recycling and persistent-resource
 AmgX. The original advective thermal operator is unchanged. The original-system
 residual threshold is `1e-10`; the five KKT components must meet `1e-8`. At most
 four error solves share the 50,000-iteration budget. Existing internal margins

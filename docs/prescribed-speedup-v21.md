@@ -7,6 +7,10 @@ comparisons](prescribed-speedup-v20.md): every transformer comparison of that
 study was repeated with the skew-symmetric transport, and the six primary
 body-fitted cases were timed again under one protocol.
 
+RefDef denotes reference deflation, the full-domain reference restricted directly
+to each inactive set; its method key in configurations and records remains
+`reference`.
+
 ## Transport forms
 
 The transformer carries a prescribed P2 Stokes velocity that is divergence-free
@@ -33,7 +37,7 @@ transformer operator has negative eigenvalues and grows under time refinement.
 | Retention ablation (method `reference_zero`) | `study/prescribed-speedup-v21` | [`5ddc619`](https://github.com/teeratornk/deflation-example/tree/5ddc6197c060543c27255400247876ea67fd881b) |
 | Stability certificates | `study/prescribed-speedup-v21` | [`6e22606`](https://github.com/teeratornk/deflation-example/tree/6e2260685b0f319bb682a0d1345c660b14cfaf73) |
 | Timed comparisons, temporal studies, verification and transfer replays | `study/prescribed-speedup-v21` | [`297899f`](https://github.com/teeratornk/deflation-example/tree/297899fdba3a38b07d09db86114acdefbd4d5111) |
-| Evidence digests and table rows | `study/prescribed-speedup-v21-evidence` | [`a457629`](https://github.com/teeratornk/deflation-example/tree/a457629aed64c3545203541325b37e7382020715) |
+| Evidence digests and table rows | `study/prescribed-speedup-v21-evidence` | [`994d0c5`](https://github.com/teeratornk/deflation-example/tree/994d0c58a067536b15af578243d749fd6a3a96e2) |
 
 The [records](../examples/prescribed_speedup_v21/README.md) contain the evidence
 archive, the complete comparison listing and the checksums.
@@ -66,7 +70,7 @@ The definitions of the [v20 page](prescribed-speedup-v20.md#definitions) apply.
 In addition:
 
 - **Speedup range:** the smallest and largest ratio of a converged time of the
-  fastest alternative to a converged time of reference deflation over the
+  fastest alternative to a converged time of RefDef over the
   repetitions.
 - **Not converged:** each method with a repetition that misses the criteria,
   with its converged and attempted repetitions.
@@ -100,7 +104,7 @@ From a checkout of this revision, copy the archive and switch to the evidence co
 
 ```bash
 cp examples/prescribed_speedup_v21/evidence.tar.gz /tmp/v21-evidence.tar.gz
-git checkout --detach a457629aed64c3545203541325b37e7382020715
+git checkout --detach 994d0c58a067536b15af578243d749fd6a3a96e2
 mkdir /tmp/v21 && tar -xzf /tmp/v21-evidence.tar.gz -C /tmp/v21
 uv run --locked python -m deflation_example.v21_evidence export \
     --evidence /tmp/v21 --output /tmp/v21-out

@@ -61,7 +61,7 @@ class StudySolver:
         if method == "amgx" and (device != "cuda" or api is None or torch is None):
             raise ValueError("AmgX requires its native binding and a CUDA device")
         if method == "reference" and reference is None:
-            raise ValueError("Reference deflation requires a declared full-domain reference")
+            raise ValueError("RefDef (reference deflation) requires a declared full-domain reference")
         self.rank = integer(rank, "Rank")
         self.window = integer(window, "Direction window", 1)
         self.rtol = positive_real(rtol, "Final relative tolerance")

@@ -9,6 +9,11 @@ every time, range and iteration count behind them, and the
 preparation and cost-component tables. The images are converted from the
 manuscript figure files listed at the end of this page.
 
+RefDef denotes reference deflation, the full-domain reference restricted directly
+to each inactive set; its method key in configurations and records remains
+`reference`. The converted figures keep their original legends, in which
+"Reference" denotes RefDef.
+
 ## Complete time and memory under spatial refinement
 
 ![Complete time and memory under spatial refinement](figures/cartesian_spatial_time_memory.svg)
@@ -24,7 +29,7 @@ slabs at the fixed horizon `T_f = 0.1`.
 ![Complete time against memory across ranks](figures/cartesian_rank_time_memory.svg)
 
 Complete time against sampled GPU process memory. Numerical labels give the
-requested total rank for reference deflation and recycling; Jacobi-CG and AmgX
+requested total rank for RefDef and recycling; Jacobi-CG and AmgX
 provide the complete-sequence controls. Each point summarizes five independently
 timed, fully warm-started sequences.
 

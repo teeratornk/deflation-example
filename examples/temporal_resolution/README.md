@@ -6,6 +6,10 @@ control, the initial temperature, the upper bound, and the 600-second horizon
 of the manuscript's prescribed-flow model. It is separate from the nonlinear
 flow–temperature optimization examples and supplies no solver timing comparison.
 
+RefDef denotes reference deflation, the full-domain reference restricted directly
+to each inactive set; its method key in configurations and records remains
+`reference`.
+
 The [complete paired records and figure commands](records.md) retain both
 transport formulations, all twenty optimization attempts and every forward
 refinement stage. All ten corrected-formulation optimizations meet their
@@ -19,7 +23,7 @@ the bound, excluding target 7. It evaluates this criterion on 64 time slabs;
 the selected control or solver performance never enters selection. Every target
 uses 4, 8, 16, 32 and 64 slabs. The physical target function is unchanged.
 
-Each optimization uses rank-100 reference deflation with guarded residual
+Each optimization uses rank-100 RefDef with guarded residual
 correction. The independently recomputed inner residual must meet `1e-10`;
 all five KKT components must meet `1e-8`. Sparse-direct PDAS also checks each
 four-slab solution. These computations have their own source identifier and

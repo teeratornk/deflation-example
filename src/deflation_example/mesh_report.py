@@ -11,7 +11,7 @@ from .mesh_presentation import summarize
 from .reporting import atomic_output, write_report, environment
 
 
-NAMES = {"jacobi": "Jacobi-CG", "reference": "Reference", "recycling": "Recycling", "amgx": "AmgX"}
+NAMES = {"jacobi": "Jacobi-CG", "reference": "RefDef", "recycling": "Recycling", "amgx": "AmgX"}
 COLORS = {"jacobi": "#777777", "reference": "#0072b2", "recycling": "#cc79a7", "amgx": "#d55e00"}
 
 

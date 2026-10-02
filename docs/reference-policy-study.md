@@ -5,6 +5,10 @@ transient state-constrained conjugate heat-transfer (CHT) optimization.
 It compares four complete solvers and isolates reference transfer on matched
 optimization traces. Earlier benchmark records retain their original scope.
 
+RefDef denotes reference deflation, the full-domain reference restricted directly
+to each inactive set; its method key in configurations and records remains
+`reference`.
+
 ## Claims and measurements
 
 The [detailed supplementary tables](supplementary-tables.md#cartesian-deployed-ranks)
@@ -14,7 +18,7 @@ commands and unchanged source data.
 | Claim | Comparison or verification | Required quantities |
 |---|---|---|
 | Full-domain storage supplies reference values at released constraints | Replay identical optimization traces with direct restriction and sequential zero-extension transfer | Newly active and newly inactive nodes, actual rank, transferred-space difference, coarse energy-error reduction, accepted iterations and total kernel cost |
-| One reference supports complete constrained optimization | Complete sequences with Jacobi-CG, reference deflation, scaled recycling and persistent-resource AmgX | Original residuals, all KKT components, accepted targets and sequences, complete costs and all failures |
+| One reference supports complete constrained optimization | Complete sequences with Jacobi-CG, RefDef, scaled recycling and persistent-resource AmgX | Original residuals, all KKT components, accepted targets and sequences, complete costs and all failures |
 | A space–time construction retains temporal coupling | Independent small trajectory optimization and mode-dependent versus tensor-product references | State/adjoint identities, initial and final blocks, objective weights, recovered control, total rank and restricted storage |
 | Reuse has a useful time–memory range | Spatial, temporal and rank studies with matched starts and declared budgets | Complete time, cumulative cost, reference/candidate storage, comparable sampled process memory, caps and memory limits |
 | Conditional analysis describes the measured coarse correction | Small CHT trace systems and a controlled parameter study | Remaining deflated spectrum, initial energy-error reduction, positive separation and certified conditioning improvement when available |
@@ -195,7 +199,7 @@ either limit retains its solution checks and timing but receives
 not enforce hard allocator caps. Rank and memory-budget comparisons are reported
 as separate experiments.
 
-The complete-study adapters cache `BZ` for both reference deflation and recycling.
+The complete-study adapters cache `BZ` for both RefDef and recycling.
 The projection then uses `(BZ).T @ z`, which avoids an additional sparse matrix
 application in each preconditioning step. Construction and retained storage enter
 the same timing and memory boundary. The rank-zero Jacobi path allocates no such
@@ -205,7 +209,7 @@ independent solutions and verify rank-zero and conditioning-fallback behavior.
 
 The independent validation report contains nine distinct small steady and
 transient problems. A bounded-variable least-squares optimizer supplies a separate
-solution and KKT check for each problem. Jacobi-CG, reference deflation and
+solution and KKT check for each problem. Jacobi-CG, RefDef and
 recycling then solve the complete PDAS problems. Uniform and unequal time steps
 use nonzero initial temperature. The report records forward and adjoint action
 checks, recovered trajectories, objective agreement, state differences and every

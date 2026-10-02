@@ -1,6 +1,7 @@
 """Verify and render the detailed supplementary tables without a GPU or network."""
 
 import argparse
+import re
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -54,8 +55,17 @@ def verify(folder=DATA):
     return manifest
 
 
+# The manuscript names the reference method RefDef; the sources keep "Reference".
+DISPLAY = {"Reference": "RefDef"}
+
+
+def display_text(text):
+    return re.sub(r"\b[Rr]eference deflation\b", "RefDef", text)
+
+
 def markdown_cell(cell):
     # Keep numerical text unchanged. Join adjacent TeX math spans for GitHub.
+    cell = DISPLAY.get(cell, cell)
     return cell.replace("$$", "").replace("|", r"\|")
 
 
@@ -65,8 +75,10 @@ def render(folder=DATA):
     lines = [
         "# Detailed supplementary tables",
         "",
-        "These tables support the prescribed-flow CHT optimization study. They give",
-        "per-case accuracy and ranks, cost components, preparation-inclusive times,",
+        "These tables support the prescribed-flow CHT optimization study; RefDef denotes",
+        "reference deflation, whose method key in configurations and records is",
+        "`reference`. The tables give per-case accuracy and ranks, cost components,",
+        "preparation-inclusive times,",
         "sampled memory, and the finer-transformer scalar diagnostics. Every row and",
         "compared method from these table groups is included. The manuscript and SI",
         "retain the principal complete comparisons, transfer tests, verification,",
@@ -123,13 +135,13 @@ def render(folder=DATA):
     for table in manifest["tables"]:
         lines.extend(
             [
-                f"## {table['title']}",
+                f"## {display_text(table['title'])}",
                 "",
-                table["description"],
+                display_text(table["description"]),
                 "",
                 f"[Reproduction example]({table['guide']}).",
                 "",
-                "| " + " | ".join(table["columns"]) + " |",
+                "| " + " | ".join(DISPLAY.get(c, c) for c in table["columns"]) + " |",
                 "| " + " | ".join(["---"] * len(table["columns"])) + " |",
             ]
         )

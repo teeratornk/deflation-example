@@ -8,6 +8,10 @@ primal-dual active-set update. Body-fitted references come from generalized
 eigenvectors of the reduced Hessian on a coarse mesh level, prolonged to the
 target mesh; Cartesian references use closed-form Laplacian modes.
 
+RefDef denotes reference deflation, the full-domain reference restricted directly
+to each inactive set; its method key in configurations and records remains
+`reference`.
+
 ## Source
 
 | Component | Branch | Commit |
@@ -24,10 +28,9 @@ archive, the complete comparison listing and the checksums.
 - **Converged repetition:** a complete sequence in which every query meets the
   independently recomputed relative residual `1e-10` and every KKT measure `1e-8`.
 - **Speedup:** the median complete-sequence time of the fastest alternative with
-  at least one converged repetition, divided by the median time of reference
-  deflation. Medians use converged repetitions only.
+  at least one converged repetition, divided by the median time of RefDef. Medians use converged repetitions only.
 - **Iteration ratio:** the median inner iterations of Jacobi-CG divided by those
-  of reference deflation.
+  of RefDef.
 - **Not converged:** a method with at least one repetition that misses the
   residual or KKT criteria, reaches an iteration cap, or fails.
 - **AmgX (1e-2), AmgX (1e-3):** AmgX with tenfold and hundredfold tighter

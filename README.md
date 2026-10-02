@@ -6,6 +6,10 @@ Solve a constrained temperature-tracking
 problem, reuse a full-domain reference space, and inspect the resulting states,
 optimality checks and linear iterations.
 
+RefDef denotes reference deflation, the full-domain reference restricted directly
+to each inactive set; its method key in configurations and records remains
+`reference`.
+
 The manuscript contains the analysis and broader experiments. Its
 [sources](https://github.com/teeratornk/opt_control) are maintained separately
 and may require repository access. The quickstart solves three small quadratic
@@ -121,7 +125,7 @@ protocols are included in the repository and source distribution.
 
 The [reference-policy study](docs/reference-policy-study.md) extends the companion
 to complete steady and transient CHT optimization. It provides an efficient
-Jacobi-CG control, reference deflation, recycling with retained coarse vectors
+Jacobi-CG control, RefDef, recycling with retained coarse vectors
 and Jacobi-scaled selection, and persistent-resource AmgX. The transient solver
 optimizes a complete backward-Euler trajectory with constraints at every time
 level. An independent bounded least-squares reference verifies small problems.

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased method naming
+
+- Name reference deflation RefDef in the documentation, the rendered supplementary tables and the report labels; keep the method key `reference` in configurations, records and evidence archives so frozen results stay valid.
+- Add the zero-extension retention ablation (`reference_zero`) and its records to the skew-transport study page.
+
 ## Unreleased memory-measurement compatibility
 
 - Normalize bare CUDA device UUIDs to NVML's GPU identifier format and preserve explicit GPU/MIG identifiers.
