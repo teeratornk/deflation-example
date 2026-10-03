@@ -66,6 +66,6 @@ order where the cell Péclet number is small ($\tau_e\propto h_e^2$).
     without row interchanges): positive definite for the skew transformer operator,
     indefinite for the original one, positive definite for Bore 1.
 - `python -m deflation_example.transport_certificate` records the same inertia for
-  every mesh used in a timed comparison. A positive-definite symmetric part gives
+  the transformer meshes and Bore 1 to Bore 3. A positive-definite symmetric part gives
   $\operatorname{Re}\lambda = x^*Kx/x^*Cx > 0$ for every eigenpair $Kx=\lambda Cx$, so
   no backward-Euler mode grows at any time step.

@@ -42,27 +42,39 @@ transformer operator has negative eigenvalues and grows under time refinement.
 The [records](../examples/prescribed_speedup_v21/README.md) contain the evidence
 archive, the complete comparison listing and the checksums.
 
-## Provenance of the corrected transformer items
+## Provenance of the tables and figures
 
-Every timed transformer run below used commit `297899f`, which contains the
-skew-symmetric transport (`transport_form=skew`); the stability certificates used
-`6e22606`, whose transport code is identical. All items regenerate from
+Every timed comparison with the prefix `v21-` used commit `297899f`, which contains
+the skew-symmetric transport (`transport_form=skew`); the retention ablation used
+`5ddc619` and the stability certificates `6e22606`, whose transport code is
+identical. The comparisons without the prefix are the Cartesian and bore-in-block
+comparisons of the [v20 study](prescribed-speedup-v20.md#source); its transformer
+comparisons used the original transport and appear here as diagnostics only. All
+items in the table below regenerate from
 [`evidence.tar.gz`](../examples/prescribed_speedup_v21/evidence.tar.gz) with the
 export command of the last section; `rows.json` records the transport of every
 tabulated comparison and the source digest of each replay and figure record.
 
 | Manuscript item | Comparisons in the archive | Transport |
 | --- | --- | --- |
-| Table 2, transformer rows; Figure 5 | `v21-wave1/P-transformer-steady-skew`, `v21-wave1/P-transformer-x4-skew` | skew |
-| Figure 1(c) | record `reference-0` of `v21-wave1/P-transformer-x4-skew` | skew |
+| Table 2 and SI Table S8, all rows; Figure 5 | `v21-wave1/P-transformer-steady-skew`, `v21-wave1/P-transformer-x4-skew`, `v21-wave1/P-engine-L1-steady`, `v21-wave1/P-engine-L1-x4`, `v21-wave1/P-engine-L2-steady`, `v21-wave1/P-engine-L2-x4` | skew (transformer); advective, energy-stable (bore-in-block) |
+| Figure 1(c) and 1(e) | record `reference-0` of `v21-wave1/P-transformer-x4-skew` and of `v21-wave1/P-engine-L2-x4` | skew; advective |
 | Tables 4–6, transformer rows; Figure 7 | `v21-wave2/*-skew` (steady, 4 and 8 slabs, sorted and shuffled order, off-design flow), `wave15/O1s-*`, `wave15/O4s-*` | skew |
-| SI Tables S14–S16, transformer rows | `v21-wave2/*-skew`, `v21-wave3/D-transformer-*-skew` | skew |
-| SI Table S10, transformer trace | `diagnostics/transfer/M-transformer-x4-skew-transfer.json`, replaying `reference-0` of `v21-wave1/P-transformer-x4-skew` | skew |
+| Tables 4–6, Cartesian and bore-in-block rows; Figure 7, including the 256-query Bore 2 sequence | the comparisons without the `v21-` prefix in the [listing](../examples/prescribed_speedup_v21/populations.md) | Cartesian skew-symmetric differences; advective, energy-stable (bore-in-block) |
+| SI Tables S14–S16, all rows | `v21-wave2/*-skew`, `v21-wave3/D-transformer-*-skew` and the comparisons without the `v21-` prefix | skew (transformer); Cartesian and bore-in-block as above |
+| SI Table S10, all traces | `diagnostics/transfer/M-transformer-x4-skew-transfer.json`, `M-engine-L2-steady-transfer.json` and `M-engine-L2-x4-transfer.json`, replaying record `reference-0` of the corresponding `v21-wave1/P-*` comparison | skew (transformer); advective (Bore 2) |
 | SI Table S5, transformer subproblem | `diagnostics/validation/V-validation-skew.json` | skew |
 | SI Table S7, transformer rows | `temporal/T-transformer-600s-skew`, `temporal/hour-skew` (skew); `temporal/published-600s-advective`, `temporal/hour-advective` (diagnostics) | skew; advective |
 | SI Table S12 (retention ablation), all rows; run commit `5ddc619` | `v21-wave6/X-transformer-*-skew-zero`, `v21-wave6/X-engine-L1-*-zero`, `v21-wave6/X-engine-L2-*-zero` | skew (transformer); advective, energy-stable (bore-in-block) |
 | SI Table S1 | `diagnostics/certificates.json` | both forms |
 | SI Table S18 (original-transport diagnostics) | `wave3/C-S4b-transformer-*`, `wave9/O*-transformer-*` | advective |
+
+Three body-fitted items come from separate tagged records: Figure 4 and SI Table
+S17 from the [temperature-bound records](https://github.com/teeratornk/deflation-example/tree/temperature-bounds-v1/examples/temperature_bounds),
+and SI Table S19 from the
+[finer-transformer refinement records](https://github.com/teeratornk/deflation-example/tree/mesh-cht-refinement-data-v1)
+and the [guarded follow-up](https://github.com/teeratornk/deflation-example/tree/guarded-refinement-data-v1/examples/guarded_refinement);
+these use the original transport.
 
 ## Definitions
 

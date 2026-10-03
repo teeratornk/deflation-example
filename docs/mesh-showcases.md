@@ -24,14 +24,55 @@ residual policy to distinguish them.
 
 | Procedure | Numerical source | Evidence |
 | --- | --- | --- |
-| Primary projected CG, `terminal` | `dc89ae8518ff6a975eadf2f6f3bae1acbd17b83b` | Six primary body-fitted comparisons and rank/temporal controls |
+| Per-update assembly and sliced Hessian (`hessian_restriction=submatrix`), skew-symmetric transformer transport (`transport_form=skew`), `terminal` | `297899fdba3a38b07d09db86114acdefbd4d5111`; retention ablation `5ddc6197c060543c27255400247876ea67fd881b` | The current six primary body-fitted comparisons, the scale, trajectory and operating comparisons and the retention ablation ([skew-transport records](prescribed-speedup-v21.md)) |
+| Primary projected CG, `terminal` | `dc89ae8518ff6a975eadf2f6f3bae1acbd17b83b` | Earlier body-fitted campaign with the original transformer transport (`mesh-cht-data-v1`) and rank/temporal controls |
 | Residual correction, `refine`, before the initial guard | `926b37c40935fbbe7134a3ab5f87ebdfddb68837` | Finer-transformer study: 40 complete four-target sequences |
 | Residual correction with initial guard, `refine` | `0b3b3f06a535f515256932c0dbf27537c242744d` | Regression tests, small CPU sequences and a separate 40-sequence finer-transformer GPU study |
+
+### Reproduce the current comparisons
+
+The current tables use the study commits of the first row. Check out the timed
+commit and install the GPU environment as in [Run the examples](#run-the-examples):
+
+```bash
+git clone https://github.com/teeratornk/deflation-example.git skew-example
+cd skew-example
+git checkout --detach 297899fdba3a38b07d09db86114acdefbd4d5111
+uv sync --locked --extra gpu --extra plot --extra study
+```
+
+After installing the native AmgX binding, the per-update assembly procedure times a
+primary case, here the transformer with the skew-symmetric transport and Bore 2
+with four slabs:
+
+```bash
+uv run --no-sync python -m deflation_example.benchmark_mesh \
+  --config-name mesh_final_transformer transport_form=skew \
+  phase=final repeats=5 targets=16 output=runs/P-transformer-steady-skew
+uv run --no-sync python -m deflation_example.benchmark_mesh \
+  --config-name mesh_final level=2 transient=true slabs=4 \
+  phase=final repeats=5 targets=16 output=runs/P-engine-L2-x4
+```
+
+The sliced-Hessian procedure adds `hessian_restriction=submatrix`, for example on
+the eight-slab transformer:
+
+```bash
+uv run --no-sync python -m deflation_example.benchmark_mesh \
+  --config-name mesh_final_transformer transport_form=skew transient=true slabs=8 \
+  hessian_restriction=submatrix phase=final repeats=5 output=runs/C-S4b-transformer-x8-skew
+```
+
+The retention ablation checks out `5ddc6197c060543c27255400247876ea67fd881b` and
+adds `'methods=[jacobi,reference,reference_zero]'` to a primary command;
+`reference_zero` carries the same reference between inactive sets by zero
+extension. The [skew-transport records](prescribed-speedup-v21.md) list every
+comparison and regenerate the tables from the archived digests.
 
 ### Reproduce the measured implementations
 
 Release `v0.6.2` preserves the measured correction implementation and the
-primary `terminal` presets. Start in a fresh directory:
+`terminal` presets of the earlier campaign. Start in a fresh directory:
 
 ```bash
 git clone --branch v0.6.2 --single-branch \
@@ -140,7 +181,8 @@ residual and KKT acceptance checks.
 
 The complete Hessian is applied through its factors. The default GPU path
 assembles each inactive Hessian for the shared sparse GPU solver interface.
-`matrix_free_inner=true` supports CPU Jacobi, reference, and recycling solves
+`matrix_free_inner=true` supports CPU Jacobi-CG, RefDef (reference deflation, method key `reference`) and
+recycling solves
 without assembling the inactive Hessian. These are distinct implementations
 and their timings must remain identifiable.
 

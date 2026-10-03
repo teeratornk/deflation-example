@@ -4,6 +4,7 @@
 
 - Name reference deflation RefDef in the documentation, the rendered supplementary tables and the report labels; keep the method key `reference` in configurations, records and evidence archives so frozen results stay valid.
 - Add the zero-extension retention ablation (`reference_zero`) and its records to the skew-transport study page.
+- Map every body-fitted table and figure of the manuscript to its comparisons and records, list the current study commits and commands in the procedure guide, and mark the earlier-campaign body-fitted tables and v20 transformer rows as superseded by the skew-transport records.
 
 ## Unreleased memory-measurement compatibility
 

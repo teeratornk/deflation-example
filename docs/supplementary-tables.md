@@ -9,6 +9,11 @@ compared method from these table groups is included. The manuscript and SI
 retain the principal complete comparisons, transfer tests, verification,
 stopping sensitivity, and conditional-bound example.
 
+The body-fitted sections come from the earlier campaign, whose transformer
+comparisons used the original advective transport. The
+[skew-transport records](prescribed-speedup-v21.md) give the current body-fitted
+tables, their per-method statistics and the regeneration command.
+
 The [body-fitted reproduction examples](mesh-showcases.md#choose-the-numerical-procedure)
 distinguish the primary projected recurrence, measured residual-correction
 study, and subsequent guarded solver. The guard is separate from the GPU timings.

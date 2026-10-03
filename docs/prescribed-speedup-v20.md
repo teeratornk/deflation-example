@@ -12,6 +12,11 @@ RefDef denotes reference deflation, the full-domain reference restricted directl
 to each inactive set; its method key in configurations and records remains
 `reference`.
 
+The transformer comparisons of this page used the original advective transport.
+The [skew-transport page](prescribed-speedup-v21.md) repeats every one of them with
+the skew-symmetric transport and gives the current manuscript tables; its evidence
+archive also contains the Cartesian and bore-in-block comparisons of this page.
+
 ## Source
 
 | Component | Branch | Commit |
@@ -73,5 +78,7 @@ ev.verify('/tmp/v20'); ev.export('/tmp/v20', '/tmp/v20-out')
 
 `verify` checks every file of the archive against its manifest. `export` writes
 the table rows, the macros, the summary, the listing and the figure to `/tmp/v20-out`.
-The regenerated files match the manuscript tables byte for byte. The export
-reads the run digests only and needs neither a GPU nor a network connection.
+The regenerated macros match the manuscript byte for byte. The current tables
+come from the [skew-transport export](prescribed-speedup-v21.md#reproduce-the-tables),
+which replaces the transformer rows of this export. The export reads the run digests
+only and needs neither a GPU nor a network connection.

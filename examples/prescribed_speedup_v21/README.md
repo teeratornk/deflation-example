@@ -13,3 +13,11 @@ definitions and reproduction commands.
 | [`rows.json`](rows.json) | The table rows, their comparison keys and the advective-to-skew twins |
 | [`summary.json`](summary.json) | Per-method statistics of every comparison |
 | [`manifest.json`](manifest.json) | Checksums of these files and the source commits |
+
+The listing and the statistics name methods by their configuration keys:
+`reference` is RefDef (reference deflation), the full-domain reference restricted
+directly to each inactive set; `reference_zero` carries the same reference between
+inactive sets by zero extension (the retention ablation); `reference-perslab4` is
+RefDef with four spatial modes, each with a temporal factor for every slab;
+`jacobi`, `recycling` and `amgx` are Jacobi-CG, recycling and AmgX, and `amgx001`
+and `amgx0001` tighten the AmgX stopping factor to 0.01 and 0.001.

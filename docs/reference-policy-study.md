@@ -44,9 +44,8 @@ implemented comparator.
 4. Freeze final configurations after pilots. Run independently repeated complete
    sequences, spatial and temporal refinements, and a small rank sweep. Preserve
    every declared attempt and report accepted timings separately from failures.
-5. Inspect spectral diagnostics and decide whether the longer conditional bounds
-   belong in the SI. Rewrite the paper from the supported claims and numerical
-   records; write the abstract last.
+5. Inspect the spectral diagnostics of the small replays and evaluate the
+   conditional bounds on a controlled example.
 
 The primary start policy carries accepted active sets across queries and uses
 the last full state as the next inner initial guess. Cold starts are a supporting
