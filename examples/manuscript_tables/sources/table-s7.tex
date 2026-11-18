@@ -1,0 +1,21 @@
+\begin{table}[pos=htbp]
+\centering\small\setlength{\tabcolsep}{4pt}
+\caption{Time refinement and replay of the optimized trajectories. The verified column
+counts discrete optimizations, over all slab counts, that meet the residual and KKT
+criteria, agree with a direct-PDAS solution at the coarsest slab count, and whose
+forward replays on 128 and 256 steps are solved to the residual tolerance; it does not
+establish feasibility between time levels. The difference columns give the largest and root-mean-square temperature
+difference between the eight-slab and 64-slab optima. Replay change and exceedance are
+diagnostics of the eight-slab controls, and the last column of the 64-slab controls. A
+dash marks a quantity without a verified optimization or without a replay. The
+bore-in-block advective operator is energy-stable
+(Table~\ref{si:tab_transport_certificates}). All temperatures are in kelvin.}
+\label{si:tab_v20_temporal}
+\begin{tabular}{@{}lllrrrrrr@{}}
+\toprule
+Model & Horizon & Transport & \begin{tabular}[b]{@{}r@{}}Discrete\\verified\end{tabular} & Difference & RMS & Replay change & Exceedance & 64-slab exceedance \\
+\midrule
+\inputrows{sections/generated/v21/temporal_rows}
+\bottomrule
+\end{tabular}
+\end{table}

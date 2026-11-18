@@ -1,0 +1,16 @@
+\begin{table}[pos=htbp]
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\caption{Median complete-sequence times in seconds over five repetitions of 16-target
+optimization sequences; every method converges at every target in every repetition.
+The speedup is the ratio of the median times of the fastest alternative and RefDef; brackets give the envelope of ratios between extreme repetition times. Dimension counts the optimized spatial or space--time
+DOFs. RefDef and recycling use total rank 100, and the transformer uses the
+skew-symmetric transport \eqref{eq:skew_transport}.}
+\label{tab:mesh_complete}
+\begin{tabular}{@{}llrrrrrl@{}}
+\toprule
+Geometry & Form & Dimension & Jacobi-CG & RefDef & Recycling & AmgX & Speedup \\
+\midrule
+\inputrows{sections/generated/v21/primary_rows}
+\bottomrule
+\end{tabular}
+\end{table}

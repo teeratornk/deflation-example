@@ -1,0 +1,15 @@
+\begin{table}[pos=htbp]
+\centering\scriptsize\setlength{\tabcolsep}{3pt}
+\caption{Single-repetition comparisons at the longest horizons and the solver
+limits. Columns follow main Table~\Mref{tab:v20_scale}; each row times one sequence
+per method, so the speedup is a single ratio without an envelope. The rows with $S=4$
+and $S=6$ time RefDef in a separate job from the alternatives.}
+\label{si:tab_v20_single}
+\begin{tabular}{@{}llrrlrr>{\raggedright\arraybackslash}p{2.6cm}@{}}
+\toprule
+Problem & Setting & Unknowns & RefDef & Fastest alternative & Speedup & \begin{tabular}[b]{@{}r@{}}Iteration\\ratio\end{tabular} & Not converged \\
+\midrule
+\inputrows{sections/generated/v21/single_rows}
+\bottomrule
+\end{tabular}
+\end{table}

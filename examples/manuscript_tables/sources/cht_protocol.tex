@@ -1,0 +1,221 @@
+\subsection{Experimental protocol}
+\label{sec:benchmarks}
+
+\subsubsection{Optimization sequences}
+The body-fitted sequences contain 16 distinct targets. Two moving
+Gaussian profiles define each desired state, and a pulse changes its
+amplitude during a transient trajectory.
+The six primary cases comprise steady and four-slab transient
+transformer problems, together with the corresponding bore-in-block problems at
+two nested refinement levels. They use rank 100 and five complete
+repetitions per solver. Section~\ref{sec:v20_results} adds larger meshes,
+longer trajectories and changing operating conditions under the procedure of
+Section~\ref{sec:final_procedure}.
+
+The operating sequences use one reference built at nominal conditions. The
+transformer day chains 24 hourly eight-slab windows through a residential load
+cycle, with the winding source proportional to the squared per-unit load. The
+overload sequence applies four emergency load profiles to the eight-slab transformer: a
+step to 1.3 per unit, a ramp to 1.5 per unit, a 1.8 per-unit pulse and an alternation
+between 0.8 and 1.3 per unit. Each profile is paired with one target and four bounds
+from 0.7 to 0.85, which gives 16 queries. The drive
+cycle chains 16 four-slab windows on Bore~2, with the interface heat flux and swirl
+speed changing between phases. Each chained window starts from the final state of
+the preceding one. The off-design sequences contain 16 queries, four targets at each
+of the velocity scales 0.5, 0.75, 1.5 and 2, and reassemble the operator for every
+query. The shuffled sequences permute the query order.
+
+Each Cartesian sequence contains 16 desired states indexed by
+$\theta_m=m/15$, $m=0,\ldots,15$. Four Gaussian profiles have
+unequal weights and query-dependent centers. Rotation and vertical
+translation change their locations across queries. Transient targets
+also rotate and pulse over physical time. Hashes verify that the targets are
+distinct and identical between methods and repetitions.
+
+The Cartesian steady bound is approximately $\psi=1.950\times10^{-4}$,
+and its transient bound is approximately $\psi=2.685\times10^{-4}$.
+The configurations retain the full-precision values.
+A direct-PDAS calibration selected each bound once; the
+resulting value stays fixed under spatial refinement and changes in
+the number of time slabs. Uniform steps partition the fixed horizon
+$T_f=0.1$ in the performance study. Unequal steps and nonzero
+initial data appear in the independent discretization checks.
+
+\subsubsection{Four complete-optimization solvers}
+The first method is ordinary Jacobi-preconditioned CG with an
+efficient rank-zero path. The second is RefDef with
+\eqref{eq:reference_restriction}. Both use the same operator
+application, precision and residual verification. The third uses
+the same deflated-CG kernel with history-based recycling. It starts
+with empty history. After an inner solve meets the residual criterion, its candidate
+pool contains the deployed coarse vectors and the last $w$ new
+CG search directions, with $w=r$. The directions are copied during
+the solve, and the space remains fixed until that solve ends.
+
+For physical candidate matrix $V$ and current Jacobi diagonal $D$,
+recycling forms an orthonormal basis $\widehat V$ of $D^{1/2}V$.
+It selects the lowest Ritz vectors of
+$\widehat V^\top D^{-1/2}BD^{-1/2}\widehat V$ and maps them back
+by $D^{-1/2}$. QR and a small-factor SVD use a relative rank threshold
+of $10^{-12}$. At most $r$ physical vectors are retained.
+Zero extension transfers them to the next inactive set.
+Capture, selection, transfer and cached products all enter the
+cost and memory measurements. A failed target clears the history.
+
+The fourth method is AmgX-preconditioned CG with classical AMG. Configuration and
+resource handles persist throughout a sequence, and each inactive matrix receives
+new matrix and vector handles, a solver and an AMG hierarchy.
+
+\subsubsection{Warm starts and accuracy}
+The primary policy warm-starts the outer and inner solves.
+The first query starts with all state DOFs active.
+Subsequent queries receive the preceding solution and active
+set after the KKT check. Within PDAS, each verified inactive solution updates
+the full state used by the next inner solve. Every method has equivalent
+access to this solution history. The cold-start variant resets the
+active set to all DOFs for each query and uses zero
+inner initial guesses. Each complete repetition starts without
+solution or recycling history.
+
+All computations use double precision. The final inactive-system
+criterion is an independently recomputed relative residual of
+$10^{-10}$. CG triggers candidate verification at a relative
+recurrence residual of $10^{-11}$; AmgX uses a native absolute
+target of $10^{-11}\|b\|_2$. For a zero right-hand side, the
+corresponding absolute targets apply. The common independent
+check determines acceptance. Each Cartesian inner solve has a cap of
+10000 iterations. The body-fitted study uses a cap of 50000 iterations.
+PDAS has a cap of 100 steps in both studies, raised to 400 for Bore~4.
+
+Set $g=MY-\ell$ and $s=\max(1,\|\ell\|_\infty)$.
+PDAS requires each of the following quantities to be at most
+$10^{-8}$:
+\begin{equation}\label{eq:cht_kkt_acceptance}
+\begin{gathered}
+ \|g+\lambda\|_\infty/s,\qquad
+ \|[Y-\psi]_+\|_\infty,\qquad
+ \|[-\lambda]_+\|_\infty/s,\\
+ \|\lambda\odot(\psi-Y)\|_\infty/s,\qquad
+ \|Y-\min(\psi,Y-g)\|_\infty/s.
+\end{gathered}
+\end{equation}
+The primal-feasibility quantity is absolute. The other four use
+the stated common normalization. Transient runs additionally
+check \eqref{eq:control_adjoint} through independent slabwise
+forward and transpose actions. Caps, cycles, memory limits,
+exceptions and residual failures are recorded separately. The reported
+times contain only sequences that satisfy these criteria at every target.
+
+\subsubsection{Time, memory and reproducibility}
+Each method and repetition runs in a fresh process on one GPU
+with four central processing unit (CPU) threads. A common small warmup initializes both
+GPU libraries. The method order rotates between repetitions.
+The complete sequence interval starts before operator assembly
+and reference or resource construction. It includes every target,
+all PDAS updates and inactive solves, matrix and basis transfers,
+verification and cleanup. Disjoint timing components sum to this
+measured total. Reference construction is charged once, to the first
+query of each sequence.
+
+Calibration, process initialization, warmup and termination are recorded
+separately; the body-fitted models use fixed bounds and need no calibration. A
+separate process samples host and GPU memory.
+
+Each case compares RefDef with the fastest tested GPU iterative
+alternative: among Jacobi-CG, recycling and AmgX, the method with the lowest
+median complete time over its converged repetitions, provided at least one
+repetition converges at every target. We call it the fastest alternative, and the
+speedup divides its median time by that of RefDef. The main-text
+comparisons are those of Tables~\ref{tab:mesh_complete} and
+\ref{tab:v20_scale}--\ref{tab:v20_operation}. The direct and block-in-time CPU
+solvers are compared separately; the block-in-time solver applies CG with block-Jacobi
+sweeps over the slab blocks of the trajectory Hessian. Most comparisons run all methods
+and repetitions within one job on one GPU; the table captions identify comparisons
+assembled from separate jobs. Repeated measurements of one Bore~3 configuration in
+separate jobs show between-job timing variation. The reported envelopes describe the
+sampled repetitions, so small speedup margins should be interpreted within that
+measurement scope.
+
+Source identifiers, configurations, target and matrix hashes, compressed
+active sets and scripts that regenerate every table and figure accompany the
+timing records.
+
+\subsubsection{Timing procedures}
+\label{sec:final_procedure}
+Two procedures share Algorithm~\ref{alg:revision_deflation} and the accuracy
+criteria above (Table~\ref{tab:procedures}). The
+per-update assembly procedure forms each inactive Hessian by sparse products after
+every active-set update; the primary comparisons of Section~\ref{sec:mesh_results}
+use it, as the original body-fitted implementation does. The sliced-Hessian procedure
+of Algorithm~\ref{alg:final_procedure} assembles the full reduced Hessian once for
+each operator and extracts every inactive principal submatrix from it; the comparisons
+of Section~\ref{sec:v20_results} use it. The extraction removes the per-update sparse
+products from the setup of every method.
+Reference meshes, ranks and temporal coverage are prescribed settings of each
+comparison. One reference, computed before the first query at the nominal flow, is
+used for every query of a sequence.
+
+Targets, loads, bounds and chained initial states change only the right-hand side
+or the constraints and leave the full reduced Hessian unchanged; each active-set update
+extracts its current inactive principal submatrix. A change of flow scale reassembles
+the full reduced Hessian. The comparisons use Algorithm~\ref{alg:revision_deflation}
+with the coarse correction and residual replacement. The \href{https://github.com/teeratornk/deflation-example/blob/ba682dd05b168d2f43ff0c58050813deee785223/docs/mesh-showcases.md#choose-the-numerical-procedure}
+{reproduction examples} give the commands for each procedure.
+
+\begin{table}[pos=htbp]
+\centering\footnotesize\setlength{\tabcolsep}{3pt}
+\caption{Timing procedures and their prescribed reference settings. Both procedures
+solve each inactive system with Algorithm~\ref{alg:revision_deflation}, including its
+residual replacement, and restrict the reference on the GPU. Complete temporal coverage
+keeps every temporal factor of each retained spatial mode; truncated coverage keeps the
+lowest spatial--temporal pairs up to the total rank. Temporal coverage does not apply to
+steady cases.}
+\label{tab:procedures}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.15\textwidth}>{\raggedright\arraybackslash}p{0.12\textwidth}>{\raggedright\arraybackslash}p{0.15\textwidth}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{0.22\textwidth}@{}}
+\toprule
+Procedure & Comparisons & Inactive Hessian & Reference mesh and rank & Temporal coverage \\
+\midrule
+Per-update assembly & Table~\ref{tab:mesh_complete} & Sparse products at every update &
+Packaged mesh, total rank 100 & Truncated with four slabs; the steady cases have no
+temporal factors \\
+Sliced Hessian & Table~\ref{tab:v20_scale} (steady) & Principal submatrix of the
+preassembled Hessian & Closed form on Cartesian grids, rank 100; packaged mesh for the
+transformer and Bore~1, rank 100; first refinement for Bore~2 and Bore~3 and second
+refinement for Bore~4, rank 200 & No temporal factors \\
+Sliced Hessian & Table~\ref{tab:v20_transient} (trajectories) & Principal submatrix of
+the preassembled Hessian & Closed form on Cartesian grids; packaged mesh for the
+transformer, Bore~1 and Bore~2, total rank 100; first refinement for Bore~3, rank 200 &
+Complete on Cartesian grids ($S=12$ at eight slabs, $S=6$ at 16 and 32) and Bore~3
+($S=50$); truncated elsewhere \\
+Sliced Hessian & Table~\ref{tab:v20_operation} (steady and trajectory sequences) &
+Principal submatrix of the preassembled Hessian & Packaged mesh, total rank 100; first
+refinement for Bore~3, rank 200 & Truncated for the transformer day, overloads, drive
+cycle and four-slab shuffled sequences. The steady sequences have no temporal
+factors \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{algorithm}[htbp]
+\caption{The sliced-Hessian procedure builds one reference and reuses it for every inactive-set solve of a query sequence.}
+\label{alg:final_procedure}
+\begin{algorithmic}[1]
+\Require Queries $q=1,\dots,N_q$ with target, bound, load and flow scale; prescribed reference mesh and rank $r$, or $S$ spatial modes with all $N_t$ temporal factors each
+\State Assemble the reduced Hessian at the nominal flow
+\State Form the closed-form Laplacian modes on a Cartesian grid, or compute the lowest generalized eigenvectors of the coarse reduced Hessian at the nominal flow with residuals at most $10^{-7}$ and prolong them to the target mesh
+\State For a trajectory, keep the $r$ lowest spatial--temporal pairs, or all $N_t$ temporal factors of each of $S$ spatial modes
+\State Store the reference on the GPU
+\For{$q=1,\dots,N_q$}
+  \If{the flow scale of query $q$ differs from that of the current operator}
+    \State Reassemble the transport and the reduced Hessian; keep the reference
+  \EndIf
+  \State Form the right-hand side from the target and load of query $q$; for a chained window, take the initial state from the final state of window $q-1$
+  \State Start from the previous converged state and active set; the first query starts with every constraint active
+  \Repeat
+    \State Extract the inactive principal submatrix of the current Hessian and restrict the reference on the GPU
+    \State Solve with Algorithm~\ref{alg:revision_deflation}; verify the relative residual at most $10^{-10}$
+    \State Update the multipliers and the active set for the bound of query $q$
+  \Until{every KKT measure is at most $10^{-8}$}
+\EndFor
+\end{algorithmic}
+\end{algorithm}

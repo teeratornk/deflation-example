@@ -1,0 +1,17 @@
+\begin{table}[pos=H]
+\centering\small\setlength{\tabcolsep}{3pt}
+\caption{Residual-correction comparisons preserve the finer-transformer
+four-target problems and final accuracy requirements. Complete sequences
+and target solves are counted separately. Times give the median and
+observed range in seconds over five complete repetitions. Residual and KKT
+columns give maxima across completed sequences; corrections count all
+error equations.}
+\label{si:tab_mesh_correction}
+\begin{tabular}{@{}llrrrrrr@{}}
+\toprule
+Form & Method & Sequences & Targets & Time [range] & Residual & KKT & Corrections \\
+\midrule
+\inputrows{sections/generated/si/correction_rows}
+\bottomrule
+\end{tabular}
+\end{table}

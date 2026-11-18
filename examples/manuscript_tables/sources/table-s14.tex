@@ -1,0 +1,24 @@
+\begin{table}[pos=htbp]
+\centering\scriptsize\setlength{\tabcolsep}{3pt}
+\caption{Supplementary comparisons under the procedure and criteria of main
+Section~\Mref{sec:v20_results}. Columns follow main Table~\Mref{tab:v20_scale}:
+times are median complete-sequence seconds over the converged repetitions, brackets
+give the envelope of ratios between extreme repetition times, and the last column
+gives converged and
+attempted repetitions of each method that fails to converge in some repetition.
+$^\dagger$Compared with Jacobi-CG alone, or on Bore~4 with Jacobi-CG and AmgX. Level
+0 denotes the packaged mesh and level $\ell$ its $\ell$-th refinement. Unless the
+setting names a reference level or rank, the transformer and Bore~2 rows use the
+packaged-mesh reference with total rank 100, and the Bore~3 rows use the packaged-mesh
+reference with rank 200; the sorted rows and the four-method Bore~3 row give the
+matching nominal comparisons. The Bore~4 envelope combines measurements from separate
+jobs.}
+\label{si:tab_v20_comparisons}
+\begin{tabular}{@{}llrrlrr>{\raggedright\arraybackslash}p{2.6cm}@{}}
+\toprule
+Problem & Setting & Unknowns & RefDef & Fastest alternative & Speedup [range] & \begin{tabular}[b]{@{}r@{}}Iteration\\ratio\end{tabular} & Not converged \\
+\midrule
+\inputrows{sections/generated/v21/si_rows}
+\bottomrule
+\end{tabular}
+\end{table}

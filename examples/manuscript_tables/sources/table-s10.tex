@@ -1,0 +1,21 @@
+\begin{table}[pos=htbp]
+\centering\footnotesize\setlength{\tabcolsep}{3pt}
+\caption{Matched mesh replays measure the information supplied by
+two specified transfers. Each trace replays the first repetition of the corresponding
+sequence of main Table~\Mref{tab:mesh_complete}; the transformer trace uses the
+skew-symmetric transport. Systems counts the inactive systems of each trace;
+activated and released count constraint changes after the first restriction,
+including those between queries. Energy fraction is the median initial energy-error fraction
+removed by the coarse correction. Iterations and
+time sum the per-kernel medians over the sampled systems, and Kernels counts these
+systems.
+Each kernel has three repetitions, all meeting the residual criterion.}
+\label{si:tab_mesh_transfer}
+\begin{tabular}{@{}lrrlrrrrr@{}}
+\toprule
+Trace & Systems & Activated/released & Transfer & Kernels & Rank & Energy fraction & Iterations & Time (s) \\
+\midrule
+\inputrows{sections/generated/v21/support_transfer_rows}
+\bottomrule
+\end{tabular}
+\end{table}

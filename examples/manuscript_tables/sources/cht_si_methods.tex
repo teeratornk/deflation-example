@@ -1,0 +1,484 @@
+\section{Methodology}\label{si:methodology}
+Continuous pointwise state constraints can produce measure-valued
+multipliers \citep{casas1986control}. Regularization and discretization
+provide approximations \citep{meyer2006optimal,ito2003semi,deckelnick2009convergence}.
+The calculations below impose bounds on the discrete state and evaluate
+the corresponding discrete Karush--Kuhn--Tucker (KKT) conditions.
+
+\subsection{Models and discretization}
+\input{sections/cht_mesh_methods}
+
+\subsubsection{Cartesian trajectories and independent optimization}
+\label{si:transient}
+The main formulation orders unknowns by time level and then by the
+spatial C-order index. The last spatial coordinate varies fastest.
+Let $N_s=n_s^3$ and let $S$ be the lower shift matrix on the
+$N_t$ time levels. With $D_t=\diag(\Delta t_n)$, the temporal
+difference matrix is $L=D_t^{-1}(I-S)$.
+The prescribed initial value contributes only to the first right-hand
+side block, $f^1=Cy^0/\Delta t_1$. These definitions give the
+assembled operator and its independent slabwise actions in main
+Equations~\Mref{eq:cht_backward_euler}--\Mref{eq:cht_trajectory_operator}.
+Forward substitution verifies the recovered control:
+\[
+ y^n=(A_s+C/\Delta t_n)^{-1}
+       \left(u^n+Cy^{n-1}/\Delta t_n\right).
+\]
+The transpose action starts from the final adjoint block and uses
+$-Cp^{n+1}/\Delta t_{n+1}$ in the preceding block.
+
+For a complete trajectory, the objective's tracking and control
+weights are $W=(D_t/\overline{\Delta t})\otimes I_{N_s}$.
+The algebraic adjoint satisfies $p=\alpha WU$. With unequal steps,
+this convention distinguishes the multiplier of the assembled
+unweighted state equation from a time-weighted adjoint variable.
+The physical objective restores the factor
+$h^3\overline{\Delta t}$. The state constraints apply at the
+$N_t$ positive time levels. The initial value is prescribed
+independently.
+
+The independent reference solves the bounded least-squares problem
+\begin{equation}\label{eq:si_cht_bvls}
+ \min_{Y\leq\psi}\frac12\left\|
+ \begin{bmatrix}W^{1/2}\\\sqrt\alpha W^{1/2}\mathcal A\end{bmatrix}Y
+ -
+ \begin{bmatrix}W^{1/2}d\\\sqrt\alpha W^{1/2}f\end{bmatrix}
+ \right\|_2^2.
+\end{equation}
+The SciPy bounded-variable least-squares method uses tolerance
+$10^{-13}$ and an iteration cap of 1000. Its active-set indicator
+defines the reference multiplier: $\lambda_i=(\ell-MY)_i$ at an
+upper-bound index identified by the reference solver and zero elsewhere. The five KKT
+components are evaluated independently for this reference solution.
+Three iterative methods solve the complete PDAS problem for comparison:
+Jacobi-preconditioned conjugate gradient (CG), denoted Jacobi-CG, RefDef and
+recycling.
+
+The verification study contains three steady $4^3$ problems,
+three uniform-step $3^3$-by-4-slab problems, and three unequal-step
+problems on the same trajectory grid. The queries are
+$\theta=0,1/2,1$. The transient initial temperature is
+$2\times10^{-4}$, the positive-level bound is $10^{-4}$, and the
+unequal steps are $(0.01,0.02,0.03,0.04)$. Uniform steps have length
+$0.025$. The reference ranks are 10 for steady problems and 12
+for trajectories. These are nine distinct optimization
+problems and 27 PDAS solver runs.
+
+
+\subsubsection{Cartesian targets and fixed physical bounds}
+\label{si:targets}
+The initial Gaussian centers are
+$(0.3,0.3,0.3)$, $(0.3,0.7,0.3)$, $(0.7,0.3,0.7)$ and
+$(0.7,0.7,0.7)$. At query $\theta$, a rotation of $1.2\theta$
+radians about $(x_1,x_2)=(1/2,1/2)$ changes their first two
+coordinates, and $0.035(2\theta-1)$ shifts their third coordinates.
+Their weights are $(1,0.8+0.15\theta,0.65,0.45)$ and their common
+Gaussian width is $\sigma=0.12$:
+\[
+ d(x,\theta)=\sum_{j=1}^4 a_j(\theta)
+ \exp\left(-\frac{\|x-z_j(\theta)\|_2^2}{2\sigma^2}\right).
+\]
+Unequal weights and the vertical shift distinguish the 16
+query targets. The \href{https://github.com/teeratornk/deflation-example/blob/ba682dd05b168d2f43ff0c58050813deee785223/docs/supplementary-figures.md#cartesian-target-fields}
+{repository figures} show desired temperatures and active sets for three
+steady queries and three time levels of one trajectory.
+
+For a transient query, let $\tau=t/T_f$.
+An additional rotation of $0.8\tau$ changes the first two center
+coordinates. A shift $0.05\sin(2\pi\tau)$ changes the third
+coordinate, and $0.15+0.85\sin^2(\pi\tau)$ multiplies every
+Gaussian weight. One query specifies this complete moving and
+pulsed trajectory. The comparison holds $T_f=0.1$ fixed.
+
+A direct-PDAS bisection with eight steps calibrates a fixed bound
+near active fraction 0.2 at $\theta=1/2$. Calibration uses $24^3$
+nodes for steady problems and $12^3$ nodes with eight slabs for
+trajectories. Each refinement uses the corresponding bound unchanged.
+Calibration precedes the solver comparisons; its measured cost enters
+the preparation-inclusive times once for each method.
+
+\subsection{Reference construction and analysis}
+\input{sections/cht_mesh_reference_methods}
+
+\subsubsection{Reference eigenpairs and compact storage}
+\label{si:construction}
+Let $L_s\phi_j=\mu_j\phi_j$ with orthonormal spatial sine modes.
+For any temporal vector $q$,
+\[
+ \mathcal A_0(q\otimes\phi_j)
+ =((\mu_jI+c_0L)q)\otimes\phi_j.
+\]
+Applying the weighted normal operator gives
+$M_0(q\otimes\phi_j)=(H_jq)\otimes\phi_j$, with $H_j$ defined
+in main Equation~\Mref{eq:cht_temporal_eigenproblem}.
+Thus the mode-dependent construction diagonalizes the specified
+homogeneous space--time reference exactly, up to floating-point
+eigensolver error.
+
+The candidate cutoff follows from monotonicity. Since
+$W_t=D_t/\overline{\Delta t}$,
+\[
+ W_tL+L^\top W_t
+ =\frac{2I-S-S^\top}{\overline{\Delta t}}
+\]
+is positive definite. For $\mu\geq0$,
+\[
+ \frac{\partial}{\partial\mu}
+ \left[W_t+\alpha(\mu I+c_0L)^\top W_t(\mu I+c_0L)\right]
+ =\alpha\left(2\mu W_t+c_0(W_tL+L^\top W_t)\right)
+\]
+is positive definite. The minimum eigenvalue therefore increases
+with the spatial Laplacian eigenvalue. A spatial mode beyond the
+first $r$ has at least $r$ preceding temporal candidates with
+no larger reference eigenvalue. The first $\min(r,N_s)$ spatial
+modes consequently suffice to identify a lowest rank-$r$ reference
+space. A fixed lexicographic order resolves repeated spatial
+eigenvalues at the cutoff.
+
+The compact reference stores each selected temporal vector $q_{j,k}$
+with its spatial factor $\phi_j$. At spatial node $a$ and time level $n$,
+restriction evaluates $\phi_j(a)q_{j,k}(n)$ directly. Only the current
+inactive candidate matrix is assembled. Memory measurements include
+these factors, the restricted candidate, the orthonormal basis and the
+cached operator product.
+
+\subsubsection{Complete and truncated temporal coverage}
+\label{si:temporal_coverage}
+Let $\Phi_S=[\phi_1,\ldots,\phi_S]$ collect the retained spatial modes and let
+$Q_j\in\mathbb R^{N_t\times N_t}$ hold all $N_t$ temporal factors of mode $j$ for a
+trajectory with $N_t$ time levels. The factors are orthonormal in the temporal
+metric, so every $Q_j$ is invertible. The complete reference therefore spans
+\[
+ \operatorname{span}\{q_{j,k}\otimes\phi_j\}
+ =\operatorname{span}\{e_n\otimes\phi_j:\ n=1,\ldots,N_t,\ j=1,\ldots,S\},
+\]
+the space that pairs every retained spatial mode with every time level. A
+restriction $R$ selects rows, and
+$R\,[\,Q_1\otimes\phi_1,\ldots,Q_S\otimes\phi_S\,]
+=R\,[\,I\otimes\phi_1,\ldots,I\otimes\phi_S\,]\operatorname{blkdiag}(Q_j\otimes 1)$
+with an invertible right factor. The restricted bases span the same space, so every
+coarse correction built from them, $Z(Z^\top BZ)^{-1}Z^\top$ and the projector $P$
+of main Equation~\Mref{eq:revision_projectors}, is identical in exact arithmetic.
+The complete construction thus depends only on the retained spatial modes; with
+complete temporal coverage, the temporal eigenvectors provide an alternative basis of the
+same correction space.
+
+A truncated construction keeps fewer than $N_t$ factors per mode, or selects the
+lowest spatial--temporal pairs up to a total rank. The temporal eigenvalue ordering
+then decides which time dependence of each mode survives, and the span no longer
+contains every $e_n\otimes\phi_j$. The companion tests confirm both statements:
+on random inactive sets of a transformer trajectory, the restricted complete and
+tensor bases give coarse corrections that agree to rounding, and a truncated
+selection misses time-level indicators of a retained mode. The Cartesian
+trajectories with $S$ spatial modes and the Bore~3 trajectory use complete
+coverage; the transformer, Bore~1 and Bore~2 trajectories select the 100 lowest
+pairs.
+
+\subsubsection{Restriction analysis and conditional convergence}
+\label{si:theory}
+Let $M_0,M\in\mathbb R^{N\times N}$ be symmetric positive definite (SPD)
+and set $\Delta=M-M_0$.
+Let $\Phi^\top\Phi=I_r$ and
+$G_0=M_0\Phi-\Phi\Lambda$ for symmetric $\Lambda$.
+For the inactive and active row partitions, main
+Equation~\Mref{eq:restriction_identity} follows directly from
+block multiplication. If $\Phi_I=ZR$ has full column rank, the
+subspace residual satisfies
+\begin{equation}\label{eq:si_F_bound}
+ \|BZ-Z(Z^\top BZ)\|_F
+ \leq\frac{
+ \|(M_0)_{IJ}\Phi_J\|_F+
+ \|\Delta_{II}\Phi_I\|_F+
+ \|(G_0)_I\|_F}{\sigma_{\min}(\Phi_I)}.
+\end{equation}
+Projection onto the orthogonal complement of $Z$ eliminates
+$\Phi_I\Lambda$. The factor $R^{-1}$ has norm
+$1/\sigma_{\min}(\Phi_I)$, which gives the displayed estimate.
+Partial cancellation between its three terms can make the
+actual residual smaller than this sufficient bound.
+
+Orthonormality of the full reference also gives
+\begin{equation}\label{eq:si_massloss}
+ \Phi_I^\top\Phi_I=I_r-\Phi_J^\top\Phi_J.
+\end{equation}
+For $\beta_J=\|\Phi_J\|_2<1$, the restriction has full rank and
+$\sigma_{\min}(\Phi_I)=\sqrt{1-\beta_J^2}$. This condition describes
+the least retained norm of any unit combination of modes. Individual
+column norms alone do not determine the rank of their combined
+restriction.
+
+Let $U_r$ span the lowest $r$ eigendirections of $B$, with
+$1\leq r<|I|$, and let $U_\perp$ span its orthogonal complement.
+Write $E=Z^\top BZ$, $F=BZ-ZE$ and
+$BU_\perp=U_\perp\Lambda_\perp$. Premultiplication yields
+\begin{equation}\label{eq:si_sylvester}
+ \Lambda_\perp X-XE=U_\perp^\top F,\qquad X=U_\perp^\top Z.
+\end{equation}
+If $\eta=\lambda_{r+1}(B)-\lambda_{\max}(E)>0$, diagonalizing $E$
+divides each transformed entry on the right by an eigenvalue
+difference at least $\eta$. The Frobenius norm then gives
+\[
+ \|\sin\Theta(U_r,Z)\|_F=\|X\|_F\leq\|F\|_F/\eta.
+\]
+This is a sufficient estimate for the specified low invariant
+subspace. Rank loss requires a lower-rank comparison. A repeated
+eigenvalue at the cutoff requires a choice of target subspace or
+a complete-cluster comparison.
+
+Combining these results bounds the largest angle $\vartheta$ by
+\begin{equation}\label{eq:si_combined_angle}
+ \sin\vartheta\leq\varepsilon_Z,\qquad
+ \varepsilon_Z=\min\left\{1,
+ \frac{\|(M_0)_{IJ}\Phi_J\|_F+
+       \|\Delta_{II}\Phi_I\|_F+\|(G_0)_I\|_F}
+      {\sigma_{\min}(\Phi_I)\eta}\right\},
+ \quad \eta>0.
+\end{equation}
+A bound equal to one is trivial. A nonpositive separation leaves
+this particular estimate unavailable.
+For deflated CG, the perturbation estimate of
+\citet{kahl2017deflated} gives
+\begin{equation}\label{eq:si_effective_kappa}
+ \kappa_{\rm eff}\leq
+ \left(\sqrt{\frac{\lambda_{\max}(B)}{\lambda_{r+1}(B)}}+
+       \sqrt{\kappa_2(B)}\,\varepsilon_Z\right)^2.
+\end{equation}
+Here $\kappa_{\rm eff}$ is the ratio of the largest to smallest
+nonzero deflated eigenvalues. Following the coarse correction,
+the usual exact-arithmetic CG estimate is
+\[
+ \|e_k\|_B\leq2
+ \left(\frac{\sqrt{\kappa_{\rm eff}}-1}
+            {\sqrt{\kappa_{\rm eff}}+1}\right)^k\|e_0\|_B.
+\]
+A conditioning-improvement certificate requires the upper bound
+in \eqref{eq:si_effective_kappa} to be smaller than the original
+condition number. A nontrivial angle bound alone does not imply
+that comparison.
+
+For Jacobi-preconditioned CG, every matrix, subspace residual,
+angle and separation in this test uses
+$\widehat B=D^{-1/2}BD^{-1/2}$ and an orthonormal basis of
+$D^{1/2}Z$. The rank-one controlled CHT example starts with an
+exact lowest eigenvector of the full Jacobi-scaled CHT matrix.
+It removes nodes in increasing order of the absolute reference
+amplitude and applies \eqref{eq:si_combined_angle}, including
+the numerical reference residual. Its physical coarse vector is
+obtained by the inverse Jacobi square-root scaling. The analytical
+timing references have their separately stated construction.
+
+\subsubsection{Projected recurrence and numerical safeguards}
+\label{si:implementation}
+For $E=Z^\top BZ$, $Q=ZE^{-1}Z^\top$ and $P=I-QB$,
+$QBQ=Q$, $P^2=P$ and $BP=P^\top B$.
+The balanced inverse $P\mathcal JP^\top+Q$ is SPD for SPD $\mathcal J$:
+both terms have nonnegative quadratic forms, and their nullspaces
+intersect only at zero. If $Z^\top r=0$, then $P^\top r=r$ and
+$Qr=0$, giving the projected action $P\mathcal Jr$ used in the implementation
+\citep{tang2009comparison,gaul2014framework}.
+The corrected initial guess and coarse-corrected restarts supply
+this residual condition.
+
+A thin QR factorization into orthonormal and upper-triangular factors,
+followed by a small-factor singular value decomposition (SVD),
+determines numerical rank on the GPU.
+RefDef and recycling apply the same relative threshold
+$10^{-12}$ and coarse condition limit $10^{10}$.
+Cholesky solves evaluate the coarse correction. Retaining $BZ$
+changes the implementation of a matrix product in the projector;
+its setup and storage are charged for both methods. The efficient
+rank-zero path allocates no coarse basis or cached coarse product.
+Original-residual checks apply to every returned inactive solution.
+PDAS then verifies the five KKT components in main
+Equation~\Mref{eq:cht_kkt_acceptance}.
+
+The recycling candidate pool retains the deployed coarse vectors
+and the last $r$ newly generated search directions. Selection uses
+the current Jacobi-scaled operator. The selected physical vectors
+are transferred by zero extension between consecutive PDAS inner
+solves. The implementation keeps the coarse space fixed during
+an inner solve and its restarts. A failed target clears the
+solution and recycling history before the next query.
+
+\subsection{Implementation and measurement}
+\subsubsection{Overview of the comparisons}
+Table~\ref{si:tab_experiment_map} lists the problems, references and measurements of
+the principal comparisons; the Results section describes the additional studies.
+
+\begin{table}[pos=htbp]
+\centering\small
+\caption{Comparisons, problems and measurements. Every timed comparison
+uses 16 targets and five complete sequence repetitions per method unless
+stated otherwise. Ranks denote total spatial or space--time rank, and $S$
+the number of spatial modes, each paired with a temporal factor for every slab.}
+\label{si:tab_experiment_map}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.19\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+Purpose & Problems and reference & Measurements \\
+\midrule
+Optimization verification &
+12 body-fitted and nine Cartesian steady or transient verification problems &
+Independent bounded least squares, original inner residuals,
+KKT components, state and objective agreement, trajectory recovery \\
+Body-fitted optimization &
+Axisymmetric transformer and three-dimensional bore-in-block meshes; coarse P1 references &
+Complete steady and transient costs, KKT and original-residual checks,
+constraint changes, rank effects, and process memory \\
+Steady scale &
+Cartesian $32^3$--$128^3$; transformer; Bore~1--4 up to
+2.5 million DOFs; ranks 100 and 200 &
+Complete time and inner iterations under main Algorithm~\Mref{alg:final_procedure},
+original residuals and KKT checks \\
+Trajectories &
+Cartesian $12^3$--$64^3$ with 8--32 slabs, $S=12$ or 6;
+transformer and Bore~1--3 with 4 or 8 slabs &
+Complete trajectory optimization, original residuals, KKT and recovery checks \\
+Operating conditions &
+Transformer day, drive cycle, off-design flow, overloads and query order;
+one nominal reference &
+Complete time over chained windows or reassembled operators;
+original residuals and KKT checks \\
+Retention ablation &
+Six primary body-fitted sequences; the same reference by direct restriction or
+zero-extension transfer, with Jacobi-CG in the same job &
+Complete time and inner iterations \\
+Transfer mechanism &
+Steady and transient PDAS traces; identical replay systems &
+Activation and release, retained rank, coarse energy removal,
+deflated spectrum on small systems, original-residual acceptance \\
+Conditional analysis &
+Controlled $6^3$ CHT restrictions; exact rank-one scaled reference &
+Separation, actual angle, sufficient bound and effective conditioning \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Numerical environment and AmgX configuration}
+\label{si:cht_environment}
+The complete performance comparisons use one NVIDIA H200 GPU and
+four threads on an Intel Xeon Platinum 8468 CPU. The software
+environment uses Python 3.12.3, NumPy 2.5.3, SciPy 1.18.1,
+PyTorch 2.10.0 with CUDA 12.8 and AmgX 2.5.0. NumPy and SciPy use
+OpenBLAS libraries reporting versions 0.3.34.106.0 and 0.3.31.dev.
+The body-fitted comparisons use the same hardware.
+The \href{https://github.com/teeratornk/deflation-example/blob/ba682dd05b168d2f43ff0c58050813deee785223/docs/mesh-showcases.md#reproduce-the-current-comparisons}
+{body-fitted reproduction examples} give the commands of the timed comparisons; the
+\href{https://github.com/teeratornk/deflation-example/blob/ba682dd05b168d2f43ff0c58050813deee785223/docs/mesh-showcases.md#reproduce-the-measured-implementations}
+{measured implementations} of the earlier campaign and of the finer-transformer
+residual-correction study are listed separately. A separate
+\href{https://github.com/teeratornk/deflation-example/blob/ba682dd05b168d2f43ff0c58050813deee785223/docs/mesh-showcases.md#use-the-recommended-guarded-solver}
+{guarded-solver example} checks the initial guess before solving.
+The \href{https://github.com/teeratornk/deflation-example/blob/ba682dd05b168d2f43ff0c58050813deee785223/docs/reference-policy-study.md#frozen-complete-optimization-campaign}
+{Cartesian examples} reproduce the spatial, temporal and rank comparisons.
+These examples provide the corresponding configurations, data and numerical procedures.
+
+Table~\ref{si:tab_amgx_configuration} specifies the native solver.
+The session retains its base configuration and resource handles.
+Each inner solve creates a configuration with its right-hand-side
+dependent absolute target, uploads the current matrix and initial
+guess, constructs a hierarchy and solves. Matrix, vector, solver
+and per-solve configuration handles are destroyed after verification.
+The session closes after the last target. Every method process
+initializes and warms both GPU libraries before its complete
+sequence interval.
+
+\begin{table}[pos=htbp]
+\centering\small
+\caption{The complete steady and transient comparisons use the
+same AmgX hierarchy settings. Original inactive systems use the absolute
+target $10^{-11}\|b\|_2$, with $10^{-11}$ used when $b=0$.
+The separate correction protocol in Section~\ref{si:mesh_refinement_diagnosis}
+specifies error-equation targets and remaining iteration budgets.}
+\label{si:tab_amgx_configuration}
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+Setting & Value \\
+\midrule
+Deterministic mode & Enabled \\
+Outer solver; arithmetic & Preconditioned conjugate gradient (PCG); double precision \\
+Convergence; residual norm; iteration cap &
+Absolute; Euclidean; 10000 for Cartesian, 50000 for body-fitted \\
+Preconditioner; construction & Algebraic multigrid (AMG); classical \\
+Coarsening; interpolation & Parallel maximal independent set (PMIS); distance-two (D2) \\
+Smoother; relaxation & Symmetric multicolor Gauss--Seidel; 1 \\
+Pre-sweeps; post-sweeps & 1; 1 \\
+Cycle; cycles per application; maximum levels & V; 1; 25 \\
+Coarse solver & Dense lower--upper (LU) factorization \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\Needspace{9\baselineskip}
+\subsubsection{Disjoint timing intervals and memory measurements}
+\label{si:cht_timing}
+Table~\ref{si:tab_timing_definitions} partitions complete-sequence
+time.
+The outer timers exclude the enclosed linear-solver call; the
+kernel timers partition that call. A synchronization barrier
+immediately precedes each GPU phase. Explicit waiting belongs to
+the synchronization interval. Waiting inside a numerical-library
+call belongs to that call's interval.
+
+\begin{table}[pos=H]
+\centering\small
+\caption{The timing intervals partition the measured complete
+optimization sequence. Their sum equals the complete time.
+Preparation costs use separate enclosing process measurements.}
+\label{si:tab_timing_definitions}
+\begin{tabularx}{\textwidth}{@{}p{0.28\textwidth}X@{}}
+\toprule
+Interval & Included work \\
+\midrule
+Assembly and target construction &
+Spatial or space--time operators, reduced matrix, desired states
+and right-hand sides \\
+Reference construction &
+Full-domain spatial and temporal factors \\
+Inactive-system and coarse-space setup &
+Inactive matrices and right-hand sides; reference restriction or
+recycling transfer and selection; rank-revealing orthogonalization,
+coarse products and factorization, or AMG hierarchy construction \\
+Initialization and iteration &
+Initial correction and residual; iterative solver recurrence \\
+Conversion and transfers &
+Matrix and vector conversion; uploads and solution downloads \\
+Verification and active-set updates &
+Independently recomputed residuals, state and multiplier recovery,
+KKT components and constraint updates \\
+Remaining work &
+Solver resource creation, synchronization, cleanup and other host work \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Component figures use the actual repetition with median complete
+time. Thus their stacked intervals add to the displayed total.
+Separate component medians summarize their own distributions.
+The complete-time ranges include all five repetitions.
+
+The speedup of a comparison is $\operatorname{med}T_{\rm alt}/\operatorname{med}T_{\rm ref}$,
+the ratio of the median complete times of the fastest alternative and RefDef over their converged repetitions. The bracketed interval is the envelope
+\[
+ \left[\frac{\min T_{\rm alt}}{\max T_{\rm ref}},\;
+        \frac{\max T_{\rm alt}}{\min T_{\rm ref}}\right]
+\]
+over the same repetitions. It combines extreme times of separate repetitions; it is
+an envelope of observed ratios, without pairing or a confidence level. The timing
+ranges overlap when the envelope contains one. Comparisons with a single repetition per method
+report the ratio alone.
+
+The enclosing process interval runs from launch to termination.
+The difference between this interval and its explicitly timed
+initialization, warmup, complete sequence and finalization includes
+imports, process creation and monitoring setup. Adding the common
+calibration once gives the preparation-inclusive total,
+$T_{\rm prep}=T_{\rm launch\text{-}to\text{-}exit}+T_{\rm cal}$. The common
+calibration belongs to the family and is charged equally to every
+method in a single-deployment comparison.
+
+A separate monitor samples host resident memory and total GPU process
+allocation at a nominal period of 10~ms. The largest sampling gap
+quantifies the temporal resolution of each measurement. GPU allocation includes allocator
+caches and all numerical backends in the process. Host and GPU
+peaks are sampled lower bounds. The same measurement and accounting
+boundary applies to all four methods.

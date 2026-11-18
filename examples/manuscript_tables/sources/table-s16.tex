@@ -1,0 +1,14 @@
+\begin{table}[pos=htbp]
+\centering\small
+\caption{CPU factorization solvers beside the GPU comparisons of the same problems.
+Entries are median complete-sequence seconds over five 16-target repetitions. Block
+denotes the block-in-time CG of the main protocol, and a dash marks a steady problem.}
+\label{si:tab_v20_direct}
+\begin{tabular}{@{}lrrrl@{}}
+\toprule
+Problem & Direct (CPU) & Block (CPU) & RefDef (GPU) & Fastest GPU alternative \\
+\midrule
+\inputrows{sections/generated/v21/direct_rows}
+\bottomrule
+\end{tabular}
+\end{table}

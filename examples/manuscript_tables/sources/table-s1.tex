@@ -1,0 +1,19 @@
+\begin{table}[pos=htbp]
+\centering\small
+\caption{Inertia of $\tfrac12(K_{FF}+K_{FF}^\top)$, the symmetric part of the assembled
+free-node matrix. Counts give negative, zero and positive eigenvalues. The transport-negative
+column counts the negative eigenvalues of the symmetric part $S$ of the free-node transport
+matrix alone, after adding $\sigma(C_\ell)_{FF}$ with
+$\sigma=10^{-9}\max|S|/\max(C_\ell)_{FF}$, which separates a semidefinite part from an
+indefinite one. The last column states whether the symmetric part of $K_{FF}$ is
+positive definite, which rules out growing modes; Table~\ref{si:tab_v20_temporal} shows
+the growth of the original transformer transport.}
+\label{si:tab_transport_certificates}
+\begin{tabular}{@{}llrrrl@{}}
+\toprule
+Model & Transport & Free nodes & Operator & Transport negative & Positive definite \\
+\midrule
+\inputrows{sections/generated/v21/certificate_rows}
+\bottomrule
+\end{tabular}
+\end{table}

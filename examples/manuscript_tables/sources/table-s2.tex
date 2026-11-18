@@ -1,0 +1,47 @@
+\begin{table}[pos=htbp]
+\centering\small
+\caption{Comparisons, problems and measurements. Every timed comparison
+uses 16 targets and five complete sequence repetitions per method unless
+stated otherwise. Ranks denote total spatial or space--time rank, and $S$
+the number of spatial modes, each paired with a temporal factor for every slab.}
+\label{si:tab_experiment_map}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.19\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+Purpose & Problems and reference & Measurements \\
+\midrule
+Optimization verification &
+12 body-fitted and nine Cartesian steady or transient verification problems &
+Independent bounded least squares, original inner residuals,
+KKT components, state and objective agreement, trajectory recovery \\
+Body-fitted optimization &
+Axisymmetric transformer and three-dimensional bore-in-block meshes; coarse P1 references &
+Complete steady and transient costs, KKT and original-residual checks,
+constraint changes, rank effects, and process memory \\
+Steady scale &
+Cartesian $32^3$--$128^3$; transformer; Bore~1--4 up to
+2.5 million DOFs; ranks 100 and 200 &
+Complete time and inner iterations under main Algorithm~\Mref{alg:final_procedure},
+original residuals and KKT checks \\
+Trajectories &
+Cartesian $12^3$--$64^3$ with 8--32 slabs, $S=12$ or 6;
+transformer and Bore~1--3 with 4 or 8 slabs &
+Complete trajectory optimization, original residuals, KKT and recovery checks \\
+Operating conditions &
+Transformer day, drive cycle, off-design flow, overloads and query order;
+one nominal reference &
+Complete time over chained windows or reassembled operators;
+original residuals and KKT checks \\
+Retention ablation &
+Six primary body-fitted sequences; the same reference by direct restriction or
+zero-extension transfer, with Jacobi-CG in the same job &
+Complete time and inner iterations \\
+Transfer mechanism &
+Steady and transient PDAS traces; identical replay systems &
+Activation and release, retained rank, coarse energy removal,
+deflated spectrum on small systems, original-residual acceptance \\
+Conditional analysis &
+Controlled $6^3$ CHT restrictions; exact rank-one scaled reference &
+Separation, actual angle, sufficient bound and effective conditioning \\
+\bottomrule
+\end{tabularx}
+\end{table}

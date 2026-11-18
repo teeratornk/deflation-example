@@ -1,0 +1,18 @@
+
+Per-update assembly & Table~\ref{tab:mesh_complete} & Sparse products at every update &
+Packaged mesh, total rank 100 & Truncated with four slabs; the steady cases have no
+temporal factors \\
+Sliced Hessian & Table~\ref{tab:v20_scale} (steady) & Principal submatrix of the
+preassembled Hessian & Closed form on Cartesian grids, rank 100; packaged mesh for the
+transformer and Bore~1, rank 100; first refinement for Bore~2 and Bore~3 and second
+refinement for Bore~4, rank 200 & No temporal factors \\
+Sliced Hessian & Table~\ref{tab:v20_transient} (trajectories) & Principal submatrix of
+the preassembled Hessian & Closed form on Cartesian grids; packaged mesh for the
+transformer, Bore~1 and Bore~2, total rank 100; first refinement for Bore~3, rank 200 &
+Complete on Cartesian grids ($S=12$ at eight slabs, $S=6$ at 16 and 32) and Bore~3
+($S=50$); truncated elsewhere \\
+Sliced Hessian & Table~\ref{tab:v20_operation} (steady and trajectory sequences) &
+Principal submatrix of the preassembled Hessian & Packaged mesh, total rank 100; first
+refinement for Bore~3, rank 200 & Truncated for the transformer day, overloads, drive
+cycle and four-slab shuffled sequences. The steady sequences have no temporal
+factors \\

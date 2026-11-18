@@ -1,0 +1,18 @@
+\begin{table}[pos=htbp]
+\centering\small\setlength{\tabcolsep}{4pt}
+% Top-align the stacked cells so each row label sits on the median time.
+\renewcommand{\shortstack}[2][c]{\begin{tabular}[t]{@{}#1@{}}#2\end{tabular}}
+\caption{Complete time and sampled GPU allocation of the primary body-fitted
+comparisons. Each cell gives the median time in seconds, the observed range
+over the converged repetitions, and the maximum sampled GPU allocation in gibibytes (GiB),
+in that order. A count in parentheses gives converged and attempted
+repetitions when they differ. Rank is the requested reference or recycling rank.}
+\label{si:tab_mesh_work}
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+Geometry & Form & Rank & Jacobi-CG & RefDef & Recycling & AmgX \\
+\midrule
+\inputrows{sections/generated/v21/primary_complete_rows}
+\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,31 @@
+\begin{table}[pos=H]
+\centering\small
+\caption{The timing intervals partition the measured complete
+optimization sequence. Their sum equals the complete time.
+Preparation costs use separate enclosing process measurements.}
+\label{si:tab_timing_definitions}
+\begin{tabularx}{\textwidth}{@{}p{0.28\textwidth}X@{}}
+\toprule
+Interval & Included work \\
+\midrule
+Assembly and target construction &
+Spatial or space--time operators, reduced matrix, desired states
+and right-hand sides \\
+Reference construction &
+Full-domain spatial and temporal factors \\
+Inactive-system and coarse-space setup &
+Inactive matrices and right-hand sides; reference restriction or
+recycling transfer and selection; rank-revealing orthogonalization,
+coarse products and factorization, or AMG hierarchy construction \\
+Initialization and iteration &
+Initial correction and residual; iterative solver recurrence \\
+Conversion and transfers &
+Matrix and vector conversion; uploads and solution downloads \\
+Verification and active-set updates &
+Independently recomputed residuals, state and multiplier recovery,
+KKT components and constraint updates \\
+Remaining work &
+Solver resource creation, synchronization, cleanup and other host work \\
+\bottomrule
+\end{tabularx}
+\end{table}

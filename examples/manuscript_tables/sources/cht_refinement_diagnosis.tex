@@ -1,0 +1,130 @@
+\Needspace{11\baselineskip}
+\subsubsection{Finer-transformer residual correction}
+\label{si:mesh_refinement_diagnosis}
+The finer transformer has 42180 spatial state DOFs and
+168720 for a four-slab trajectory; the study uses the original advective
+transport. On this mesh the recurrence residual separates from the original
+residual and the coarse space loses orthogonality, with positive curvature and
+retained rank; residual correction closes this gap. The
+\href{https://github.com/teeratornk/deflation-example/tree/development-studies-v1/examples/development_studies}
+{versioned development-study archive} holds the uncorrected runs,
+scalar diagnostics and configuration checks.
+
+The corrected solver returns a candidate for an independent CPU residual check
+at each candidate convergence or scheduled replacement, before continuing
+the projected recurrence. An improving candidate $x$ whose original residual
+exceeds the tolerance defines
+the error equation $B\delta x=e$, where $e=b-Bx$, following residual-based
+iterative refinement \citep[Chapter~12]{higham2002accuracy}.
+
+\Needspace{10\baselineskip}
+The error solve starts from zero and requests a factor-ten reduction:
+its local residual criterion is
+$\|e-B\delta x\|_2/\|e\|_2\leq0.1$.
+CG uses relative internal target 0.01, and AmgX uses absolute target
+$0.01\|e\|_2$. This additional factor-ten margin allows for the difference
+between the internal and independently evaluated residuals.
+The local test determines the error solve's convergence status. The procedure
+can retain an improving candidate that misses that test; it always
+checks the updated state against the original threshold $10^{-10}$.
+The original-system check determines whether further correction is required.
+
+Algorithm~\ref{alg:mesh_residual_correction} states the recommended procedure,
+including the subsequent
+initial-residual guard supplied by the
+\href{https://github.com/teeratornk/deflation-example/blob/ba682dd05b168d2f43ff0c58050813deee785223/docs/mesh-showcases.md#use-the-recommended-guarded-solver}
+{guarded-solver example}.
+The timed correction study omits this initial check
+and initializes the best residual to infinity. Both procedures use the
+same local targets and final accuracy requirements.
+
+\begin{algorithm}[htbp]
+\caption{Guarded residual correction checks the initial state and every subsequent candidate against the original inactive equations.}
+\label{alg:mesh_residual_correction}
+\begin{algorithmic}[1]
+\Require SPD $B$, right-hand side $b$, initial state $x_0$,
+final tolerance $\varepsilon=10^{-10}$ and shared budget $K=50000$
+\State $x\gets x_0$; independently compute $e_0\gets b-Bx_0$ and
+$\rho_{\rm best}\gets\|e_0\|_2/\|b\|_2$ (use $\|e_0\|_2$ if $b=0$)
+\If{$\rho_{\rm best}\leq\varepsilon$}
+  \State \Return $(x,\rho_{\rm best},\texttt{converged})$
+\EndIf
+\State $f\gets b$; $v_0\gets x_0$; $\varepsilon_{\rm loc}\gets\varepsilon$
+\For{$j=0,\ldots,4$}
+  \State Solve $Bv=f$ from $v_0$ with local target $\varepsilon_{\rm loc}$
+  and remaining budget $K$; record status and scalar checks
+  \State Subtract the completed iterations from $K$
+  \State $\widetilde x\gets v$ if $j=0$, otherwise $\widetilde x\gets x+v$
+  \State Independently compute $e\gets b-B\widetilde x$ and
+  $\rho\gets\|e\|_2/\|b\|_2$ (use $\|e\|_2$ if $b=0$)
+  \State Set \emph{improved} if $\rho$ is finite and $\rho<\rho_{\rm best}$
+  \If{\emph{improved}} \State $x\gets\widetilde x$; $\rho_{\rm best}\gets\rho$ \EndIf
+  \If{$\rho\leq\varepsilon$} \State \Return $(x,\rho_{\rm best},\texttt{converged})$ \EndIf
+  \If{no improvement} \State \Return $(x,\rho_{\rm best},\texttt{residual\_stagnation})$ \EndIf
+  \If{$K=0$} \State \Return $(x,\rho_{\rm best},\texttt{maxiter})$ \EndIf
+  \If{scalar breakdown other than nonpositive $r^\top z$}
+    \State \Return $(x,\rho_{\rm best},\texttt{breakdown})$
+  \EndIf
+  \If{$j=4$} \State \Return $(x,\rho_{\rm best},\texttt{residual\_failed})$ \EndIf
+  \State $f\gets e$; $v_0\gets0$; $\varepsilon_{\rm loc}\gets0.1$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+Every return supplies the retained state and its corresponding independently
+evaluated residual, together with the termination status.
+An exhausted iteration budget gives \texttt{maxiter}; the correction cap
+gives \texttt{residual\_failed}. Rejected candidates leave $x$ and its residual unchanged.
+
+\Needspace{9\baselineskip}
+The CG kernel returns at candidate convergence, a scheduled residual
+replacement, a failed scalar check or exhaustion of its remaining iteration budget.
+A nonpositive $r^\top z$ can therefore lead to a fresh error solve
+when the original residual improves. Nonpositive curvature and nonfinite
+scalars terminate the solve if the original residual exceeds the tolerance. Stagnation and
+exhausted budgets also terminate it. Each error equation restarts the
+Krylov method from zero and recomputes its initial coarse correction.
+PDAS separately uses the $10^{-8}$ KKT threshold.
+
+All four methods in the timed correction study use the correction procedure.
+AmgX retains its resources
+and rebuilds the matrix-specific solver with the remaining iteration
+budget and error-equation stopping target. Each correction is a separate
+Krylov solve; recycling updates its space after locally converged solves.
+Construction, transfers, every error equation and original-residual
+verification enter the complete time.
+Table~\ref{si:tab_mesh_correction} reports five complete repetitions
+per method and form. All 40 sequences and 160 target solves meet the
+unchanged residual and KKT criteria. On the steady four-target problem, AmgX
+has the lowest median cost, 23.1~s against 29.3~s for RefDef, and
+the transient RefDef and Jacobi-CG timings have overlapping ranges.
+
+\begin{table}[pos=H]
+\centering\small\setlength{\tabcolsep}{3pt}
+\caption{Residual-correction comparisons preserve the finer-transformer
+four-target problems and final accuracy requirements. Complete sequences
+and target solves are counted separately. Times give the median and
+observed range in seconds over five complete repetitions. Residual and KKT
+columns give maxima across completed sequences; corrections count all
+error equations.}
+\label{si:tab_mesh_correction}
+\begin{tabular}{@{}llrrrrrr@{}}
+\toprule
+Form & Method & Sequences & Targets & Time [range] & Residual & KKT & Corrections \\
+\midrule
+\inputrows{sections/generated/si/correction_rows}
+\bottomrule
+\end{tabular}
+\end{table}
+
+The guarded procedure of Algorithm~\ref{alg:mesh_residual_correction} also
+completes all 40 sequences of a separate GPU comparison on these four-target
+problems. Every original
+residual is below $10^{-10}$, and every KKT component is below $10^{-8}$.
+AmgX has the lowest steady median; Jacobi-CG has the lowest transient
+median, with overlapping RefDef and Jacobi-CG timing ranges.
+The \href{https://github.com/teeratornk/deflation-example/tree/guarded-refinement-data-v1/examples/guarded_refinement}
+{versioned guarded-solver comparison} gives all repetitions, time components
+and reproduction commands; these measurements remain separate from
+Table~\ref{si:tab_mesh_correction}.
+\FloatBarrier

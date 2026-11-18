@@ -1,0 +1,23 @@
+\begin{table}[pos=htbp]
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\caption{Steady comparisons under Algorithm~\ref{alg:final_procedure} with 16 targets.
+Times are median complete-sequence seconds over the repetitions, out of five, that
+converge at every target. The speedup is the ratio of the median times of the fastest
+alternative and RefDef, and brackets give the envelope of ratios between
+extreme repetition times; the iteration ratio divides
+the median inner iterations of Jacobi-CG by those of RefDef, and a dash
+marks a ratio without a converged Jacobi-CG repetition. The last column lists each
+method with a repetition that fails to converge, with its converged and attempted
+repetitions. The standard AmgX stopping factor is $10^{-1}$; AmgX ($10^{-2}$) and AmgX
+($10^{-3}$) set it to $10^{-2}$ and $10^{-3}$. The $96^3$ and Bore~4 envelopes combine
+measurements from separate jobs. $^\dagger$Compared with a subset of the alternatives: Bore~4
+with Jacobi-CG and AmgX, where PDAS may take up to 400 steps.}
+\label{tab:v20_scale}
+\begin{tabular}{@{}llrrlrr>{\raggedright\arraybackslash}p{2.6cm}@{}}
+\toprule
+Problem & Size & Unknowns & RefDef & Fastest alternative & Speedup [range] & \begin{tabular}[b]{@{}r@{}}Iteration\\ratio\end{tabular} & Not converged \\
+\midrule
+\inputrows{sections/generated/v21/scale_rows}
+\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,61 @@
+# Complete manuscript tables
+
+This archive preserves all six article tables and nineteen supporting-information
+tables from the 22-page article and 21-page SI at manuscript revision
+`ce40ee5b133905a55eb9511ee9bfb2d286a5c7e6`. The shorter article and SI retain the
+scientific argument and selected comparisons. Original table numbers below remain
+fixed so a relocated table has a stable destination after manuscript renumbering.
+Captions, units, failed outcomes, ranges and numerical precision are preserved.
+Section, equation and algorithm numbers in these captions refer to that frozen version.
+
+## Read and reproduce
+
+The tables below can be read directly on GitHub. The
+[manifest](../examples/manuscript_tables/manifest.json) maps every original table
+label to its source files, original manuscript paths, SHA-256 checksums and row count.
+Each table links to the numerical reproduction guide for its measurements.
+
+To verify the complete source inventory and regenerate this reader page from the
+archived table rows, run from a checkout of this repository revision:
+
+```bash
+python3 tools/manuscript_tables.py
+python3 tools/manuscript_tables.py --write
+```
+
+These commands use only the Python standard library and need no GPU or network.
+They check and render the preserved table rows; they do not rerun the thermal solves.
+To recompute the numerical rows from recorded measurements, follow the
+[v21 evidence export](prescribed-speedup-v21.md#reproduce-the-tables), the
+[Cartesian reproduction guide](reference-policy-study.md#frozen-complete-optimization-campaign),
+and the linked temperature-bound and residual-correction examples. Those guides
+identify the measured source revisions and data archives. The v21 export checks
+the raw-record manifest before reconstructing the tables. New thermal timings
+require the hardware and settings specified in the corresponding guide.
+
+## Measurement and interpretation
+
+The primary comparison uses one NVIDIA H200 GPU and four CPU threads, double
+precision, 16 distinct targets and five complete sequence repetitions per method.
+Complete time includes operator and reference construction, all active-set updates
+and inner solves, transfers, independent verification and cleanup. Process startup,
+common warmup and calibration have their separately stated boundaries. Reference
+construction is charged once per sequence. Timing envelopes combine observed
+extrema; they are not confidence intervals. Single-repetition and separate-job
+comparisons are identified in their captions.
+
+The original inactive-system residual threshold is 1e-10 and the discrete KKT
+threshold is 1e-8, except the explicitly identified tolerance variations. State
+bounds hold at the optimization time levels; Table S7 records violations on finer
+forward replays. Sampled GPU allocations include allocator caches and all numerical
+backends and are lower bounds on process peaks. Tables S18 and S19 use the earlier
+advective transformer transport and have a different interpretation from the
+current skew-symmetric comparisons.
+
+The original [measurement definitions](../examples/manuscript_tables/sources/cht_si_methods.tex),
+[timing procedures](../examples/manuscript_tables/sources/cht_protocol.tex), and
+[earlier residual-correction description and Algorithm S1](../examples/manuscript_tables/sources/cht_refinement_diagnosis.tex)
+are preserved as LaTeX source. The
+[measured and guarded numerical procedures](mesh-showcases.md#choose-the-numerical-procedure)
+give their executable reproduction routes. Earlier relocated tables remain in
+[the preceding repository supplement](supplementary-tables.md).

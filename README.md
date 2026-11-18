@@ -31,6 +31,11 @@ transformer comparisons with the energy-stable transport, the body-fitted
 baselines and the time-refinement studies, and
 [transport forms](docs/transport-forms.md) derives the two transport forms.
 
+The [complete manuscript table archive](docs/manuscript-tables.md) preserves all
+25 original article and SI tables, including configurations, sensitivity studies,
+failed outcomes and earlier correction studies. Its 214 rows retain their original
+captions and numerical precision, with checksums and CPU-only regeneration commands.
+
 ## Quickstart
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then:

@@ -1,0 +1,15 @@
+\begin{table}[pos=htbp]
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\caption{Trajectory comparisons optimize all slabs of the horizon at once. Columns
+follow Table~\ref{tab:v20_scale}, and unknowns count all slabs. The Cartesian references
+keep $S=12$ spatial modes, each with a temporal factor for every slab, at eight slabs and $S=6$ at 16 and 32 slabs, and the
+transformer uses the skew-symmetric transport. $^\dagger$Compared with Jacobi-CG alone.}
+\label{tab:v20_transient}
+\begin{tabular}{@{}llrrlrr>{\raggedright\arraybackslash}p{2.6cm}@{}}
+\toprule
+Problem & Slabs & Unknowns & RefDef & Fastest alternative & Speedup [range] & \begin{tabular}[b]{@{}r@{}}Iteration\\ratio\end{tabular} & Not converged \\
+\midrule
+\inputrows{sections/generated/v21/transient_rows}
+\bottomrule
+\end{tabular}
+\end{table}

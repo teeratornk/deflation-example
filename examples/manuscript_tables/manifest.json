@@ -1,0 +1,923 @@
+{
+  "format": "manuscript-tables-v1",
+  "manuscript_revision": "ce40ee5b133905a55eb9511ee9bfb2d286a5c7e6",
+  "repository": "https://github.com/teeratornk/opt_control",
+  "references": {
+    "alg:final_procedure": "2",
+    "eq:cht_backward_euler": "2",
+    "eq:cht_kkt_acceptance": "25",
+    "eq:cht_temporal_eigenproblem": "17",
+    "eq:cht_trajectory_operator": "3",
+    "eq:restriction_identity": "20",
+    "eq:revision_projectors": "18",
+    "eq:revision_reduced": "5",
+    "eq:skew_transport": "10",
+    "fig:mesh_sequences": "5",
+    "fig:optimized_temperature_bounds": "4",
+    "sec:v20_results": "3.4",
+    "si:cht_timing": "S2.3.3",
+    "si:cht_validation_results": "S3.1.2",
+    "si:limits": "S3.5",
+    "si:mesh_formulation": "S2.1.1",
+    "si:mesh_reference": "S2.2.1",
+    "si:mesh_refinement_diagnosis": "S3.5.1",
+    "si:mesh_results": "S3.1.1",
+    "si:mesh_targets": "S2.1.3",
+    "si:methodology": "S2",
+    "si:tab_amgx_configuration": "S3",
+    "si:tab_cht_conditioning": "S13",
+    "si:tab_experiment_map": "S2",
+    "si:tab_mesh_transfer": "S10",
+    "si:tab_retention_ablation": "S12",
+    "si:tab_small_spectrum": "S11",
+    "si:tab_v20_comparisons": "S14",
+    "si:tab_v20_direct": "S16",
+    "si:tab_v20_single": "S15",
+    "si:temperature_bounds": "S3.4.2",
+    "si:temporal_coverage": "S2.2.3",
+    "si:theory": "S2.2.4",
+    "si:transient": "S2.1.4",
+    "si:transport_forms": "S2.1.2",
+    "si:v20_temporal": "S3.1.3",
+    "tab:cht_transfer": "3",
+    "tab:mesh_complete": "2",
+    "tab:v20_operation": "6",
+    "tab:v20_scale": "4",
+    "tab:v20_transient": "5",
+    "tab:procedures": "1",
+    "si:tab_transport_certificates": "S1",
+    "si:tab_timing_definitions": "S4",
+    "si:tab_mesh_validation": "S5",
+    "si:tab_cht_validation": "S6",
+    "si:tab_v20_temporal": "S7",
+    "si:tab_mesh_work": "S8",
+    "si:tab_cht_accuracy": "S9",
+    "si:tab_temperature_bounds": "S17",
+    "si:tab_original_transport": "S18",
+    "si:tab_mesh_correction": "S19",
+    "eq:coarse_energy": "24",
+    "eq:cht_energy_removal": "24",
+    "eq:coarse_energy_fraction": "24",
+    "sec:cht_transfer_results": "3.3",
+    "sec:cht_accuracy": "3.1",
+    "alg:projected_cg": "1",
+    "alg:revision_deflation": "1",
+    "si:mesh_timing": "S3.2.2",
+    "si:cht_complete_results": "S3.2.3"
+  },
+  "tables": [
+    {
+      "number": "1",
+      "label": "tab:procedures",
+      "title": "Timing procedures and reference settings",
+      "caption": "Timing procedures and their prescribed reference settings. Both procedures\nsolve each inactive system with Algorithm~\\ref{alg:revision_deflation}, including its\nresidual replacement, and restrict the reference on the GPU. Complete temporal coverage\nkeeps every temporal factor of each retained spatial mode; truncated coverage keeps the\nlowest spatial--temporal pairs up to the total rank. Temporal coverage does not apply to\nsteady cases.",
+      "columns": [
+        "Procedure",
+        "Comparisons",
+        "Inactive Hessian",
+        "Reference mesh and rank",
+        "Temporal coverage"
+      ],
+      "rows": 4,
+      "source": "sources/table-1.tex",
+      "rows_source": "sources/table-1.rows.tex",
+      "source_inputs": [],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "2",
+      "label": "tab:mesh_complete",
+      "title": "Primary complete optimization costs",
+      "caption": "Median complete-sequence times in seconds over five repetitions of 16-target\noptimization sequences; every method converges at every target in every repetition.\nThe speedup is the ratio of the median times of the fastest alternative and RefDef; brackets give the envelope of ratios between extreme repetition times. Dimension counts the optimized spatial or space--time\nDOFs. RefDef and recycling use total rank 100, and the transformer uses the\nskew-symmetric transport \\eqref{eq:skew_transport}.",
+      "columns": [
+        "Geometry",
+        "Form",
+        "Dimension",
+        "Jacobi-CG",
+        "RefDef",
+        "Recycling",
+        "AmgX",
+        "Speedup"
+      ],
+      "rows": 6,
+      "source": "sources/table-2.tex",
+      "rows_source": "sources/table-2.rows.tex",
+      "source_inputs": [
+        "sections/generated/v21/primary_rows.tex"
+      ],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "3",
+      "label": "tab:cht_transfer",
+      "title": "Matched Cartesian transfer replays",
+      "caption": "Matched replays of direct restriction and zero-extension transfer of the\nfull-domain reference on the same systems with zero initial guesses. Time\nand iterations sum per-kernel medians over three repetitions. Solves counts the\nreplayed inactive systems, Rank gives the smallest and largest retained rank over these\nsolves, and Energy fraction is the median of\nEquation~\\eqref{eq:coarse_energy_fraction}.",
+      "columns": [
+        "Grid and slabs",
+        "Solves",
+        "Transfer",
+        "Rank",
+        "Energy fraction",
+        "Iterations",
+        "Time (s)"
+      ],
+      "rows": 10,
+      "source": "sources/table-3.tex",
+      "rows_source": "sources/table-3.rows.tex",
+      "source_inputs": [
+        "sections/generated/si/transfer_rows.tex"
+      ],
+      "guide": "reference-policy-study.md#frozen-complete-optimization-campaign"
+    },
+    {
+      "number": "4",
+      "label": "tab:v20_scale",
+      "title": "Steady scale comparisons",
+      "caption": "Steady comparisons under Algorithm~\\ref{alg:final_procedure} with 16 targets.\nTimes are median complete-sequence seconds over the repetitions, out of five, that\nconverge at every target. The speedup is the ratio of the median times of the fastest\nalternative and RefDef, and brackets give the envelope of ratios between\nextreme repetition times; the iteration ratio divides\nthe median inner iterations of Jacobi-CG by those of RefDef, and a dash\nmarks a ratio without a converged Jacobi-CG repetition. The last column lists each\nmethod with a repetition that fails to converge, with its converged and attempted\nrepetitions. The standard AmgX stopping factor is $10^{-1}$; AmgX ($10^{-2}$) and AmgX\n($10^{-3}$) set it to $10^{-2}$ and $10^{-3}$. The $96^3$ and Bore~4 envelopes combine\nmeasurements from separate jobs. $^\\dagger$Compared with a subset of the alternatives: Bore~4\nwith Jacobi-CG and AmgX, where PDAS may take up to 400 steps.",
+      "columns": [
+        "Problem",
+        "Size",
+        "Unknowns",
+        "RefDef",
+        "Fastest alternative",
+        "Speedup [range]",
+        "Iteration ratio",
+        "Not converged"
+      ],
+      "rows": 10,
+      "source": "sources/table-4.tex",
+      "rows_source": "sources/table-4.rows.tex",
+      "source_inputs": [
+        "sections/generated/v21/scale_rows.tex"
+      ],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "5",
+      "label": "tab:v20_transient",
+      "title": "Trajectory comparisons",
+      "caption": "Trajectory comparisons optimize all slabs of the horizon at once. Columns\nfollow Table~\\ref{tab:v20_scale}, and unknowns count all slabs. The Cartesian references\nkeep $S=12$ spatial modes, each with a temporal factor for every slab, at eight slabs and $S=6$ at 16 and 32 slabs, and the\ntransformer uses the skew-symmetric transport. $^\\dagger$Compared with Jacobi-CG alone.",
+      "columns": [
+        "Problem",
+        "Slabs",
+        "Unknowns",
+        "RefDef",
+        "Fastest alternative",
+        "Speedup [range]",
+        "Iteration ratio",
+        "Not converged"
+      ],
+      "rows": 15,
+      "source": "sources/table-5.tex",
+      "rows_source": "sources/table-5.rows.tex",
+      "source_inputs": [
+        "sections/generated/v21/transient_rows.tex"
+      ],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "6",
+      "label": "tab:v20_operation",
+      "title": "Operating sequences",
+      "caption": "Operating sequences change loads, flow rates, windows or query order; one\nreference built at nominal conditions is used for every query. Columns follow\nTable~\\ref{tab:v20_scale}, and the transformer uses the skew-symmetric transport in\nevery sequence.",
+      "columns": [
+        "Scenario",
+        "Problem",
+        "Unknowns",
+        "RefDef",
+        "Fastest alternative",
+        "Speedup [range]",
+        "Iteration ratio",
+        "Not converged"
+      ],
+      "rows": 9,
+      "source": "sources/table-6.tex",
+      "rows_source": "sources/table-6.rows.tex",
+      "source_inputs": [
+        "sections/generated/v21/operation_rows.tex"
+      ],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "S1",
+      "label": "si:tab_transport_certificates",
+      "title": "Transport energy stability",
+      "caption": "Inertia of $\\tfrac12(K_{FF}+K_{FF}^\\top)$, the symmetric part of the assembled\nfree-node matrix. Counts give negative, zero and positive eigenvalues. The transport-negative\ncolumn counts the negative eigenvalues of the symmetric part $S$ of the free-node transport\nmatrix alone, after adding $\\sigma(C_\\ell)_{FF}$ with\n$\\sigma=10^{-9}\\max|S|/\\max(C_\\ell)_{FF}$, which separates a semidefinite part from an\nindefinite one. The last column states whether the symmetric part of $K_{FF}$ is\npositive definite, which rules out growing modes; Table~\\ref{si:tab_v20_temporal} shows\nthe growth of the original transformer transport.",
+      "columns": [
+        "Model",
+        "Transport",
+        "Free nodes",
+        "Operator",
+        "Transport negative",
+        "Positive definite"
+      ],
+      "rows": 7,
+      "source": "sources/table-s1.tex",
+      "rows_source": "sources/table-s1.rows.tex",
+      "source_inputs": [
+        "sections/generated/v21/certificate_rows.tex"
+      ],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "S2",
+      "label": "si:tab_experiment_map",
+      "title": "Comparison inventory",
+      "caption": "Comparisons, problems and measurements. Every timed comparison\nuses 16 targets and five complete sequence repetitions per method unless\nstated otherwise. Ranks denote total spatial or space--time rank, and $S$\nthe number of spatial modes, each paired with a temporal factor for every slab.",
+      "columns": [
+        "Purpose",
+        "Problems and reference",
+        "Measurements"
+      ],
+      "rows": 8,
+      "source": "sources/table-s2.tex",
+      "rows_source": "sources/table-s2.rows.tex",
+      "source_inputs": [],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "S3",
+      "label": "si:tab_amgx_configuration",
+      "title": "AmgX configuration",
+      "caption": "The complete steady and transient comparisons use the\nsame AmgX hierarchy settings. Original inactive systems use the absolute\ntarget $10^{-11}\\|b\\|_2$, with $10^{-11}$ used when $b=0$.\nThe separate correction protocol in Section~\\ref{si:mesh_refinement_diagnosis}\nspecifies error-equation targets and remaining iteration budgets.",
+      "columns": [
+        "Setting",
+        "Value"
+      ],
+      "rows": 9,
+      "source": "sources/table-s3.tex",
+      "rows_source": "sources/table-s3.rows.tex",
+      "source_inputs": [],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "S4",
+      "label": "si:tab_timing_definitions",
+      "title": "Timing boundaries",
+      "caption": "The timing intervals partition the measured complete\noptimization sequence. Their sum equals the complete time.\nPreparation costs use separate enclosing process measurements.",
+      "columns": [
+        "Interval",
+        "Included work"
+      ],
+      "rows": 7,
+      "source": "sources/table-s4.tex",
+      "rows_source": "sources/table-s4.rows.tex",
+      "source_inputs": [],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "S5",
+      "label": "si:tab_mesh_validation",
+      "title": "Independent body-fitted verification",
+      "caption": "Independent bounded-variable least squares verifies the\nmesh PDAS solutions. State and objective errors are relative to\nthe independent solution. KKT is the largest of the five stated\nKKT components of the PDAS solution, and Dimension counts the optimized DOFs. Uniform and unequal entries denote complete\ntwo-slab optimizations.",
+      "columns": [
+        "Geometry",
+        "Form",
+        "Target",
+        "Dimension",
+        "State error",
+        "Objective error",
+        "KKT"
+      ],
+      "rows": 12,
+      "source": "sources/table-s5.tex",
+      "rows_source": "sources/table-s5.rows.tex",
+      "source_inputs": [
+        "sections/generated/v21/support_validation_rows.tex"
+      ],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "S6",
+      "label": "si:tab_cht_validation",
+      "title": "Independent Cartesian verification",
+      "caption": "Independent bounded least squares corroborates\nthe complete PDAS solutions. The last three columns give\nmaxima across the three PDAS solvers for each problem.\nQuery indices 0, 1 and 2 correspond to\n$\\theta=0,1/2,1$. KKT entries are the largest of\nthe five quantities defined in the main protocol.",
+      "columns": [
+        "Family",
+        "Query",
+        "Reference KKT",
+        "PDAS KKT",
+        "Relative state",
+        "Relative objective"
+      ],
+      "rows": 9,
+      "source": "sources/table-s6.tex",
+      "rows_source": "sources/table-s6.rows.tex",
+      "source_inputs": [
+        "sections/generated/cht/validation_rows.tex"
+      ],
+      "guide": "reference-policy-study.md#frozen-complete-optimization-campaign"
+    },
+    {
+      "number": "S7",
+      "label": "si:tab_v20_temporal",
+      "title": "Time refinement and replay",
+      "caption": "Time refinement and replay of the optimized trajectories. The verified column\ncounts discrete optimizations, over all slab counts, that meet the residual and KKT\ncriteria, agree with a direct-PDAS solution at the coarsest slab count, and whose\nforward replays on 128 and 256 steps are solved to the residual tolerance; it does not\nestablish feasibility between time levels. The difference columns give the largest and root-mean-square temperature\ndifference between the eight-slab and 64-slab optima. Replay change and exceedance are\ndiagnostics of the eight-slab controls, and the last column of the 64-slab controls. A\ndash marks a quantity without a verified optimization or without a replay. The\nbore-in-block advective operator is energy-stable\n(Table~\\ref{si:tab_transport_certificates}). All temperatures are in kelvin.",
+      "columns": [
+        "Model",
+        "Horizon",
+        "Transport",
+        "Discrete verified",
+        "Difference",
+        "RMS",
+        "Replay change",
+        "Exceedance",
+        "64-slab exceedance"
+      ],
+      "rows": 5,
+      "source": "sources/table-s7.tex",
+      "rows_source": "sources/table-s7.rows.tex",
+      "source_inputs": [
+        "sections/generated/v21/temporal_rows.tex"
+      ],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "S8",
+      "label": "si:tab_mesh_work",
+      "title": "Complete timing ranges and GPU allocation",
+      "caption": "Complete time and sampled GPU allocation of the primary body-fitted\ncomparisons. Each cell gives the median time in seconds, the observed range\nover the converged repetitions, and the maximum sampled GPU allocation in gibibytes (GiB),\nin that order. A count in parentheses gives converged and attempted\nrepetitions when they differ. Rank is the requested reference or recycling rank.",
+      "columns": [
+        "Geometry",
+        "Form",
+        "Rank",
+        "Jacobi-CG",
+        "RefDef",
+        "Recycling",
+        "AmgX"
+      ],
+      "rows": 6,
+      "source": "sources/table-s8.tex",
+      "rows_source": "sources/table-s8.rows.tex",
+      "source_inputs": [
+        "sections/generated/v21/primary_complete_rows.tex"
+      ],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "S9",
+      "label": "si:tab_cht_accuracy",
+      "title": "Cartesian residual and KKT maxima",
+      "caption": "The residual and KKT maxima cover the 300 complete Cartesian\nsequences of Section~\\ref{si:cht_complete_results}.\nThe columns give\nthe original relative linear residual and maxima of\nstationarity, primal feasibility, dual feasibility,\ncomplementarity and projected gradient. Primal feasibility\nis absolute; the other KKT quantities use the normalization\nin the main protocol.",
+      "columns": [
+        "Method",
+        "Sequences",
+        "Residual",
+        "Stationarity",
+        "Primal",
+        "Dual",
+        "Complementarity",
+        "Projected"
+      ],
+      "rows": 4,
+      "source": "sources/table-s9.tex",
+      "rows_source": "sources/table-s9.rows.tex",
+      "source_inputs": [
+        "sections/generated/si/accuracy_rows.tex"
+      ],
+      "guide": "reference-policy-study.md#frozen-complete-optimization-campaign"
+    },
+    {
+      "number": "S10",
+      "label": "si:tab_mesh_transfer",
+      "title": "Matched body-fitted transfer replays",
+      "caption": "Matched mesh replays measure the information supplied by\ntwo specified transfers. Each trace replays the first repetition of the corresponding\nsequence of main Table~\\Mref{tab:mesh_complete}; the transformer trace uses the\nskew-symmetric transport. Systems counts the inactive systems of each trace;\nactivated and released count constraint changes after the first restriction,\nincluding those between queries. Energy fraction is the median initial energy-error fraction\nremoved by the coarse correction. Iterations and\ntime sum the per-kernel medians over the sampled systems, and Kernels counts these\nsystems.\nEach kernel has three repetitions, all meeting the residual criterion.",
+      "columns": [
+        "Trace",
+        "Systems",
+        "Activated/released",
+        "Transfer",
+        "Kernels",
+        "Rank",
+        "Energy fraction",
+        "Iterations",
+        "Time (s)"
+      ],
+      "rows": 6,
+      "source": "sources/table-s10.tex",
+      "rows_source": "sources/table-s10.rows.tex",
+      "source_inputs": [
+        "sections/generated/v21/support_transfer_rows.tex"
+      ],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "S11",
+      "label": "si:tab_small_spectrum",
+      "title": "Deflated spectra of small replays",
+      "caption": "Median condition numbers of the small matched replays in Jacobi-scaled\ncoordinates: the original preconditioned matrix and the deflated operator after each\ntransfer.",
+      "columns": [
+        "Trace",
+        "Original",
+        "Direct restriction",
+        "Zero-extension transfer"
+      ],
+      "rows": 2,
+      "source": "sources/table-s11.tex",
+      "rows_source": "sources/table-s11.rows.tex",
+      "source_inputs": [
+        "sections/generated/si/spectrum_rows.tex"
+      ],
+      "guide": "reference-policy-study.md#frozen-complete-optimization-campaign"
+    },
+    {
+      "number": "S12",
+      "label": "si:tab_retention_ablation",
+      "title": "Complete-sequence retention ablation",
+      "caption": "Complete-sequence retention ablation. Times are median complete-sequence\nseconds over five repetitions of 16 targets. The ratio divides the median time of\nzero-extension transfer by that of direct restriction; brackets give the envelope of\nratios between extreme repetition times. The iteration ratio divides their median inner\niterations.",
+      "columns": [
+        "Geometry",
+        "Form",
+        "Jacobi-CG",
+        "Direct restriction",
+        "Zero extension",
+        "Ratio [range]",
+        "Iteration ratio"
+      ],
+      "rows": 6,
+      "source": "sources/table-s12.tex",
+      "rows_source": "sources/table-s12.rows.tex",
+      "source_inputs": [
+        "sections/generated/v21/ablation_rows.tex"
+      ],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "S13",
+      "label": "si:tab_cht_conditioning",
+      "title": "Conditional conditioning certificates",
+      "caption": "Controlled $6^3$ CHT restrictions distinguish\nangle bounds from conditioning-improvement certificates.\nEvery row retains rank one. The columns give removed\nnodes $q$, minimum restricted singular value $\\sigma$,\nsubspace residual, separation, actual largest-angle\nsine, sufficient angle bound $\\epsilon$, original\ncondition number, predicted upper bound $K$ and\nmeasured effective condition number.",
+      "columns": [
+        "$q$",
+        "$\\sigma$",
+        "$\\|F\\|_F$",
+        "$\\eta$",
+        "$\\sin\\theta$",
+        "$\\epsilon$",
+        "$\\kappa(B)$",
+        "$K$",
+        "$\\kappa_{\\rm eff}$"
+      ],
+      "rows": 7,
+      "source": "sources/table-s13.tex",
+      "rows_source": "sources/table-s13.rows.tex",
+      "source_inputs": [
+        "sections/generated/cht/conditioning_rows.tex"
+      ],
+      "guide": "reference-policy-study.md#frozen-complete-optimization-campaign"
+    },
+    {
+      "number": "S14",
+      "label": "si:tab_v20_comparisons",
+      "title": "Supplementary sensitivity comparisons",
+      "caption": "Supplementary comparisons under the procedure and criteria of main\nSection~\\Mref{sec:v20_results}. Columns follow main Table~\\Mref{tab:v20_scale}:\ntimes are median complete-sequence seconds over the converged repetitions, brackets\ngive the envelope of ratios between extreme repetition times, and the last column\ngives converged and\nattempted repetitions of each method that fails to converge in some repetition.\n$^\\dagger$Compared with Jacobi-CG alone, or on Bore~4 with Jacobi-CG and AmgX. Level\n0 denotes the packaged mesh and level $\\ell$ its $\\ell$-th refinement. Unless the\nsetting names a reference level or rank, the transformer and Bore~2 rows use the\npackaged-mesh reference with total rank 100, and the Bore~3 rows use the packaged-mesh\nreference with rank 200; the sorted rows and the four-method Bore~3 row give the\nmatching nominal comparisons. The Bore~4 envelope combines measurements from separate\njobs.",
+      "columns": [
+        "Problem",
+        "Setting",
+        "Unknowns",
+        "RefDef",
+        "Fastest alternative",
+        "Speedup [range]",
+        "Iteration ratio",
+        "Not converged"
+      ],
+      "rows": 37,
+      "source": "sources/table-s14.tex",
+      "rows_source": "sources/table-s14.rows.tex",
+      "source_inputs": [
+        "sections/generated/v21/si_rows.tex"
+      ],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "S15",
+      "label": "si:tab_v20_single",
+      "title": "Single-repetition and solver-limit comparisons",
+      "caption": "Single-repetition comparisons at the longest horizons and the solver\nlimits. Columns follow main Table~\\Mref{tab:v20_scale}; each row times one sequence\nper method, so the speedup is a single ratio without an envelope. The rows with $S=4$\nand $S=6$ time RefDef in a separate job from the alternatives.",
+      "columns": [
+        "Problem",
+        "Setting",
+        "Unknowns",
+        "RefDef",
+        "Fastest alternative",
+        "Speedup",
+        "Iteration ratio",
+        "Not converged"
+      ],
+      "rows": 9,
+      "source": "sources/table-s15.tex",
+      "rows_source": "sources/table-s15.rows.tex",
+      "source_inputs": [
+        "sections/generated/v21/single_rows.tex"
+      ],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "S16",
+      "label": "si:tab_v20_direct",
+      "title": "CPU direct and block-in-time comparisons",
+      "caption": "CPU factorization solvers beside the GPU comparisons of the same problems.\nEntries are median complete-sequence seconds over five 16-target repetitions. Block\ndenotes the block-in-time CG of the main protocol, and a dash marks a steady problem.",
+      "columns": [
+        "Problem",
+        "Direct (CPU)",
+        "Block (CPU)",
+        "RefDef (GPU)",
+        "Fastest GPU alternative"
+      ],
+      "rows": 5,
+      "source": "sources/table-s16.tex",
+      "rows_source": "sources/table-s16.rows.tex",
+      "source_inputs": [
+        "sections/generated/v21/direct_rows.tex"
+      ],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "S17",
+      "label": "si:tab_temperature_bounds",
+      "title": "Optimized fields under different bounds",
+      "caption": "The optimized Bore 1 fields satisfy three upper temperature bounds.\nExtrema and active fractions cover all optimized state DOFs.\nThe tracking error uses the spatial or space--time objective weights.\nTemperatures and errors are dimensionless; the active fraction is a percentage.",
+      "columns": [
+        "Form",
+        "Bound",
+        "Minimum",
+        "Maximum",
+        "Tracking error",
+        "Active (\\%)"
+      ],
+      "rows": 6,
+      "source": "sources/table-s17.tex",
+      "rows_source": "sources/table-s17.rows.tex",
+      "source_inputs": [
+        "sections/generated/mesh/temperature_bound_rows.tex"
+      ],
+      "guide": "../examples/temperature_bounds/README.md"
+    },
+    {
+      "number": "S18",
+      "label": "si:tab_original_transport",
+      "title": "Earlier advective transformer comparisons",
+      "caption": "Transformer comparisons with the original advective transport, whose\noperator has growing modes. Columns follow main Table~\\Mref{tab:v20_scale}.",
+      "columns": [
+        "Problem",
+        "Setting",
+        "Unknowns",
+        "RefDef",
+        "Fastest alternative",
+        "Speedup [range]",
+        "Iteration ratio",
+        "Not converged"
+      ],
+      "rows": 7,
+      "source": "sources/table-s18.tex",
+      "rows_source": "sources/table-s18.rows.tex",
+      "source_inputs": [
+        "sections/generated/v21/original_rows.tex"
+      ],
+      "guide": "prescribed-speedup-v21.md#reproduce-the-tables"
+    },
+    {
+      "number": "S19",
+      "label": "si:tab_mesh_correction",
+      "title": "Earlier residual-correction comparisons",
+      "caption": "Residual-correction comparisons preserve the finer-transformer\nfour-target problems and final accuracy requirements. Complete sequences\nand target solves are counted separately. Times give the median and\nobserved range in seconds over five complete repetitions. Residual and KKT\ncolumns give maxima across completed sequences; corrections count all\nerror equations.",
+      "columns": [
+        "Form",
+        "Method",
+        "Sequences",
+        "Targets",
+        "Time [range]",
+        "Residual",
+        "KKT",
+        "Corrections"
+      ],
+      "rows": 8,
+      "source": "sources/table-s19.tex",
+      "rows_source": "sources/table-s19.rows.tex",
+      "source_inputs": [
+        "sections/generated/si/correction_rows.tex"
+      ],
+      "guide": "mesh-showcases.md#choose-the-numerical-procedure"
+    }
+  ],
+  "files": [
+    {
+      "path": "sources/table-1.tex",
+      "source_path": "sections/cht_protocol.tex",
+      "kind": "table",
+      "sha256": "c07978ae7a7b3f817fcaf47c88ee0b5665d916d660e38a8a3a15542b47dba92c"
+    },
+    {
+      "path": "sources/table-1.rows.tex",
+      "source_path": "sections/cht_protocol.tex",
+      "kind": "rows",
+      "sha256": "a3c6cb2f2784b134856cfcbdd4470168dce5ed5ebf9d1f56d6e06d6db0de7cc9"
+    },
+    {
+      "path": "sources/table-2.tex",
+      "source_path": "sections/cht_mesh_results.tex",
+      "kind": "table",
+      "sha256": "f3d14439a8c65bf81c2c886c79de113918c3975059ee72e6f309512f0e6e1c6b"
+    },
+    {
+      "path": "sources/table-2.rows.tex",
+      "source_path": "sections/generated/v21/primary_rows.tex",
+      "kind": "rows",
+      "sha256": "118d788e3dca5ebad95b0f488a88f564171d695d2ddf8be4ed25e8417eb2a398"
+    },
+    {
+      "path": "sources/table-3.tex",
+      "source_path": "sections/cht_results.tex",
+      "kind": "table",
+      "sha256": "95e769799c01c74da1f5ada027bf3c48eb576c203675ae0fb5c6005fa589851b"
+    },
+    {
+      "path": "sources/table-3.rows.tex",
+      "source_path": "sections/generated/si/transfer_rows.tex",
+      "kind": "rows",
+      "sha256": "24d71bb7285c96289a67152402cb428c775cb47debc878833c79e0661971932a"
+    },
+    {
+      "path": "sources/table-4.tex",
+      "source_path": "sections/cht_results.tex",
+      "kind": "table",
+      "sha256": "1b62db0b8da50b67994ffc31c399c4ee77e2b6fc3f3c140a72d5177bee7ebc95"
+    },
+    {
+      "path": "sources/table-4.rows.tex",
+      "source_path": "sections/generated/v21/scale_rows.tex",
+      "kind": "rows",
+      "sha256": "3b6923a6b99d00621e93e36b33112f6ed46c40b09ad7aa68837c39d7abaefdc1"
+    },
+    {
+      "path": "sources/table-5.tex",
+      "source_path": "sections/cht_results.tex",
+      "kind": "table",
+      "sha256": "e2e46b201caa683b2ef00f03dbcdcc95639611349335b9a5c11cfd33abdca170"
+    },
+    {
+      "path": "sources/table-5.rows.tex",
+      "source_path": "sections/generated/v21/transient_rows.tex",
+      "kind": "rows",
+      "sha256": "904737514f5361b6b5c8d2de66738acc7ba8bdc1c951429a586d8e1e793efe5c"
+    },
+    {
+      "path": "sources/table-6.tex",
+      "source_path": "sections/cht_results.tex",
+      "kind": "table",
+      "sha256": "7d8742bcee06301bf0d125090cd923d098418db886982f688abbb02d27034302"
+    },
+    {
+      "path": "sources/table-6.rows.tex",
+      "source_path": "sections/generated/v21/operation_rows.tex",
+      "kind": "rows",
+      "sha256": "880311d46d886dca127c7656a8a9a2a54ef9a6ad1a0a4e28ced8f22d93020a58"
+    },
+    {
+      "path": "sources/table-s1.tex",
+      "source_path": "sections/cht_mesh_methods.tex",
+      "kind": "table",
+      "sha256": "38be175ff42dbf165ac251ff745f6a2afedf9fa7e2682166d33b9cb541859706"
+    },
+    {
+      "path": "sources/table-s1.rows.tex",
+      "source_path": "sections/generated/v21/certificate_rows.tex",
+      "kind": "rows",
+      "sha256": "636c6da24ba6f4b3873fafea275f4eaaa5f9705b58d2dd83c5879f7412c17f75"
+    },
+    {
+      "path": "sources/table-s2.tex",
+      "source_path": "sections/cht_si_methods.tex",
+      "kind": "table",
+      "sha256": "0a05fc8c2200f29a437a5da8c11dd307c112843af3c8100e960905d24eb54c6b"
+    },
+    {
+      "path": "sources/table-s2.rows.tex",
+      "source_path": "sections/cht_si_methods.tex",
+      "kind": "rows",
+      "sha256": "b1c87e055690314ce49ac7ee84fbdd95265918722d8f1e5a56db2b11308e872d"
+    },
+    {
+      "path": "sources/table-s3.tex",
+      "source_path": "sections/cht_si_methods.tex",
+      "kind": "table",
+      "sha256": "aadee82a023bf513a25596cd064ecceb9d880b0d2ef6be93d26ca7c0e20ad365"
+    },
+    {
+      "path": "sources/table-s3.rows.tex",
+      "source_path": "sections/cht_si_methods.tex",
+      "kind": "rows",
+      "sha256": "e1508fa09df8761463d9c2bfc67502c54068aa2577d2465451c52afb1f15e4cc"
+    },
+    {
+      "path": "sources/table-s4.tex",
+      "source_path": "sections/cht_si_methods.tex",
+      "kind": "table",
+      "sha256": "5ce312b510e90785567b34bd647e43a6a7b78fb9b1f412d15dfe9f62e5c2bb64"
+    },
+    {
+      "path": "sources/table-s4.rows.tex",
+      "source_path": "sections/cht_si_methods.tex",
+      "kind": "rows",
+      "sha256": "300d4d89b0fe48f3cb605c3036d794bcf081810b1d57b916467765d2d05a2707"
+    },
+    {
+      "path": "sources/table-s5.tex",
+      "source_path": "sections/cht_mesh_verification.tex",
+      "kind": "table",
+      "sha256": "92bb0312f30a804b00575ad43fecfd869c14a2d56ca3a005c5c01bde0a20c06e"
+    },
+    {
+      "path": "sources/table-s5.rows.tex",
+      "source_path": "sections/generated/v21/support_validation_rows.tex",
+      "kind": "rows",
+      "sha256": "a05fa96579b86478bb8f4075a57f9f0ac86ec0fc7f09859fe704c644ba2aa7b1"
+    },
+    {
+      "path": "sources/table-s6.tex",
+      "source_path": "sections/cht_si_results.tex",
+      "kind": "table",
+      "sha256": "e8ea97adbced4722f32a0e8b99eeb628c612059b391ad09a531f75b916bdc5b7"
+    },
+    {
+      "path": "sources/table-s6.rows.tex",
+      "source_path": "sections/generated/cht/validation_rows.tex",
+      "kind": "rows",
+      "sha256": "a1d989e6f0618bb1c43fd6de777b9434e67cd09aba36ec89f0e6edcccaa3dea5"
+    },
+    {
+      "path": "sources/table-s7.tex",
+      "source_path": "sections/cht_si_results.tex",
+      "kind": "table",
+      "sha256": "7a959816d60c52f00c51c2ab56af5e70052acdbd6d59db9139e1cda7cbaf384b"
+    },
+    {
+      "path": "sources/table-s7.rows.tex",
+      "source_path": "sections/generated/v21/temporal_rows.tex",
+      "kind": "rows",
+      "sha256": "43912b4168ac4e94d00f5b0d525f91157a27e1248fca9555929ce55f192763e4"
+    },
+    {
+      "path": "sources/table-s8.tex",
+      "source_path": "sections/cht_mesh_support.tex",
+      "kind": "table",
+      "sha256": "faa2f20b81ee326cc1f5f3cb391244337a5ed6814c68c019f609fa3b2863e794"
+    },
+    {
+      "path": "sources/table-s8.rows.tex",
+      "source_path": "sections/generated/v21/primary_complete_rows.tex",
+      "kind": "rows",
+      "sha256": "b5a94d4f5712340049f378bb7c2c5f3887d060aa0d45f50e003765556e5ae553"
+    },
+    {
+      "path": "sources/table-s9.tex",
+      "source_path": "sections/cht_si_results.tex",
+      "kind": "table",
+      "sha256": "8b9522cc17f5116edc232322d8d88934f7ca5df1fb3ca8a4f44e5549d2bee79a"
+    },
+    {
+      "path": "sources/table-s9.rows.tex",
+      "source_path": "sections/generated/si/accuracy_rows.tex",
+      "kind": "rows",
+      "sha256": "74092c91b9267fab705097435de98d378792e0080e178f24f36617f7a4430c83"
+    },
+    {
+      "path": "sources/table-s10.tex",
+      "source_path": "sections/cht_mesh_transfer_support.tex",
+      "kind": "table",
+      "sha256": "72a40afc68db73284fc4db502fe3e272ef7b7480517926ab3b182a2c9f02fce3"
+    },
+    {
+      "path": "sources/table-s10.rows.tex",
+      "source_path": "sections/generated/v21/support_transfer_rows.tex",
+      "kind": "rows",
+      "sha256": "db34be4bcbc425f3966869a7a4650702f1d3dfaadb4eb1fadf29c12bf9b04392"
+    },
+    {
+      "path": "sources/table-s11.tex",
+      "source_path": "sections/cht_si_results.tex",
+      "kind": "table",
+      "sha256": "24b80e87781ae27bcd0e2bfc323f68fd8220c6d0ea0c06011cbde537a0fc5ae4"
+    },
+    {
+      "path": "sources/table-s11.rows.tex",
+      "source_path": "sections/generated/si/spectrum_rows.tex",
+      "kind": "rows",
+      "sha256": "8a630276b9218593c32d6e57f24bb5d703cf5742f5ef49942542031a3f93d3da"
+    },
+    {
+      "path": "sources/table-s12.tex",
+      "source_path": "sections/cht_si_results.tex",
+      "kind": "table",
+      "sha256": "97d9d6a15c04402ca980317baf53cee662c93f54a8578e42718bfb8063ef255c"
+    },
+    {
+      "path": "sources/table-s12.rows.tex",
+      "source_path": "sections/generated/v21/ablation_rows.tex",
+      "kind": "rows",
+      "sha256": "a4aaf8d4e8faf8af9eab6b2c2626ddcc213a04f0a1053afb9c38cb5423a99f0b"
+    },
+    {
+      "path": "sources/table-s13.tex",
+      "source_path": "sections/cht_si_results.tex",
+      "kind": "table",
+      "sha256": "41b7ae9521c151a25e6539980c47d63ff2612e0eb76184e75d986c5f7b3e3518"
+    },
+    {
+      "path": "sources/table-s13.rows.tex",
+      "source_path": "sections/generated/cht/conditioning_rows.tex",
+      "kind": "rows",
+      "sha256": "71b7d7ae4aa8fc140d9d120a15d0f1b02b81e650092003ed6e645dd095f0a81b"
+    },
+    {
+      "path": "sources/table-s14.tex",
+      "source_path": "sections/cht_si_results.tex",
+      "kind": "table",
+      "sha256": "b6ec160bc6cddd2ff2fe73cd36a5cb777c2ce98180909288849ddf98df5a921b"
+    },
+    {
+      "path": "sources/table-s14.rows.tex",
+      "source_path": "sections/generated/v21/si_rows.tex",
+      "kind": "rows",
+      "sha256": "2905907c44b6694e14e16d06c7d01f3fc94b200ee6c84f96aeca81954c9b7905"
+    },
+    {
+      "path": "sources/table-s15.tex",
+      "source_path": "sections/cht_si_results.tex",
+      "kind": "table",
+      "sha256": "c9814c2437673992f5bc4a50c2d16eff48a975c00e5ad06bc08d842cf442ff16"
+    },
+    {
+      "path": "sources/table-s15.rows.tex",
+      "source_path": "sections/generated/v21/single_rows.tex",
+      "kind": "rows",
+      "sha256": "2bbb7bd15d428c7efb21336b5fd256a7ef8efe6382e25acad0274b2e76fab81e"
+    },
+    {
+      "path": "sources/table-s16.tex",
+      "source_path": "sections/cht_si_results.tex",
+      "kind": "table",
+      "sha256": "83c3ef3e1bfe4bb7e8e230eb45d6d260bcebe961a4c3e249fe8348e9f9368dd3"
+    },
+    {
+      "path": "sources/table-s16.rows.tex",
+      "source_path": "sections/generated/v21/direct_rows.tex",
+      "kind": "rows",
+      "sha256": "995811883e3ad3d36741002866a29527389666a2993541f5d79d5dbfb16a657a"
+    },
+    {
+      "path": "sources/table-s17.tex",
+      "source_path": "sections/temperature_bound_support.tex",
+      "kind": "table",
+      "sha256": "c334bf32bfdbb9c453241e2e5f3bf31088ada55bc340a0be986bd0d42bd1dc31"
+    },
+    {
+      "path": "sources/table-s17.rows.tex",
+      "source_path": "sections/generated/mesh/temperature_bound_rows.tex",
+      "kind": "rows",
+      "sha256": "03ba3fc669ab5275f365983386e3601f1c295e070ff56ca0066415456f2266d4"
+    },
+    {
+      "path": "sources/table-s18.tex",
+      "source_path": "sections/cht_si_results.tex",
+      "kind": "table",
+      "sha256": "cafba81ffbebf480100414e8302da5653edf6f062a6b3307feacabc7c84435c8"
+    },
+    {
+      "path": "sources/table-s18.rows.tex",
+      "source_path": "sections/generated/v21/original_rows.tex",
+      "kind": "rows",
+      "sha256": "45f73843600c5f44e98b1027026d73decb9439b228abbfa86522077babd3e7aa"
+    },
+    {
+      "path": "sources/table-s19.tex",
+      "source_path": "sections/cht_refinement_diagnosis.tex",
+      "kind": "table",
+      "sha256": "79c0d18696a0830011e46cbc40e24f9fd0fc4306a0135e866e5aa3ba41167f12"
+    },
+    {
+      "path": "sources/table-s19.rows.tex",
+      "source_path": "sections/generated/si/correction_rows.tex",
+      "kind": "rows",
+      "sha256": "ab604fe90d54d12a9dcb466cfac7a49607913790b4b35b7d5d479adea83ce5c2"
+    },
+    {
+      "path": "sources/cht_refinement_diagnosis.tex",
+      "source_path": "sections/cht_refinement_diagnosis.tex",
+      "kind": "context",
+      "sha256": "047d47531131120103a947754ab73a84c77d1e3959f46024c9cad65ab9d36bb4"
+    },
+    {
+      "path": "sources/cht_si_methods.tex",
+      "source_path": "sections/cht_si_methods.tex",
+      "kind": "context",
+      "sha256": "fbb827f5884518e3200e1a3a1320ecf50cd1f8b363a22383ffd975cccdf40539"
+    },
+    {
+      "path": "sources/cht_protocol.tex",
+      "source_path": "sections/cht_protocol.tex",
+      "kind": "context",
+      "sha256": "a9ca01341077869e47b6dfa7437107403d0aa62d79856c2965871c9cc0ac196b"
+    }
+  ]
+}
